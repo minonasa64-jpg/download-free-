@@ -1,0 +1,26 @@
+name: pro_downloader
+description: A new Flutter project for downloading videos.
+
+# إصدار التطبيق (رقم الإصدار + رقم البناء)
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.2
+  # المكتبات التي سنستخدمها لاحقاً لبرمجة التحميل
+  dio: ^5.4.0
+  path_provider: ^2.1.2
+  permission_handler: ^11.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
