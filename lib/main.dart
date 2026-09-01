@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart'; // مكتبة الاتصال بالإنترنت والمحرك
 
 // ==========================================
 // 1. نقطة الانطلاق (MAIN & APP)
@@ -166,49 +167,115 @@ class _MainNavigationState extends State<MainNavigation> {
 }
 
 // ==========================================
-// 4. الشاشة الرئيسية (HOME TAB)
+// 4. الشاشة الرئيسية مع الاتصال بالسيرفر (HOME TAB)
 // ==========================================
-class HomeTab extends StatelessWidget {
+class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
 
-  // دالة لإظهار نافذة اختيار الجودة من الأسفل
-  void _showQualityBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.circular(10))),
-              const SizedBox(height: 20),
-              const Text('اختر جودة التحميل', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              _buildQualityTile(context, 'فيديو عالي الدقة (1080p)', '45.2 MB', Icons.hd),
-              _buildQualityTile(context, 'فيديو متوسط الدقة (720p)', '20.1 MB', Icons.sd),
-              _buildQualityTile(context, 'صوت فقط (MP3)', '4.5 MB', Icons.music_note),
-            ],
-          ),
-        );
-      },
-    );
+  @override
+  State<HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<HomeTab> {
+  // للتحكم في حقل النص وقراءة الرابط منه
+  final TextEditingController _urlController = TextEditingController();
+  
+  // متغير لمعرفة ما إذا كان التطبيق ينتظر رداً من السيرفر
+  bool _isLoading = false;
+
+  // دالة الاتصال بالمحرك (API)
+  Future<void> _extractVideo() async {
+    final url = _urlController.text.trim();
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء إدخال رابط أولاً!')));
+      return;
+    }
+
+    setState(() => _isLoading = true); // تشغيل دائرة التحميل
+
+    try {
+      final dio = Dio();
+      // إرسال الرابط لمحركك على Railway
+      final response = await dio.post(
+        'https://web-production-69773.up.railway.app/api/extract',
+        data: {'url': url},
+      );
+
+      if (response.statusCode == 200 && response.data['status'] == 'success') {
+        final formats = response.data['formats'] as List;
+        final title = response.data['title'] ?? 'فيديو بدون عنوان';
+        
+        // إظهار نافذة الجودة مع البيانات الحقيقية
+        if (mounted) _showQualityBottomSheet(context, title, formats);
+      } else {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فشل استخراج الروابط.')));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حدث خطأ في الاتصال بالخادم.')));
+    } finally {
+      if (mounted) setState(() => _isLoading = false); // إيقاف التحميل
+    }
   }
 
-  Widget _buildQualityTile(BuildContext context, String title, String size, IconData icon) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(size),
-        trailing: const Icon(Icons.download_rounded),
-        onTap: () {
-          Navigator.pop(context); // إغلاق النافذة
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('بدأ التحميل...')));
-        },
-      ),
+  // دالة لإظهار نافذة الجودة بالبيانات الديناميكية
+  void _showQualityBottomSheet(BuildContext context, String title, List formats) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.5,
+          minChildSize: 0.3,
+          maxChildSize: 0.8,
+          expand: false,
+          builder: (context, scrollController) {
+            return Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                children: [
+                  Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.circular(10))),
+                  const SizedBox(height: 20),
+                  Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      itemCount: formats.length,
+                      itemBuilder: (context, index) {
+                        final format = formats[index];
+                        final quality = format['quality'];
+                        final ext = format['ext'].toString().toUpperCase();
+                        // حساب الحجم بالميغابايت
+                        final sizeMb = format['filesize'] != null && format['filesize'] > 0 
+                            ? '${(format['filesize'] / (1024 * 1024)).toStringAsFixed(1)} MB' 
+                            : 'غير معروف';
+                        
+                        final icon = ext == 'M4A' || ext == 'MP3' ? Icons.music_note : Icons.video_file;
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          child: ListTile(
+                            leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+                            title: Text('$quality - $ext', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text('الحجم: $sizeMb'),
+                            trailing: const Icon(Icons.download_rounded),
+                            onTap: () {
+                              Navigator.pop(context); // إغلاق النافذة
+                              // هنا سنضع لاحقاً كود التحميل الفعلي
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم اختيار الجودة: $quality')));
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -225,26 +292,16 @@ class HomeTab extends StatelessWidget {
             Text('من أين تريد التحميل اليوم؟', style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 30),
             
-            // شريط المنصات المدعومة
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildPlatformIcon(context, 'يوتيوب', Icons.ondemand_video, Colors.red),
-                  _buildPlatformIcon(context, 'فيسبوك', Icons.facebook, Colors.blue),
-                  _buildPlatformIcon(context, 'إنستغرام', Icons.camera_alt, Colors.purple),
-                  _buildPlatformIcon(context, 'تويتر', Icons.alternate_email, Colors.lightBlue),
-                ],
-              ),
-            ),
-            const SizedBox(height: 40),
-
             // حقل إدخال الرابط
             TextField(
+              controller: _urlController,
               decoration: InputDecoration(
                 hintText: 'ألصق رابط الفيديو هنا...',
                 prefixIcon: const Icon(Icons.link),
-                suffixIcon: IconButton(icon: const Icon(Icons.content_paste), onPressed: () {}),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () => _urlController.clear(),
+                ),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
                 filled: true,
                 fillColor: Theme.of(context).colorScheme.surfaceVariant,
@@ -252,37 +309,26 @@ class HomeTab extends StatelessWidget {
             ),
             const SizedBox(height: 25),
 
-            // زر الاستخراج
+            // زر الاستخراج أو دائرة التحميل
             SizedBox(
               width: double.infinity,
               height: 60,
-              child: ElevatedButton.icon(
-                onPressed: () => _showQualityBottomSheet(context),
-                icon: const Icon(Icons.search),
-                label: const Text('استخراج الروابط', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  elevation: 5,
-                ),
-              ),
+              child: _isLoading 
+                ? const Center(child: CircularProgressIndicator()) 
+                : ElevatedButton.icon(
+                    onPressed: _extractVideo,
+                    icon: const Icon(Icons.search),
+                    label: const Text('استخراج الروابط', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      elevation: 5,
+                    ),
+                  ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildPlatformIcon(BuildContext context, String name, IconData icon, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 15),
-      child: Column(
-        children: [
-          CircleAvatar(radius: 30, backgroundColor: color.withOpacity(0.2), child: Icon(icon, color: color, size: 30)),
-          const SizedBox(height: 8),
-          Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-        ],
       ),
     );
   }
@@ -296,7 +342,6 @@ class DownloadsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // استخدام DefaultTabController لتقسيم الشاشة لتبويبتين
     return DefaultTabController(
       length: 2,
       child: SafeArea(
@@ -308,57 +353,32 @@ class DownloadsTab extends StatelessWidget {
               child: Text('إدارة التنزيلات', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
             ),
             const TabBar(
-              tabs: [Tab(text: 'جاري التحميل (1)'), Tab(text: 'مكتملة (3)')],
+              tabs: [Tab(text: 'جاري التحميل (0)'), Tab(text: 'مكتملة (0)')],
             ),
             Expanded(
               child: TabBarView(
                 children: [
-                  // تبويبة: جاري التحميل
-                  ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      Card(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                        child: Padding(
-                          padding: const EdgeInsets.all(15.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('مقطع فيديو مضحك.mp4', style: TextStyle(fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 10),
-                              const LinearProgressIndicator(value: 0.65),
-                              const SizedBox(height: 10),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: const [Text('65%'), Text('1.2 MB/s')],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                  // تبويبة: جاري التحميل (واجهة مبدئية)
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.downloading, size: 60, color: Colors.grey),
+                        SizedBox(height: 10),
+                        Text('لا توجد تحميلات حالياً', style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
                   ),
-                  // تبويبة: مكتملة
-                  ListView.builder(
-                    padding: const EdgeInsets.all(20),
-                    itemCount: 3,
-                    itemBuilder: (context, index) {
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 15),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(10),
-                          leading: Container(
-                            width: 80,
-                            decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(10)),
-                            child: const Icon(Icons.play_circle_outline, color: Colors.white, size: 40),
-                          ),
-                          title: Text('فيديو محمل ${index + 1}'),
-                          subtitle: const Text('15 MB • MP4'),
-                          trailing: IconButton(icon: const Icon(Icons.share), onPressed: () {}),
-                        ),
-                      );
-                    },
+                  // تبويبة: مكتملة (واجهة مبدئية)
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.video_library, size: 60, color: Colors.grey),
+                        SizedBox(height: 10),
+                        Text('لم تقم بتحميل أي فيديو بعد', style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -401,7 +421,7 @@ class SettingsTab extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.folder),
                   title: const Text('مسار الحفظ'),
-                  subtitle: const Text('/storage/emulated/0/ProDownloader'),
+                  subtitle: const Text('الذاكرة الداخلية / التنزيلات'),
                   trailing: const Icon(Icons.edit, size: 20),
                   onTap: () {},
                 ),
