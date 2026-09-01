@@ -1,17 +1,16 @@
 name: Build Flutter APK
 
-# متى يتم تشغيل هذا البناء؟
 on:
   push:
     branches:
       - main
       - master
-  workflow_dispatch: # هذا السطر يسمح لك بتشغيل البناء يدوياً من واجهة جيت هاب بضغطة زر
+  workflow_dispatch: 
 
 jobs:
   build:
     name: Build APK
-    runs-on: ubuntu-latest # الخادم الذي سنستخدمه من مايكروسوفت
+    runs-on: ubuntu-latest 
 
     steps:
       - name: 📥 سحب الكود من المستودع
@@ -21,12 +20,15 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17' # أفضل إصدار مستقر حالياً مع فلاتر والأندرويد
+          java-version: '17' 
 
       - name: 🐦 إعداد بيئة فلاتر
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable' # استخدام أحدث نسخة مستقرة من فلاتر
+          channel: 'stable' 
+
+      - name: 🏗️ بناء هياكل فلاتر الأساسية وملفات الأندرويد
+        run: flutter create --platforms=android .
 
       - name: 📦 تحميل الحزم والمكتبات
         run: flutter pub get
