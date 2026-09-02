@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart'; // مكتبة الاتصال بالإنترنت والمحرك
+import 'package:dio/dio.dart'; 
+import 'package:permission_handler/permission_handler.dart'; // مكتبة الصلاحيات
 
 // ==========================================
 // 1. نقطة الانطلاق (MAIN & APP)
@@ -161,7 +163,7 @@ class _MainNavigationState extends State<MainNavigation> {
 }
 
 // ==========================================
-// 4. الشاشة الرئيسية (HOME TAB - مع كشف الأخطاء)
+// 4. الشاشة الرئيسية (HOME TAB - مع الحفظ في المعرض)
 // ==========================================
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -172,9 +174,10 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   final TextEditingController _urlController = TextEditingController();
-  bool _isLoading = false;
+  bool _isLoadingExtraction = false;
+  bool _isDownloadingFile = false;
+  double _downloadProgress = 0.0;
 
-  // دالة الاتصال بالمحرك (API) بعد التعديل لكشف الأخطاء الحقيقية
   Future<void> _extractVideo() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
@@ -182,7 +185,7 @@ class _HomeTabState extends State<HomeTab> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isLoadingExtraction = true);
 
     try {
       final dio = Dio();
@@ -197,24 +200,66 @@ class _HomeTabState extends State<HomeTab> {
         
         if (mounted) _showQualityBottomSheet(context, title, formats);
       } else {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('رد غير متوقع من الخادم: ${response.data}')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('رد غير متوقع من الخادم.')));
       }
-    } on DioException catch (e) {
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('حدث خطأ أثناء الاستخراج: $e')));
+    } finally {
+      if (mounted) setState(() => _isLoadingExtraction = false);
+    }
+  }
+
+  Future<void> _downloadFile(String downloadUrl, String title, String extension) async {
+    // 1. طلب صلاحية الوصول لذاكرة الهاتف
+    var status = await Permission.storage.request();
+    if (!status.isGranted) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب الموافقة على صلاحية التخزين لحفظ الفيديو!')));
+      return;
+    }
+
+    setState(() {
+      _isDownloadingFile = true;
+      _downloadProgress = 0.0;
+    });
+
+    try {
+      // 2. تحديد مجلد التنزيلات العام (Public Downloads)
+      Directory dir = Directory('/storage/emulated/0/Download/ProDownloader');
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      
+      String safeTitle = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      String savePath = '${dir.path}/$safeTitle.$extension';
+
+      final dio = Dio();
+      await dio.download(
+        downloadUrl,
+        savePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            setState(() {
+              _downloadProgress = received / total;
+            });
+          }
+        },
+      );
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('خطأ الشبكة: ${e.message ?? e.response?.statusCode}'),
-          duration: const Duration(seconds: 5),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ تم الحفظ في التنزيلات:\n$savePath'),
+            duration: const Duration(seconds: 5),
+            backgroundColor: Colors.green,
+          )
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('خطأ تقني: $e'),
-          duration: const Duration(seconds: 5),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ فشل التحميل: $e'), backgroundColor: Colors.red));
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isDownloadingFile = false);
     }
   }
 
@@ -225,9 +270,9 @@ class _HomeTabState extends State<HomeTab> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (context) {
         return DraggableScrollableSheet(
-          initialChildSize: 0.5,
-          minChildSize: 0.3,
-          maxChildSize: 0.8,
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
           expand: false,
           builder: (context, scrollController) {
             return Padding(
@@ -245,23 +290,22 @@ class _HomeTabState extends State<HomeTab> {
                       itemBuilder: (context, index) {
                         final format = formats[index];
                         final quality = format['quality'];
-                        final ext = format['ext'].toString().toUpperCase();
+                        final ext = format['ext'].toString().toLowerCase();
                         final sizeMb = format['filesize'] != null && format['filesize'] > 0 
                             ? '${(format['filesize'] / (1024 * 1024)).toStringAsFixed(1)} MB' 
                             : 'غير معروف';
-                        
-                        final icon = ext == 'M4A' || ext == 'MP3' ? Icons.music_note : Icons.video_file;
+                        final icon = ext == 'm4a' || ext == 'mp3' ? Icons.music_note : Icons.video_file;
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 10),
                           child: ListTile(
                             leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-                            title: Text('$quality - $ext', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            title: Text('$quality - ${ext.toUpperCase()}', style: const TextStyle(fontWeight: FontWeight.bold)),
                             subtitle: Text('الحجم: $sizeMb'),
                             trailing: const Icon(Icons.download_rounded),
                             onTap: () {
                               Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم اختيار الجودة: $quality')));
+                              _downloadFile(format['url'], title, ext);
                             },
                           ),
                         );
@@ -289,30 +333,25 @@ class _HomeTabState extends State<HomeTab> {
             const SizedBox(height: 10),
             Text('من أين تريد التحميل اليوم؟', style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 30),
-            
             TextField(
               controller: _urlController,
               decoration: InputDecoration(
                 hintText: 'ألصق رابط الفيديو هنا...',
                 prefixIcon: const Icon(Icons.link),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () => _urlController.clear(),
-                ),
+                suffixIcon: IconButton(icon: const Icon(Icons.clear), onPressed: () => _urlController.clear()),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
                 filled: true,
                 fillColor: Theme.of(context).colorScheme.surfaceVariant,
               ),
             ),
             const SizedBox(height: 25),
-
             SizedBox(
               width: double.infinity,
               height: 60,
-              child: _isLoading 
+              child: _isLoadingExtraction 
                 ? const Center(child: CircularProgressIndicator()) 
                 : ElevatedButton.icon(
-                    onPressed: _extractVideo,
+                    onPressed: _isDownloadingFile ? null : _extractVideo,
                     icon: const Icon(Icons.search),
                     label: const Text('استخراج الروابط', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
@@ -323,6 +362,26 @@ class _HomeTabState extends State<HomeTab> {
                     ),
                   ),
             ),
+            if (_isDownloadingFile) ...[
+              const SizedBox(height: 40),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceVariant, borderRadius: BorderRadius.circular(15)),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('جاري تحميل الملف...', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text('${(_downloadProgress * 100).toStringAsFixed(0)}%', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 15),
+                    LinearProgressIndicator(value: _downloadProgress, minHeight: 8, borderRadius: BorderRadius.circular(10)),
+                  ],
+                ),
+              ),
+            ]
           ],
         ),
       ),
@@ -331,40 +390,59 @@ class _HomeTabState extends State<HomeTab> {
 }
 
 // ==========================================
-// 5. قسم التنزيلات (DOWNLOADS TAB)
+// 5. قسم التنزيلات (DOWNLOADS TAB - يعرض الملفات المحملة)
 // ==========================================
-class DownloadsTab extends StatelessWidget {
+class DownloadsTab extends StatefulWidget {
   const DownloadsTab({super.key});
 
   @override
+  State<DownloadsTab> createState() => _DownloadsTabState();
+}
+
+class _DownloadsTabState extends State<DownloadsTab> {
+  List<FileSystemEntity> _downloadedFiles = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFiles(); // تحميل الملفات عند فتح الشاشة
+  }
+
+  // دالة لجلب الملفات من مجلد التطبيق
+  Future<void> _loadFiles() async {
+    try {
+      final dir = Directory('/storage/emulated/0/Download/ProDownloader');
+      if (await dir.exists()) {
+        setState(() {
+          _downloadedFiles = dir.listSync().where((file) {
+            return file.path.endsWith('.mp4') || file.path.endsWith('.m4a') || file.path.endsWith('.mp3');
+          }).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('خطأ في جلب الملفات: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(20.0),
-              child: Text('إدارة التنزيلات', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('تنزيلاتي المكتملة', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                IconButton(icon: const Icon(Icons.refresh), onPressed: _loadFiles), // زر تحديث القائمة
+              ],
             ),
-            const TabBar(
-              tabs: [Tab(text: 'جاري التحميل (0)'), Tab(text: 'مكتملة (0)')],
-            ),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.downloading, size: 60, color: Colors.grey),
-                        SizedBox(height: 10),
-                        Text('لا توجد تحميلات حالياً', style: TextStyle(color: Colors.grey)),
-                      ],
-                    ),
-                  ),
-                  Center(
+          ),
+          Expanded(
+            child: _downloadedFiles.isEmpty
+                ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: const [
@@ -373,12 +451,42 @@ class DownloadsTab extends StatelessWidget {
                         Text('لم تقم بتحميل أي فيديو بعد', style: TextStyle(color: Colors.grey)),
                       ],
                     ),
+                  )
+                : ListView.builder(
+                    itemCount: _downloadedFiles.length,
+                    itemBuilder: (context, index) {
+                      final file = _downloadedFiles[index];
+                      final fileName = file.path.split('/').last;
+                      final isAudio = fileName.endsWith('.m4a') || fileName.endsWith('.mp3');
+                      
+                      // حساب حجم الملف
+                      final fileSize = File(file.path).lengthSync();
+                      final sizeMb = (fileSize / (1024 * 1024)).toStringAsFixed(2);
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                            child: Icon(isAudio ? Icons.music_note : Icons.play_arrow, color: Theme.of(context).colorScheme.primary),
+                          ),
+                          title: Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text('الحجم: $sizeMb MB'),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.redAccent),
+                            onPressed: () {
+                              // حذف الملف
+                              File(file.path).deleteSync();
+                              _loadFiles(); // تحديث القائمة
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحذف بنجاح')));
+                            },
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -415,8 +523,8 @@ class SettingsTab extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.folder),
                   title: const Text('مسار الحفظ'),
-                  subtitle: const Text('الذاكرة الداخلية / التنزيلات'),
-                  trailing: const Icon(Icons.edit, size: 20),
+                  subtitle: const Text('الذاكرة الداخلية / Download / ProDownloader'),
+                  trailing: const Icon(Icons.check, color: Colors.green),
                   onTap: () {},
                 ),
                 const Divider(),
