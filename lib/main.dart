@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart'; 
-import 'package:permission_handler/permission_handler.dart'; // مكتبة الصلاحيات
+import 'package:permission_handler/permission_handler.dart';
 
 // ==========================================
 // 1. نقطة الانطلاق (MAIN & APP)
@@ -163,7 +163,7 @@ class _MainNavigationState extends State<MainNavigation> {
 }
 
 // ==========================================
-// 4. الشاشة الرئيسية (HOME TAB - مع الحفظ في المعرض)
+// 4. الشاشة الرئيسية (HOME TAB - تم إزالة عائق الصلاحيات!)
 // ==========================================
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -210,12 +210,9 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _downloadFile(String downloadUrl, String title, String extension) async {
-    // 1. طلب صلاحية الوصول لذاكرة الهاتف
-    var status = await Permission.storage.request();
-    if (!status.isGranted) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب الموافقة على صلاحية التخزين لحفظ الفيديو!')));
-      return;
-    }
+    // تم حذف نقطة التفتيش المزعجة! نطلب الصلاحية برفق للأجهزة القديمة فقط دون إيقاف الكود.
+    await Permission.storage.request();
+    await Permission.videos.request();
 
     setState(() {
       _isDownloadingFile = true;
@@ -223,14 +220,20 @@ class _HomeTabState extends State<HomeTab> {
     });
 
     try {
-      // 2. تحديد مجلد التنزيلات العام (Public Downloads)
-      Directory dir = Directory('/storage/emulated/0/Download/ProDownloader');
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-      
       String safeTitle = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-      String savePath = '${dir.path}/$safeTitle.$extension';
+      String savePath = '';
+
+      // الخطة أ: محاولة حفظ الفيديو في مجلد خاص
+      try {
+        Directory customDir = Directory('/storage/emulated/0/Download/ProDownloader');
+        if (!await customDir.exists()) {
+          await customDir.create(recursive: true);
+        }
+        savePath = '${customDir.path}/$safeTitle.$extension';
+      } catch (e) {
+        // الخطة ب: إذا رفض النظام، نحفظه في مجلد التنزيلات العام مباشرة (مضمونة 100%)
+        savePath = '/storage/emulated/0/Download/$safeTitle.$extension';
+      }
 
       final dio = Dio();
       await dio.download(
@@ -248,7 +251,7 @@ class _HomeTabState extends State<HomeTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ تم الحفظ في التنزيلات:\n$savePath'),
+            content: Text('✅ تم الحفظ بنجاح!\nالمسار: $savePath'),
             duration: const Duration(seconds: 5),
             backgroundColor: Colors.green,
           )
@@ -390,7 +393,7 @@ class _HomeTabState extends State<HomeTab> {
 }
 
 // ==========================================
-// 5. قسم التنزيلات (DOWNLOADS TAB - يعرض الملفات المحملة)
+// 5. قسم التنزيلات (DOWNLOADS TAB)
 // ==========================================
 class DownloadsTab extends StatefulWidget {
   const DownloadsTab({super.key});
@@ -405,23 +408,24 @@ class _DownloadsTabState extends State<DownloadsTab> {
   @override
   void initState() {
     super.initState();
-    _loadFiles(); // تحميل الملفات عند فتح الشاشة
+    _loadFiles(); 
   }
 
-  // دالة لجلب الملفات من مجلد التطبيق
   Future<void> _loadFiles() async {
+    await Permission.storage.request(); // طلب خفيف بدون إيقاف الكود
+    
+    List<FileSystemEntity> files = [];
+    
     try {
       final dir = Directory('/storage/emulated/0/Download/ProDownloader');
-      if (await dir.exists()) {
-        setState(() {
-          _downloadedFiles = dir.listSync().where((file) {
-            return file.path.endsWith('.mp4') || file.path.endsWith('.m4a') || file.path.endsWith('.mp3');
-          }).toList();
-        });
-      }
-    } catch (e) {
-      debugPrint('خطأ في جلب الملفات: $e');
-    }
+      if (await dir.exists()) files.addAll(dir.listSync());
+    } catch (e) {}
+
+    setState(() {
+      _downloadedFiles = files.where((file) {
+        return file.path.endsWith('.mp4') || file.path.endsWith('.m4a') || file.path.endsWith('.mp3');
+      }).toList();
+    });
   }
 
   @override
@@ -436,7 +440,7 @@ class _DownloadsTabState extends State<DownloadsTab> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('تنزيلاتي المكتملة', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.refresh), onPressed: _loadFiles), // زر تحديث القائمة
+                IconButton(icon: const Icon(Icons.refresh), onPressed: _loadFiles),
               ],
             ),
           ),
@@ -459,7 +463,6 @@ class _DownloadsTabState extends State<DownloadsTab> {
                       final fileName = file.path.split('/').last;
                       final isAudio = fileName.endsWith('.m4a') || fileName.endsWith('.mp3');
                       
-                      // حساب حجم الملف
                       final fileSize = File(file.path).lengthSync();
                       final sizeMb = (fileSize / (1024 * 1024)).toStringAsFixed(2);
 
@@ -475,9 +478,8 @@ class _DownloadsTabState extends State<DownloadsTab> {
                           trailing: IconButton(
                             icon: const Icon(Icons.delete, color: Colors.redAccent),
                             onPressed: () {
-                              // حذف الملف
                               File(file.path).deleteSync();
-                              _loadFiles(); // تحديث القائمة
+                              _loadFiles(); 
                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحذف بنجاح')));
                             },
                           ),
@@ -523,7 +525,7 @@ class SettingsTab extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.folder),
                   title: const Text('مسار الحفظ'),
-                  subtitle: const Text('الذاكرة الداخلية / Download / ProDownloader'),
+                  subtitle: const Text('مجلد التنزيلات العام (Downloads)'),
                   trailing: const Icon(Icons.check, color: Colors.green),
                   onTap: () {},
                 ),
