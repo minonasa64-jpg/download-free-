@@ -16,7 +16,6 @@ class ProDownloaderApp extends StatefulWidget {
 }
 
 class _ProDownloaderAppState extends State<ProDownloaderApp> {
-  // متغير للتحكم في الوضع الليلي/النهاري
   ThemeMode _themeMode = ThemeMode.dark;
 
   void toggleTheme(bool isDark) {
@@ -31,12 +30,10 @@ class _ProDownloaderAppState extends State<ProDownloaderApp> {
       title: 'Pro Downloader',
       debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
-      // الثيم النهاري
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple, brightness: Brightness.light),
       ),
-      // الثيم الليلي (الافتراضي)
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurpleAccent, brightness: Brightness.dark),
@@ -64,12 +61,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    // إعداد حركة الظهور والتكبير (Fade & Scale)
     _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500));
     _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOutBack);
     _controller.forward();
 
-    // الانتقال للشاشة الرئيسية بعد 3 ثواني
     Future.delayed(const Duration(seconds: 3), () {
       Navigator.pushReplacement(
         context,
@@ -136,7 +131,6 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
-
   late final List<Widget> _pages;
 
   @override
@@ -167,7 +161,7 @@ class _MainNavigationState extends State<MainNavigation> {
 }
 
 // ==========================================
-// 4. الشاشة الرئيسية مع الاتصال بالسيرفر (HOME TAB)
+// 4. الشاشة الرئيسية (HOME TAB - مع كشف الأخطاء)
 // ==========================================
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -177,13 +171,10 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  // للتحكم في حقل النص وقراءة الرابط منه
   final TextEditingController _urlController = TextEditingController();
-  
-  // متغير لمعرفة ما إذا كان التطبيق ينتظر رداً من السيرفر
   bool _isLoading = false;
 
-  // دالة الاتصال بالمحرك (API)
+  // دالة الاتصال بالمحرك (API) بعد التعديل لكشف الأخطاء الحقيقية
   Future<void> _extractVideo() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
@@ -191,11 +182,10 @@ class _HomeTabState extends State<HomeTab> {
       return;
     }
 
-    setState(() => _isLoading = true); // تشغيل دائرة التحميل
+    setState(() => _isLoading = true);
 
     try {
       final dio = Dio();
-      // إرسال الرابط لمحركك على Railway
       final response = await dio.post(
         'https://web-production-69773.up.railway.app/api/extract',
         data: {'url': url},
@@ -205,19 +195,29 @@ class _HomeTabState extends State<HomeTab> {
         final formats = response.data['formats'] as List;
         final title = response.data['title'] ?? 'فيديو بدون عنوان';
         
-        // إظهار نافذة الجودة مع البيانات الحقيقية
         if (mounted) _showQualityBottomSheet(context, title, formats);
       } else {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فشل استخراج الروابط.')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('رد غير متوقع من الخادم: ${response.data}')));
+      }
+    } on DioException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('خطأ الشبكة: ${e.message ?? e.response?.statusCode}'),
+          duration: const Duration(seconds: 5),
+        ));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حدث خطأ في الاتصال بالخادم.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('خطأ تقني: $e'),
+          duration: const Duration(seconds: 5),
+        ));
+      }
     } finally {
-      if (mounted) setState(() => _isLoading = false); // إيقاف التحميل
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // دالة لإظهار نافذة الجودة بالبيانات الديناميكية
   void _showQualityBottomSheet(BuildContext context, String title, List formats) {
     showModalBottomSheet(
       context: context,
@@ -246,7 +246,6 @@ class _HomeTabState extends State<HomeTab> {
                         final format = formats[index];
                         final quality = format['quality'];
                         final ext = format['ext'].toString().toUpperCase();
-                        // حساب الحجم بالميغابايت
                         final sizeMb = format['filesize'] != null && format['filesize'] > 0 
                             ? '${(format['filesize'] / (1024 * 1024)).toStringAsFixed(1)} MB' 
                             : 'غير معروف';
@@ -261,8 +260,7 @@ class _HomeTabState extends State<HomeTab> {
                             subtitle: Text('الحجم: $sizeMb'),
                             trailing: const Icon(Icons.download_rounded),
                             onTap: () {
-                              Navigator.pop(context); // إغلاق النافذة
-                              // هنا سنضع لاحقاً كود التحميل الفعلي
+                              Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم اختيار الجودة: $quality')));
                             },
                           ),
@@ -292,7 +290,6 @@ class _HomeTabState extends State<HomeTab> {
             Text('من أين تريد التحميل اليوم؟', style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 30),
             
-            // حقل إدخال الرابط
             TextField(
               controller: _urlController,
               decoration: InputDecoration(
@@ -309,7 +306,6 @@ class _HomeTabState extends State<HomeTab> {
             ),
             const SizedBox(height: 25),
 
-            // زر الاستخراج أو دائرة التحميل
             SizedBox(
               width: double.infinity,
               height: 60,
@@ -358,7 +354,6 @@ class DownloadsTab extends StatelessWidget {
             Expanded(
               child: TabBarView(
                 children: [
-                  // تبويبة: جاري التحميل (واجهة مبدئية)
                   Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -369,7 +364,6 @@ class DownloadsTab extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // تبويبة: مكتملة (واجهة مبدئية)
                   Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
