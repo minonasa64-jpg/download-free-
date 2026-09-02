@@ -30,9 +30,9 @@ jobs:
       - name: 🏗️ بناء هياكل فلاتر الأساسية وملفات الأندرويد
         run: flutter create --platforms=android .
 
-      - name: 🌐 إضافة صلاحية الإنترنت للتطبيق
+      - name: 🌐 إضافة صلاحيات النظام (إنترنت + تخزين)
         run: |
-          sed -i '/<manifest xmlns:android=/a \    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<manifest xmlns:android=/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />' android/app/src/main/AndroidManifest.xml
 
       - name: 📦 تحميل الحزم والمكتبات
         run: flutter pub get
