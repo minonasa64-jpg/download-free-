@@ -16,7 +16,7 @@ jobs:
       - name: 📥 سحب الكود من المستودع
         uses: actions/checkout@v4
 
-      - name: ☕ إعداد بيئة جافا (مطلوبة لبرمجة الأندرويد)
+      - name: ☕ إعداد بيئة جافا
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
@@ -27,20 +27,23 @@ jobs:
         with:
           channel: 'stable' 
 
-      - name: 🏗️ بناء هياكل فلاتر الأساسية وملفات الأندرويد
+      - name: 🏗️ بناء هياكل فلاتر الأساسية
         run: flutter create --platforms=android .
 
-      - name: 🌐 إضافة صلاحيات النظام (إنترنت + تخزين)
+      - name: 🌐 حقن جميع الصلاحيات إجبارياً
         run: |
-          sed -i '/<manifest xmlns:android=/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<manifest xmlns:android=/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />' android/app/src/main/AndroidManifest.xml
 
       - name: 📦 تحميل الحزم والمكتبات
         run: flutter pub get
 
-      - name: 🛠️ بناء ملف APK بصيغة الإصدار (Release)
+      - name: 🎨 دمج الأيقونة الجديدة
+        run: dart run flutter_launcher_icons
+
+      - name: 🛠️ بناء ملف APK النهائي
         run: flutter build apk --release
 
-      - name: 📤 رفع ملف الـ APK النهائي كـ Artifact
+      - name: 📤 رفع ملف التطبيق
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
