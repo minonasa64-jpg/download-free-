@@ -5,7 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ==========================================
@@ -16,57 +16,32 @@ final ValueNotifier<String> langNotifier = ValueNotifier('ar');
 
 const Map<String, Map<String, String>> langMap = {
   'ar': {
-    'search': 'بحث',
-    'link': 'رابط',
-    'downloads': 'تنزيلاتي',
-    'settings': 'الإعدادات',
-    'discover': 'اكتشف فيديوهات جديدة',
-    'search_hint': 'ابحث في يوتيوب...',
-    'start_search': 'ابدأ البحث الآن',
-    'have_link': 'لديك رابط مباشر؟',
-    'paste_here': 'ألصق الرابط هنا للتحميل',
-    'downloaded': 'تم التنزيل',
-    'general': 'عام',
-    'dl_settings': 'إعدادات التنزيل',
-    'notif': 'الإشعارات',
-    'theme': 'السمة',
-    'language': 'اللغة',
-    'more_tools': 'أدوات إضافية',
-    'share_app': 'مشاركة التطبيق',
-    'clean_cache': 'تنظيف الملفات المؤقتة',
-    'about': 'حول التطبيق',
-    'formats_title': 'المزيد من التنسيقات',
-    'audio': 'موسيقى',
-    'video': 'فيديو',
-    'download_btn': 'تنزيل',
-    'related': 'فيديوهات ذات صلة',
+    'search': 'بحث', 'link': 'رابط', 'downloads': 'تنزيلاتي', 'settings': 'الإعدادات',
+    'discover': 'اكتشف فيديوهات جديدة', 'search_hint': 'ابحث في يوتيوب...', 'start_search': 'ابدأ البحث الآن',
+    'have_link': 'لديك رابط مباشر؟', 'paste_here': 'ألصق الرابط هنا للتحميل', 'downloaded': 'تم التنزيل',
+    'general': 'عام', 'dl_settings': 'إعدادات التنزيل', 'notif': 'الإشعارات', 'theme': 'السمة', 'language': 'اللغة',
+    'more_tools': 'أدوات إضافية', 'share_app': 'مشاركة التطبيق', 'clean_cache': 'تنظيف الملفات المؤقتة', 'about': 'حول التطبيق',
+    'formats_title': 'المزيد من التنسيقات', 'audio': 'موسيقى', 'video': 'فيديو', 'download_btn': 'تنزيل',
+    'related': 'فيديوهات ذات صلة', 'downloading': 'جاري التنزيل...', 'completed': 'اكتمل التنزيل بنجاح',
   },
   'en': {
-    'search': 'Search',
-    'link': 'Link',
-    'downloads': 'Downloads',
-    'settings': 'Settings',
-    'discover': 'Discover new videos',
-    'search_hint': 'Search YouTube...',
-    'start_search': 'Start searching now',
-    'have_link': 'Have a direct link?',
-    'paste_here': 'Paste link here to download',
-    'downloaded': 'Downloaded',
-    'general': 'General',
-    'dl_settings': 'Download Settings',
-    'notif': 'Notifications',
-    'theme': 'Theme',
-    'language': 'Language',
-    'more_tools': 'More Tools',
-    'share_app': 'Share App',
-    'clean_cache': 'Clear Cache',
-    'about': 'About App',
-    'formats_title': 'More Formats',
-    'audio': 'Audio',
-    'video': 'Video',
-    'download_btn': 'Download',
-    'related': 'Related Videos',
+    'search': 'Search', 'link': 'Link', 'downloads': 'Downloads', 'settings': 'Settings',
+    'discover': 'Discover new videos', 'search_hint': 'Search YouTube...', 'start_search': 'Start searching now',
+    'have_link': 'Have a direct link?', 'paste_here': 'Paste link here to download', 'downloaded': 'Downloaded',
+    'general': 'General', 'dl_settings': 'Download Settings', 'notif': 'Notifications', 'theme': 'Theme', 'language': 'Language',
+    'more_tools': 'More Tools', 'share_app': 'Share App', 'clean_cache': 'Clear Cache', 'about': 'About App',
+    'formats_title': 'More Formats', 'audio': 'Audio', 'video': 'Video', 'download_btn': 'Download',
+    'related': 'Related Videos', 'downloading': 'Downloading...', 'completed': 'Download Completed',
   },
+  'fr': {
+    'search': 'Recherche', 'link': 'Lien', 'downloads': 'Téléchargements', 'settings': 'Paramètres',
+    'discover': 'Découvrir des vidéos', 'search_hint': 'Rechercher sur YouTube...', 'start_search': 'Commencez à chercher',
+    'have_link': 'Lien direct ?', 'paste_here': 'Collez le lien ici', 'downloaded': 'Téléchargé',
+    'general': 'Général', 'dl_settings': 'Téléchargement', 'notif': 'Notifications', 'theme': 'Thème', 'language': 'Langue',
+    'more_tools': 'Outils', 'share_app': 'Partager', 'clean_cache': 'Vider le cache', 'about': 'À propos',
+    'formats_title': 'Plus de formats', 'audio': 'Audio', 'video': 'Vidéo', 'download_btn': 'Télécharger',
+    'related': 'Vidéos similaires', 'downloading': 'Téléchargement...', 'completed': 'Terminé',
+  }
 };
 
 String t(String key) {
@@ -78,11 +53,7 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   
   final savedTheme = prefs.getString('theme') ?? 'dark';
-  if (savedTheme == 'light') {
-    themeNotifier.value = ThemeMode.light;
-  } else {
-    themeNotifier.value = ThemeMode.dark;
-  }
+  themeNotifier.value = savedTheme == 'light' ? ThemeMode.light : ThemeMode.dark;
   
   final savedLang = prefs.getString('lang') ?? 'ar';
   langNotifier.value = savedLang;
@@ -268,7 +239,7 @@ class _MainNavigationState extends State<MainNavigation> {
 }
 
 // ==========================================
-// 5. محرك الاستخراج ونافذة الجودات (مفصل)
+// 5. محرك الاستخراج الدقيق (يبرز الفيديو بوضوح)
 // ==========================================
 Future<void> extractHybridFast(BuildContext context, String url, Function(bool) setLoading) async {
   setLoading(true);
@@ -278,7 +249,6 @@ Future<void> extractHybridFast(BuildContext context, String url, Function(bool) 
     String videoTitle = 'فيديو بدون عنوان';
     String? thumb;
 
-    // الاعتماد الكلي على الهاتف للاستخراج المباشر والسريع
     if (url.contains('youtube.com') || url.contains('youtu.be')) {
       final ytEngine = yt.YoutubeExplode();
       var video = await ytEngine.videos.get(url);
@@ -286,38 +256,45 @@ Future<void> extractHybridFast(BuildContext context, String url, Function(bool) 
       thumb = video.thumbnails.highResUrl;
       var manifest = await ytEngine.videos.streamsClient.getManifest(video.id);
       
-      // 1. استخراج جودات الفيديو (يحتوي على فيديو وصوت معاً - Muxed)
+      // -- استخراج جودات الفيديو مع الصوت (Muxed) --
       for (var stream in manifest.muxed) {
         String quality = '${stream.videoResolution.height}p';
-        String desc = 'جودة عادية للتشغيل السريع';
-        if (stream.videoResolution.height >= 720) {
-          desc = 'عرض واضح وتشغيل سريع';
-        }
-        
         videoList.add({
           'quality_name': 'سريع ($quality)',
-          'desc': desc,
+          'desc': 'جودة متوافقة مع جميع الأجهزة (يحتوي على صوت)',
           'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
           'url': stream.url.toString(),
-          'ext': stream.container.name, // عادة mp4
+          'ext': stream.container.name,
         });
       }
 
-      // 2. استخراج جودات الصوت فقط (Audio Only)
-      for (var stream in manifest.audioOnly) {
-        if (stream.container.name == 'mp4' || stream.container.name == 'm4a') {
-          audioList.add({
-            'quality_name': 'سريع (128K) M4A',
-            'desc': 'الأفضل للتشغيل على الهاتف',
+      // -- استخراج جودات الفيديو العالية جداً (بدون صوت عادة) لخيارات أكثر --
+      for (var stream in manifest.videoOnly) {
+        if (stream.videoResolution.height >= 1080) {
+          String quality = '${stream.videoResolution.height}p';
+          videoList.add({
+            'quality_name': 'جودة عالية ($quality)',
+            'desc': 'فيديو بدقة فائقة الوضوح (HD)',
             'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
             'url': stream.url.toString(),
-            'ext': 'm4a',
+            'ext': stream.container.name,
           });
         }
       }
+
+      // -- استخراج الصوت فقط (Audio Only) --
+      for (var stream in manifest.audioOnly) {
+        audioList.add({
+          'quality_name': 'صوت (Audio) ${stream.container.name.toUpperCase()}',
+          'desc': 'يدعم سماعات السيارة والأجهزة الذكية',
+          'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
+          'url': stream.url.toString(),
+          'ext': stream.container.name == 'webm' ? 'mp3' : stream.container.name,
+        });
+      }
       ytEngine.close();
     } else {
-      // الروابط الأخرى (فيسبوك، تيك توك، الخ) يتم معالجتها هنا
+      // للمواقع الأخرى كفيسبوك وانستغرام
       final dio = Dio();
       final response = await dio.post(
         'https://web-production-69773.up.railway.app/api/extract',
@@ -332,10 +309,7 @@ Future<void> extractHybridFast(BuildContext context, String url, Function(bool) 
         for (var f in formats) {
           String ext = f['ext'].toString().toLowerCase();
           String quality = f['quality'].toString();
-          String size = 'غير محدد';
-          if (f['filesize'] != null) {
-            size = (f['filesize'] / (1024 * 1024)).toStringAsFixed(1);
-          }
+          String size = f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
           
           if (ext == 'm4a' || ext == 'mp3') {
             audioList.add({
@@ -391,7 +365,7 @@ Future<void> extractHybridFast(BuildContext context, String url, Function(bool) 
 }
 
 // ------------------------------------------
-// واجهة الجودات المطابقة للصورة
+// واجهة الجودات المطابقة للصورة تماماً
 // ------------------------------------------
 class FormatSelectionSheet extends StatefulWidget {
   final String title;
@@ -494,11 +468,15 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                 ),
                 onPressed: _selectedFormat == null ? null : () {
                   Navigator.pop(context);
-                  downloadFileFinal(
-                    context,
-                    _selectedFormat!['url'],
-                    widget.title,
-                    _selectedFormat!['ext'],
+                  // استدعاء دالة التحميل المرئية الجديدة
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => DownloadProgressDialog(
+                      downloadUrl: _selectedFormat!['url'],
+                      title: widget.title,
+                      extension: _selectedFormat!['ext'],
+                    )
                   );
                 },
                 child: Text(
@@ -568,60 +546,130 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
 }
 
 // ------------------------------------------
-// دالة التحميل النهائية والمستقرة
+// نافذة تقدم التحميل الحية (لحل مشكلة اختفاء الإشعار)
 // ------------------------------------------
-Future<void> downloadFileFinal(BuildContext context, String downloadUrl, String title, String extension) async {
-  if (Platform.isAndroid) {
-    if (await Permission.manageExternalStorage.isDenied) {
-      await Permission.manageExternalStorage.request();
+class DownloadProgressDialog extends StatefulWidget {
+  final String downloadUrl;
+  final String title;
+  final String extension;
+
+  const DownloadProgressDialog({
+    super.key,
+    required this.downloadUrl,
+    required this.title,
+    required this.extension,
+  });
+
+  @override
+  State<DownloadProgressDialog> createState() => _DownloadProgressDialogState();
+}
+
+class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
+  double _progress = 0.0;
+  String _downloadedSize = "0 MB";
+  String _totalSize = "0 MB";
+  bool _isFinished = false;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startDownload();
+  }
+
+  Future<void> _startDownload() async {
+    // معالجة قوية للصلاحيات في أندرويد 13+
+    if (Platform.isAndroid) {
+      if (await Permission.manageExternalStorage.isDenied) {
+        await Permission.manageExternalStorage.request();
+      }
+      await Permission.storage.request();
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String basePath = prefs.getString('download_path') ?? '/storage/emulated/0/Download/ProDownloader';
+      if (!basePath.endsWith('/')) {
+        basePath += '/';
+      }
+      Directory(basePath).createSync(recursive: true);
+
+      String safeTitle = widget.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      String savePath = '$basePath$safeTitle.${widget.extension}';
+      
+      final dio = Dio();
+      await dio.download(
+        widget.downloadUrl,
+        savePath,
+        options: Options(
+          headers: {'User-Agent': 'Mozilla/5.0'}
+        ),
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            if (mounted) {
+              setState(() {
+                _progress = received / total;
+                _downloadedSize = (received / (1024 * 1024)).toStringAsFixed(1);
+                _totalSize = (total / (1024 * 1024)).toStringAsFixed(1);
+              });
+            }
+          }
+        },
+      );
+      
+      if (mounted) {
+        setState(() {
+          _isFinished = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+        });
+      }
     }
   }
-  await Permission.storage.request();
 
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    String basePath = prefs.getString('download_path') ?? '/storage/emulated/0/Download/ProDownloader';
-    if (!basePath.endsWith('/')) {
-      basePath += '/';
-    }
-    Directory(basePath).createSync(recursive: true);
-
-    String safeTitle = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-    String savePath = '$basePath$safeTitle.$extension';
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('بدأ التنزيل... يمكنك التحقق من مجلد التنزيلات'),
-        backgroundColor: Colors.orange,
-      )
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_hasError) ...[
+            const Icon(Icons.error_outline, color: Colors.red, size: 50),
+            const SizedBox(height: 15),
+            const Text('فشل التنزيل. يرجى التحقق من الأذونات والمساحة.', textAlign: TextAlign.center),
+            const SizedBox(height: 15),
+            ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('إغلاق'))
+          ] else if (_isFinished) ...[
+            const Icon(Icons.check_circle_outline, color: Colors.green, size: 50),
+            const SizedBox(height: 15),
+            Text(t('completed'), style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+              onPressed: () => Navigator.pop(context), 
+              child: const Text('حسناً', style: TextStyle(color: Colors.white))
+            )
+          ] else ...[
+            const CircularProgressIndicator(color: Colors.redAccent),
+            const SizedBox(height: 20),
+            Text(t('downloading'), style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            LinearProgressIndicator(
+              value: _progress,
+              backgroundColor: Colors.grey[300],
+              color: Colors.redAccent,
+            ),
+            const SizedBox(height: 10),
+            Text('$_downloadedSize MB / $_totalSize MB', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          ]
+        ],
+      ),
     );
-    
-    final dio = Dio();
-    await dio.download(
-      downloadUrl,
-      savePath,
-      options: Options(
-        headers: {'User-Agent': 'Mozilla/5.0'}
-      )
-    );
-    
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ اكتمل التحميل:\n$savePath'),
-          backgroundColor: Colors.green,
-        )
-      );
-    }
-  } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('❌ فشل التنزيل، تحقق من اتصالك ومساحة التخزين'),
-          backgroundColor: Colors.red,
-        )
-      );
-    }
   }
 }
 
@@ -675,7 +723,7 @@ class _SearchTabState extends State<SearchTab> {
         });
       }
     } catch (e) {
-      // معالجة الخطأ بصمت
+      // صمت
     } finally {
       if (mounted) {
         setState(() {
@@ -699,7 +747,7 @@ class _SearchTabState extends State<SearchTab> {
           });
         }
       } catch (e) {
-        // معالجة الخطأ
+        // صمت
       }
       setState(() {
         _isLoadingMore = false;
@@ -900,7 +948,7 @@ class _SearchTabState extends State<SearchTab> {
 }
 
 // ==========================================
-// 7. شاشة المشاهدة والفيديوهات ذات الصلة (بدون اختصار)
+// 7. شاشة المشاهدة والفيديوهات ذات الصلة (بدون أخطاء)
 // ==========================================
 class WatchVideoScreen extends StatefulWidget { 
   final yt.Video video; 
@@ -917,6 +965,7 @@ class WatchVideoScreen extends StatefulWidget {
 class _WatchVideoScreenState extends State<WatchVideoScreen> {
   late YoutubePlayerController _controller; 
   bool _isLoadingExtraction = false;
+  bool _hasPlayerError = false;
   
   // متغيرات الفيديوهات ذات الصلة
   final yt.YoutubeExplode _yt = yt.YoutubeExplode();
@@ -926,17 +975,21 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   @override
   void initState() { 
     super.initState(); 
-    // تهيئة مشغل iframe الجديد
-    _controller = YoutubePlayerController.fromVideoId(
-      videoId: widget.video.id.value,
-      autoPlay: true,
-      params: const YoutubePlayerParams(
-        showFullscreenButton: true,
-        mute: false,
-      ),
-    );
     
-    // جلب الفيديوهات المرتبطة
+    // محاولة تهيئة المشغل بأمان
+    try {
+      _controller = YoutubePlayerController(
+        initialVideoId: widget.video.id.value,
+        flags: const YoutubePlayerFlags(
+          autoPlay: true,
+          mute: false,
+          enableCaption: false,
+        ),
+      );
+    } catch (e) {
+      _hasPlayerError = true;
+    }
+    
     _fetchRelatedVideos();
   }
 
@@ -945,7 +998,6 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       final results = await _yt.search.search(widget.video.title);
       if (mounted) {
         setState(() {
-          // جلب 10 فيديوهات مشابهة بعد تخطي النتيجة الأولى
           _relatedVideos = results.whereType<yt.Video>().skip(1).take(10).toList();
           _isLoadingRelated = false;
         });
@@ -961,7 +1013,9 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
 
   @override
   void dispose() {
-    _controller.close();
+    if (!_hasPlayerError) {
+      _controller.dispose();
+    }
     super.dispose();
   }
   
@@ -979,10 +1033,25 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          YoutubePlayer(
-            controller: _controller,
-            aspectRatio: 16 / 9,
-          ),
+          // عرض الفيديو أو رسالة خطأ آمنة
+          _hasPlayerError
+            ? Container(
+                height: 220,
+                color: Colors.black,
+                child: const Center(
+                  child: Text(
+                    'هذا الفيديو محمي من العرض خارج يوتيوب.\nلكن لا يزال بإمكانك تحميله!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                ),
+              )
+            : YoutubePlayer(
+                controller: _controller,
+                showVideoProgressIndicator: true,
+                progressIndicatorColor: Colors.redAccent,
+              ),
+              
           Expanded(
             child: SingleChildScrollView(
               child: Padding(
@@ -1110,7 +1179,9 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                               color: Colors.redAccent,
                             ),
                             onTap: () {
-                              _controller.close();
+                              if (!_hasPlayerError) {
+                                _controller.pause();
+                              }
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
@@ -1280,7 +1351,7 @@ class _DownloadsTabState extends State<DownloadsTab> {
         files.addAll(dir.listSync());
       }
     } catch (e) {
-      // تجاهل الخطأ في حال عدم وجود المجلد
+      // تجاهل الخطأ 
     }
     setState(() {
       _downloadedFiles = files.where((file) {
@@ -1344,7 +1415,7 @@ class _DownloadsTabState extends State<DownloadsTab> {
 }
 
 // ==========================================
-// 10. قسم الإعدادات (كامل ومفصل)
+// 10. قسم الإعدادات 
 // ==========================================
 class SettingsTab extends StatelessWidget {
   const SettingsTab({super.key});
