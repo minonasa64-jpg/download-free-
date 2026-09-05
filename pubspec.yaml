@@ -16,6 +16,7 @@ dependencies:
   share_plus: ^8.0.3
   youtube_explode_dart: ^2.2.2
   youtube_player_flutter: ^8.1.2
+  shared_preferences: ^2.2.2 # المكتبة الجديدة لبرمجة الإعدادات الحقيقية
 
 dev_dependencies:
   flutter_test:
