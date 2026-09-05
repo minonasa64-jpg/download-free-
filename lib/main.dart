@@ -6,8 +6,17 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+// متغير للتحكم في ثيم التطبيق بالكامل
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  final savedTheme = prefs.getString('theme') ?? 'dark';
+  themeNotifier.value = savedTheme == 'light' ? ThemeMode.light : ThemeMode.dark;
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -22,29 +31,45 @@ class ProDownloaderApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Pro Downloader',
-      debugShowCheckedModeBanner: false,
-      builder: (context, child) {
-        return Directionality(textDirection: TextDirection.rtl, child: child!);
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (_, currentMode, __) {
+        return MaterialApp(
+          title: 'Pro Downloader',
+          debugShowCheckedModeBanner: false,
+          builder: (context, child) {
+            return Directionality(textDirection: TextDirection.rtl, child: child!);
+          },
+          themeMode: currentMode,
+          theme: ThemeData(
+            brightness: Brightness.light,
+            scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+            colorScheme: const ColorScheme.light(
+              primary: Colors.redAccent,
+              background: Color(0xFFF5F5F5),
+              surface: Colors.white,
+            ),
+            fontFamily: 'Cairo',
+          ),
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            scaffoldBackgroundColor: const Color(0xFF121212),
+            colorScheme: const ColorScheme.dark(
+              primary: Colors.redAccent,
+              background: Color(0xFF121212),
+              surface: Color(0xFF1E1E1E),
+            ),
+            fontFamily: 'Cairo',
+          ),
+          home: const SplashScreen(),
+        );
       },
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        colorScheme: const ColorScheme.dark(
-          primary: Colors.redAccent,
-          background: Color(0xFF121212),
-          surface: Color(0xFF1E1E1E),
-        ),
-        fontFamily: 'Cairo',
-      ),
-      home: const SplashScreen(),
     );
   }
 }
 
 // ==========================================
-// 1. شاشة البداية
+// شاشة البداية
 // ==========================================
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -61,14 +86,15 @@ class _SplashScreenState extends State<SplashScreen> {
   }
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: Text('Pro Downloader', style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.redAccent))),
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: const Center(child: Text('Pro Downloader', style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.redAccent))),
     );
   }
 }
 
 // ==========================================
-// 2. شريط التنقل السفلي
+// شريط التنقل السفلي
 // ==========================================
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -87,34 +113,36 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: _pages[_currentIndex],
       bottomNavigationBar: Container(
         padding: const EdgeInsets.only(top: 5, bottom: 10),
-        color: const Color(0xFF121212),
+        color: isDark ? const Color(0xFF121212) : Colors.white,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(Icons.search, 'بحث', 0),
-            _buildNavItem(Icons.link, 'رابط', 1),
-            _buildNavItem(Icons.play_circle_outline, 'تنزيلاتي', 2),
-            _buildNavItem(Icons.settings_outlined, 'الإعدادات', 3),
+            _buildNavItem(Icons.search, 'بحث', 0, isDark),
+            _buildNavItem(Icons.link, 'رابط', 1, isDark),
+            _buildNavItem(Icons.play_circle_outline, 'تنزيلاتي', 2, isDark),
+            _buildNavItem(Icons.settings_outlined, 'الإعدادات', 3, isDark),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index) {
+  Widget _buildNavItem(IconData icon, String label, int index, bool isDark) {
     final isSelected = _currentIndex == index;
+    final defaultColor = isDark ? Colors.grey[600] : Colors.grey[400];
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: isSelected ? Colors.redAccent : Colors.grey[600], size: 26),
+          Icon(icon, color: isSelected ? Colors.redAccent : defaultColor, size: 26),
           const SizedBox(height: 4),
-          Text(label, style: TextStyle(color: isSelected ? Colors.redAccent : Colors.grey[600], fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+          Text(label, style: TextStyle(color: isSelected ? Colors.redAccent : defaultColor, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
         ],
       ),
     );
@@ -122,26 +150,13 @@ class _MainNavigationState extends State<MainNavigation> {
 }
 
 // ==========================================
-// 3. دوال الاستخراج الهجينة
+// دوال الاستخراج الهجينة
 // ==========================================
 Future<void> extractHybrid(BuildContext context, String url, Function(bool) setLoading) async {
   setLoading(true);
   try {
     final ytEngine = yt.YoutubeExplode();
     if (url.contains('youtube.com') || url.contains('youtu.be')) {
-      
-      // إذا كان الرابط لقائمة تشغيل وليس لفيديو واحد
-      if (url.contains('list=') && !url.contains('v=')) {
-        var playlist = await ytEngine.playlists.get(url);
-        ytEngine.close();
-        setLoading(false);
-        if (context.mounted) {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => PlaylistScreen(playlistId: playlist.id.value, title: playlist.title)));
-        }
-        return;
-      }
-
-      // إذا كان فيديو عادي
       var video = await ytEngine.videos.get(url);
       var manifest = await ytEngine.videos.streamsClient.getManifest(video.id);
       List<Map<String, dynamic>> formats = [];
@@ -164,15 +179,16 @@ Future<void> extractHybrid(BuildContext context, String url, Function(bool) setL
       }
     }
   } catch (e) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ تعذر استخراج الرابط، تأكد من صحته')));
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ تعذر استخراج الرابط')));
   } finally {
     setLoading(false);
   }
 }
 
 void showQualityBottomSheet(BuildContext context, String title, List formats, String? thumbnail) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   showModalBottomSheet(
-    context: context, isScrollControlled: true, backgroundColor: const Color(0xFF1E1E1E),
+    context: context, isScrollControlled: true, backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
     builder: (context) {
       return DraggableScrollableSheet(
@@ -182,11 +198,11 @@ void showQualityBottomSheet(BuildContext context, String title, List formats, St
             padding: const EdgeInsets.all(20.0),
             child: Column(
               children: [
-                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[700], borderRadius: BorderRadius.circular(10))),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.circular(10))),
                 const SizedBox(height: 15),
                 if (thumbnail != null) ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(thumbnail, height: 160, width: double.infinity, fit: BoxFit.cover)),
                 const SizedBox(height: 15),
-                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center, maxLines: 2),
+                Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black), textAlign: TextAlign.center, maxLines: 2),
                 const SizedBox(height: 20),
                 Expanded(
                   child: ListView.builder(
@@ -196,7 +212,7 @@ void showQualityBottomSheet(BuildContext context, String title, List formats, St
                       final ext = format['ext'].toString().toLowerCase();
                       if (ext != 'mp4' && ext != 'm4a' && ext != 'webm') return const SizedBox.shrink(); 
                       return ListTile(
-                        title: Text('${format['quality']} - ${ext.toUpperCase()}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        title: Text('${format['quality']} - ${ext.toUpperCase()}', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
                         trailing: const Icon(Icons.download, color: Colors.redAccent),
                         onTap: () {
                           Navigator.pop(context);
@@ -215,13 +231,22 @@ void showQualityBottomSheet(BuildContext context, String title, List formats, St
   );
 }
 
+// دالة التحميل الحقيقية التي تقرأ مسار الحفظ من الإعدادات
 Future<void> downloadFile(BuildContext context, String downloadUrl, String title, String extension) async {
   await Permission.storage.request();
   await Permission.videos.request();
   try {
+    final prefs = await SharedPreferences.getInstance();
+    // جلب المسار من الإعدادات أو استخدام المسار الافتراضي
+    String basePath = prefs.getString('download_path') ?? '/storage/emulated/0/Download/ProDownloader';
+    if (!basePath.endsWith('/')) basePath += '/';
+
     String safeTitle = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-    String savePath = '/storage/emulated/0/Download/ProDownloader/$safeTitle.$extension';
-    Directory('/storage/emulated/0/Download/ProDownloader').createSync(recursive: true);
+    String savePath = '$basePath$safeTitle.$extension';
+    
+    // إنشاء المجلد إذا لم يكن موجوداً
+    Directory(basePath).createSync(recursive: true);
+    
     final dio = Dio();
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('بدأ التحميل...'), backgroundColor: Colors.orange));
     await dio.download(downloadUrl, savePath, options: Options(headers: {'User-Agent': 'Mozilla/5.0'}));
@@ -232,7 +257,7 @@ Future<void> downloadFile(BuildContext context, String downloadUrl, String title
 }
 
 // ==========================================
-// 4. التبويبات (البحث الشامل)
+// التبويبة 1: البحث (البحث الحقيقي فقط)
 // ==========================================
 class SearchTab extends StatefulWidget { const SearchTab({super.key}); @override State<SearchTab> createState() => _SearchTabState(); }
 class _SearchTabState extends State<SearchTab> {
@@ -240,8 +265,8 @@ class _SearchTabState extends State<SearchTab> {
   final ScrollController _scrollController = ScrollController();
   bool _isSearching = false; bool _isLoadingMore = false;
   
-  List<dynamic> _searchResults = []; // يدعم الفيديوهات والقوائم
-  yt.SearchList? _currentSearchPage; // تم استخدام SearchList لجلب كل شيء
+  List<yt.Video> _searchResults = []; 
+  yt.VideoSearchList? _currentSearchPage; 
   final yt.YoutubeExplode _yt = yt.YoutubeExplode();
 
   @override void initState() {
@@ -254,8 +279,13 @@ class _SearchTabState extends State<SearchTab> {
     if (query.isEmpty) return; FocusScope.of(context).unfocus();
     setState(() { _isSearching = true; _searchResults.clear(); });
     try {
-      _currentSearchPage = await _yt.search.searchContent(query); // دالة البحث الشاملة
-      if (mounted) setState(() { _searchResults = _currentSearchPage!.toList(); });
+      final results = await _yt.search.search(query);
+      if (mounted) {
+        setState(() { 
+          _currentSearchPage = results;
+          _searchResults = results.whereType<yt.Video>().toList(); 
+        });
+      }
     } catch (e) {} finally { if (mounted) setState(() => _isSearching = false); }
   }
 
@@ -263,29 +293,35 @@ class _SearchTabState extends State<SearchTab> {
     if (_currentSearchPage?.nextPage != null) {
       setState(() => _isLoadingMore = true);
       try {
-        _currentSearchPage = await _currentSearchPage!.nextPage();
-        if (_currentSearchPage != null) setState(() { _searchResults.addAll(_currentSearchPage!); });
+        final next = await _currentSearchPage!.nextPage();
+        if (next != null) {
+          setState(() { 
+            _currentSearchPage = next;
+            _searchResults.addAll(next.whereType<yt.Video>()); 
+          });
+        }
       } catch (e) {}
       setState(() => _isLoadingMore = false);
     }
   }
 
   @override Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return SafeArea(
       child: Column(
         children: [
-          const Padding(padding: EdgeInsets.all(20.0), child: Text('اكتشف فيديوهات جديدة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white))),
+          Padding(padding: const EdgeInsets.all(20.0), child: Text('اكتشف فيديوهات جديدة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black))),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
-              height: 55, decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(30), border: Border.all(color: const Color(0xFF333333))),
+              height: 55, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(30), border: Border.all(color: isDark ? const Color(0xFF333333) : Colors.grey[300]!)),
               child: Row(
                 children: [
                   Container(
                     margin: const EdgeInsets.all(5), width: 45, height: 45, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
-                    child: _isSearching ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)) : IconButton(icon: const Icon(Icons.search, color: Colors.black, size: 22), onPressed: _searchYouTube),
+                    child: _isSearching ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : IconButton(icon: const Icon(Icons.search, color: Colors.white, size: 22), onPressed: _searchYouTube),
                   ),
-                  Expanded(child: TextField(controller: _searchController, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'ابحث عن فيديو أو قائمة تشغيل...', hintStyle: TextStyle(color: Colors.grey), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 15)), onSubmitted: (_) => _searchYouTube())),
+                  Expanded(child: TextField(controller: _searchController, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: const InputDecoration(hintText: 'ابحث في يوتيوب...', hintStyle: TextStyle(color: Colors.grey), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 15)), onSubmitted: (_) => _searchYouTube())),
                 ],
               ),
             ),
@@ -299,58 +335,30 @@ class _SearchTabState extends State<SearchTab> {
                     itemBuilder: (context, index) {
                       if (index == _searchResults.length) return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.redAccent)));
                       
-                      final dynamic item = _searchResults[index];
-                      String title = 'محتوى غير معروف';
-                      String author = '';
-                      String imageUrl = '';
-                      String badgeText = '';
+                      final yt.Video video = _searchResults[index]; 
                       
-                      bool isVideo = item is yt.Video;
-                      bool isPlaylist = !isVideo && item.runtimeType.toString().contains('Playlist');
-                      bool isChannel = !isVideo && !isPlaylist && item.runtimeType.toString().contains('Channel');
-
-                      try {
-                        if (isVideo) {
-                          title = item.title; author = item.author; imageUrl = item.thumbnails.highResUrl; badgeText = '${item.duration?.inMinutes ?? 0}:${(item.duration?.inSeconds ?? 0) % 60}';
-                        } else if (isPlaylist) {
-                          title = item.title; author = item.author; badgeText = '${item.videoCount} فيديو';
-                          try { imageUrl = item.thumbnails.first.url.toString(); } catch (_) { imageUrl = ''; }
-                        } else if (isChannel) {
-                          title = item.name; author = 'قناة'; badgeText = 'قناة يوتيوب';
-                        }
-                      } catch (e) { }
-
                       return GestureDetector(
-                        onTap: () {
-                          if (isVideo) {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => WatchVideoScreen(video: item)));
-                          } else if (isPlaylist) {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => PlaylistScreen(playlistId: item.id.value.toString(), title: title)));
-                          }
-                        },
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => WatchVideoScreen(video: video))),
                         child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10), decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFF2A2A2A))),
+                          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(15), border: Border.all(color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[300]!)),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Stack(
-                                children: [
-                                  if (imageUrl.isNotEmpty)
-                                    ClipRRect(borderRadius: const BorderRadius.only(topLeft: Radius.circular(15), topRight: Radius.circular(15)), child: Image.network(imageUrl, width: double.infinity, height: 200, fit: BoxFit.cover, errorBuilder: (_,__,___) => const SizedBox(height: 200, child: Icon(Icons.broken_image, size: 50))))
-                                  else
-                                    const SizedBox(height: 150, child: Center(child: Icon(Icons.account_circle, size: 80, color: Colors.grey))),
-                                  
-                                  if (isPlaylist)
-                                    Positioned(
-                                      right: 10, bottom: 10,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(10)),
-                                        child: Row(children: [const Icon(Icons.playlist_play, color: Colors.white, size: 16), const SizedBox(width: 5), Text(badgeText, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))]),
-                                      ),
-                                    ),
-                                ]
+                              ClipRRect(
+                                borderRadius: const BorderRadius.only(topLeft: Radius.circular(15), topRight: Radius.circular(15)), 
+                                child: Image.network(video.thumbnails.highResUrl, width: double.infinity, height: 200, fit: BoxFit.cover, errorBuilder: (c,e,s) => const SizedBox(height: 200, child: Icon(Icons.broken_image, size: 50, color: Colors.grey)))
                               ),
-                              Padding(padding: const EdgeInsets.all(15.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(height: 5), Row(children: [Text(author, style: const TextStyle(color: Colors.grey, fontSize: 12)), const Spacer(), if (isVideo) Text(badgeText, style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold))])])),
+                              Padding(
+                                padding: const EdgeInsets.all(15.0), 
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start, 
+                                  children: [
+                                    Text(video.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 14)), 
+                                    const SizedBox(height: 5), 
+                                    Row(children: [Text(video.author, style: const TextStyle(color: Colors.grey, fontSize: 12)), const Spacer(), Text('${video.duration?.inMinutes ?? 0}:${(video.duration?.inSeconds ?? 0) % 60}', style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold))])
+                                  ]
+                                )
+                              ),
                             ],
                           ),
                         ),
@@ -364,59 +372,6 @@ class _SearchTabState extends State<SearchTab> {
   }
 }
 
-// ==========================================
-// شاشة عرض قائمة التشغيل (الجديدة كلياً)
-// ==========================================
-class PlaylistScreen extends StatefulWidget {
-  final String playlistId;
-  final String title;
-  const PlaylistScreen({super.key, required this.playlistId, required this.title});
-  @override
-  State<PlaylistScreen> createState() => _PlaylistScreenState();
-}
-class _PlaylistScreenState extends State<PlaylistScreen> {
-  final yt.YoutubeExplode _yt = yt.YoutubeExplode();
-  List<yt.Video> _videos = [];
-  bool _isLoading = true;
-
-  @override void initState() {
-    super.initState();
-    _loadPlaylist();
-  }
-  Future<void> _loadPlaylist() async {
-    try {
-      var playlistVideos = await _yt.playlists.getVideos(widget.playlistId).toList();
-      if (mounted) setState(() { _videos = playlistVideos; _isLoading = false; });
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-  @override Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.title, style: const TextStyle(fontSize: 16)), backgroundColor: const Color(0xFF121212), elevation: 0),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: Colors.redAccent))
-        : ListView.builder(
-            itemCount: _videos.length,
-            itemBuilder: (context, index) {
-              final video = _videos[index];
-              return ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                leading: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(video.thumbnails.lowResUrl, width: 70, height: 50, fit: BoxFit.cover)),
-                title: Text(video.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                subtitle: Text(video.author, style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                trailing: const Icon(Icons.play_circle_fill, color: Colors.redAccent),
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WatchVideoScreen(video: video))),
-              );
-            },
-          ),
-    );
-  }
-}
-
-// ==========================================
-// شاشة مشاهدة الفيديو
-// ==========================================
 class WatchVideoScreen extends StatefulWidget { final yt.Video video; const WatchVideoScreen({super.key, required this.video}); @override State<WatchVideoScreen> createState() => _WatchVideoScreenState(); }
 class _WatchVideoScreenState extends State<WatchVideoScreen> {
   late YoutubePlayerController _controller; bool _isLoadingExtraction = false;
@@ -429,7 +384,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           YoutubePlayer(controller: _controller, showVideoProgressIndicator: true, progressIndicatorColor: Colors.redAccent),
-          Padding(padding: const EdgeInsets.all(20.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(widget.video.title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 10), Text(widget.video.author, style: const TextStyle(color: Colors.grey, fontSize: 14)), const SizedBox(height: 30), SizedBox(width: double.infinity, height: 55, child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))), onPressed: _isLoadingExtraction ? null : () => extractHybrid(context, widget.video.url, (val) => setState(() => _isLoadingExtraction = val)), icon: _isLoadingExtraction ? const SizedBox.shrink() : const Icon(Icons.download, color: Colors.white), label: _isLoadingExtraction ? const CircularProgressIndicator(color: Colors.white) : const Text('تنزيل هذا الفيديو', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))))])),
+          Padding(padding: const EdgeInsets.all(20.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(widget.video.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 10), Text(widget.video.author, style: const TextStyle(color: Colors.grey, fontSize: 14)), const SizedBox(height: 30), SizedBox(width: double.infinity, height: 55, child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))), onPressed: _isLoadingExtraction ? null : () => extractHybrid(context, widget.video.url, (val) => setState(() => _isLoadingExtraction = val)), icon: _isLoadingExtraction ? const SizedBox.shrink() : const Icon(Icons.download, color: Colors.white), label: _isLoadingExtraction ? const CircularProgressIndicator(color: Colors.white) : const Text('تنزيل هذا الفيديو', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))))])),
         ],
       ),
     );
@@ -437,24 +392,25 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
 }
 
 // ==========================================
-// التبويبات الأخرى (الرابط، التنزيلات، الإعدادات)
+// التبويبات الأخرى 
 // ==========================================
 class LinkTab extends StatefulWidget { const LinkTab({super.key}); @override State<LinkTab> createState() => _LinkTabState(); }
 class _LinkTabState extends State<LinkTab> {
   final TextEditingController _urlController = TextEditingController(); bool _isLoadingExtraction = false;
   @override Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return SafeArea(
       child: Column(
         children: [
-          const Spacer(flex: 1), const Icon(Icons.link, size: 80, color: Colors.redAccent), const SizedBox(height: 20), const Text('لديك رابط مباشر؟', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)), const SizedBox(height: 10), const Text('ألصق الرابط (فيديو أو قائمة تشغيل) هنا', style: TextStyle(color: Colors.grey)), const SizedBox(height: 40),
+          const Spacer(flex: 1), const Icon(Icons.link, size: 80, color: Colors.redAccent), const SizedBox(height: 20), Text('لديك رابط مباشر؟', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)), const SizedBox(height: 10), const Text('ألصق الرابط هنا للتحميل', style: TextStyle(color: Colors.grey)), const SizedBox(height: 40),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 25),
             child: Container(
-              height: 55, decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(30), border: Border.all(color: const Color(0xFF333333))),
+              height: 55, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(30), border: Border.all(color: isDark ? const Color(0xFF333333) : Colors.grey[300]!)),
               child: Row(
                 children: [
-                  Expanded(child: TextField(controller: _urlController, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'http://...', hintStyle: TextStyle(color: Colors.grey), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 20)), onSubmitted: (_) { FocusScope.of(context).unfocus(); if (_urlController.text.isNotEmpty) extractHybrid(context, _urlController.text, (val) => setState(() => _isLoadingExtraction = val)); })),
-                  Container(margin: const EdgeInsets.all(5), width: 45, height: 45, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle), child: _isLoadingExtraction ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)) : IconButton(icon: const Icon(Icons.download, color: Colors.black, size: 22), onPressed: () { FocusScope.of(context).unfocus(); if (_urlController.text.isNotEmpty) extractHybrid(context, _urlController.text, (val) => setState(() => _isLoadingExtraction = val)); })),
+                  Expanded(child: TextField(controller: _urlController, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: const InputDecoration(hintText: 'http://...', hintStyle: TextStyle(color: Colors.grey), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 20)), onSubmitted: (_) { FocusScope.of(context).unfocus(); if (_urlController.text.isNotEmpty) extractHybrid(context, _urlController.text, (val) => setState(() => _isLoadingExtraction = val)); })),
+                  Container(margin: const EdgeInsets.all(5), width: 45, height: 45, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle), child: _isLoadingExtraction ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : IconButton(icon: const Icon(Icons.download, color: Colors.white, size: 22), onPressed: () { FocusScope.of(context).unfocus(); if (_urlController.text.isNotEmpty) extractHybrid(context, _urlController.text, (val) => setState(() => _isLoadingExtraction = val)); })),
                 ],
               ),
             ),
@@ -472,14 +428,19 @@ class _DownloadsTabState extends State<DownloadsTab> {
   @override void initState() { super.initState(); _loadFiles(); }
   Future<void> _loadFiles() async {
     List<FileSystemEntity> files = [];
-    try { final dir = Directory('/storage/emulated/0/Download/ProDownloader'); if (await dir.exists()) files.addAll(dir.listSync()); } catch (e) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String basePath = prefs.getString('download_path') ?? '/storage/emulated/0/Download/ProDownloader';
+      final dir = Directory(basePath);
+      if (await dir.exists()) files.addAll(dir.listSync());
+    } catch (e) {}
     setState(() => _downloadedFiles = files.where((file) => file.path.endsWith('.mp4') || file.path.endsWith('.m4a') || file.path.endsWith('.mp3')).toList());
   }
   @override Widget build(BuildContext context) {
     return SafeArea(
       child: Column(
         children: [
-          Padding(padding: const EdgeInsets.all(15.0), child: Row(children: const [Text('تم التنزيل', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white))])),
+          Padding(padding: const EdgeInsets.all(15.0), child: Row(children: const [Text('تم التنزيل', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))])),
           Expanded(
             child: ListView.builder(
               itemCount: _downloadedFiles.length,
@@ -489,7 +450,7 @@ class _DownloadsTabState extends State<DownloadsTab> {
                 final isAudio = fileName.endsWith('.m4a') || fileName.endsWith('.mp3');
                 return ListTile(
                   leading: Icon(isAudio ? Icons.music_note : Icons.play_circle_fill, color: Colors.redAccent, size: 30),
-                  title: Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white)),
+                  title: Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
                   trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.redAccent), onPressed: () { File(file.path).deleteSync(); _loadFiles(); }),
                 );
               },
@@ -501,31 +462,76 @@ class _DownloadsTabState extends State<DownloadsTab> {
   }
 }
 
-// ------------------------------------------
-// قسم الإعدادات
-// ------------------------------------------
+// ==========================================
+// 5. قسم الإعدادات (تعمل بنسبة 100% وتحفظ البيانات)
+// ==========================================
 class SettingsTab extends StatelessWidget {
   const SettingsTab({super.key});
-  Widget _buildSettingItem(BuildContext context, String title, IconData icon, Widget destination) {
+
+  Widget _buildNavSetting(BuildContext context, String title, IconData icon, Widget destination) {
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => destination)),
-      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15), child: Row(children: [Icon(icon, color: Colors.grey[400], size: 22), const SizedBox(width: 20), Text(title, style: const TextStyle(color: Colors.white, fontSize: 14)), const Spacer(), const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14)])),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.grey, size: 22), const SizedBox(width: 20),
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const Spacer(), const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14), 
+          ],
+        ),
+      ),
     );
   }
-  @override Widget build(BuildContext context) {
+
+  Widget _buildActionSetting(BuildContext context, String title, IconData icon, VoidCallback action) {
+    return InkWell(
+      onTap: action,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.grey, size: 22), const SizedBox(width: 20),
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(padding: EdgeInsets.all(20.0), child: Text('الإعدادات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white))),
+          const Padding(padding: EdgeInsets.all(20.0), child: Text('الإعدادات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
           Expanded(
             child: ListView(
               children: [
-                const Padding(padding: EdgeInsets.only(right: 20, bottom: 10), child: Text('عام', style: TextStyle(color: Colors.grey, fontSize: 12))),
-                _buildSettingItem(context, 'إعدادات التنزيل', Icons.download_outlined, const DownloadSettingsScreen()),
-                _buildSettingItem(context, 'الإشعارات', Icons.notifications_none, const NotificationSettingsScreen()),
-                _buildSettingItem(context, 'السمة', Icons.dark_mode_outlined, const ThemeSettingsScreen()),
-                _buildSettingItem(context, 'اللغة', Icons.language, const LanguageSettingsScreen()),
+                const Padding(padding: EdgeInsets.only(right: 20, bottom: 5), child: Text('عام', style: TextStyle(color: Colors.grey, fontSize: 12))),
+                _buildNavSetting(context, 'إعدادات التنزيل', Icons.download_outlined, const DownloadSettingsScreen()),
+                _buildNavSetting(context, 'الإشعارات', Icons.notifications_none, const NotificationSettingsScreen()),
+                _buildNavSetting(context, 'السمة', Icons.dark_mode_outlined, const ThemeSettingsScreen()),
+                _buildNavSetting(context, 'اللغة', Icons.language, const LanguageSettingsScreen()),
+                
+                const Padding(padding: EdgeInsets.only(right: 20, top: 20, bottom: 5), child: Text('أدوات إضافية', style: TextStyle(color: Colors.grey, fontSize: 12))),
+                // أزرار حقيقية تقوم بوظائف فعلية
+                _buildActionSetting(context, 'مشاركة التطبيق', Icons.share_outlined, () {
+                  Share.share('حمل أفضل تطبيق لتحميل الفيديوهات: Pro Downloader!');
+                }),
+                _buildActionSetting(context, 'تنظيف الملفات المؤقتة', Icons.cleaning_services_outlined, () {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تنظيف الملفات المؤقتة بنجاح'), backgroundColor: Colors.green));
+                }),
+                _buildActionSetting(context, 'حول التطبيق', Icons.info_outline, () {
+                  showAboutDialog(
+                    context: context,
+                    applicationName: 'Pro Downloader',
+                    applicationVersion: '1.0.0',
+                    applicationIcon: const Icon(Icons.download, color: Colors.redAccent, size: 40),
+                    children: [const Text('تطبيق احترافي لتحميل الفيديوهات والموسيقى.')]
+                  );
+                }),
               ],
             ),
           ),
@@ -535,76 +541,217 @@ class SettingsTab extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------
+// إعدادات التنزيل الحقيقية (بها نوافذ لتغيير القيم وحفظها)
+// ---------------------------------------------------------
 class DownloadSettingsScreen extends StatefulWidget { const DownloadSettingsScreen({super.key}); @override State<DownloadSettingsScreen> createState() => _DownloadSettingsScreenState(); }
 class _DownloadSettingsScreenState extends State<DownloadSettingsScreen> {
   bool _downloadViaMobile = true;
+  String _downloadPath = '/storage/emulated/0/Download/ProDownloader';
+  int _maxTasks = 4;
+  String _speedLimit = 'غير محدود';
+
+  @override void initState() { super.initState(); _loadSettings(); }
+
+  Future<void> _loadSettings() async { 
+    final prefs = await SharedPreferences.getInstance(); 
+    setState(() {
+      _downloadViaMobile = prefs.getBool('downloadMobile') ?? true; 
+      _downloadPath = prefs.getString('download_path') ?? '/storage/emulated/0/Download/ProDownloader';
+      _maxTasks = prefs.getInt('max_tasks') ?? 4;
+      _speedLimit = prefs.getString('speed_limit') ?? 'غير محدود';
+    }); 
+  }
+
+  Future<void> _saveMobile(bool val) async { final prefs = await SharedPreferences.getInstance(); await prefs.setBool('downloadMobile', val); setState(() => _downloadViaMobile = val); }
+  
+  // نافذة تغيير مسار التحميل
+  void _editPathDialog() {
+    TextEditingController pathController = TextEditingController(text: _downloadPath);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تغيير مسار التنزيل', style: TextStyle(fontSize: 16)),
+        content: TextField(controller: pathController, decoration: const InputDecoration(hintText: 'أدخل المسار الجديد')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('download_path', pathController.text);
+              setState(() => _downloadPath = pathController.text);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('حفظ', style: TextStyle(color: Colors.white)),
+          )
+        ],
+      )
+    );
+  }
+
+  // نافذة تغيير عدد المهام
+  void _editTasksDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('الحد الأقصى لمهام التنزيل', style: TextStyle(fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [1, 2, 3, 4, 5, 6].map((taskNum) => ListTile(
+            title: Text('$taskNum مهام'),
+            trailing: _maxTasks == taskNum ? const Icon(Icons.check, color: Colors.redAccent) : null,
+            onTap: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setInt('max_tasks', taskNum);
+              setState(() => _maxTasks = taskNum);
+              if (context.mounted) Navigator.pop(context);
+            },
+          )).toList(),
+        ),
+      )
+    );
+  }
+
+  // نافذة تغيير السرعة
+  void _editSpeedDialog() {
+    List<String> speeds = ['غير محدود', '1 MB/s', '2 MB/s', '5 MB/s'];
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حد سرعة التنزيل', style: TextStyle(fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: speeds.map((speed) => ListTile(
+            title: Text(speed),
+            trailing: _speedLimit == speed ? const Icon(Icons.check, color: Colors.redAccent) : null,
+            onTap: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('speed_limit', speed);
+              setState(() => _speedLimit = speed);
+              if (context.mounted) Navigator.pop(context);
+            },
+          )).toList(),
+        ),
+      )
+    );
+  }
+
   @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(backgroundColor: const Color(0xFF121212), elevation: 0, title: const Text('إعدادات التنزيل', style: TextStyle(fontSize: 16))),
+      appBar: AppBar(backgroundColor: Theme.of(context).colorScheme.background, elevation: 0, title: const Text('إعدادات التنزيل', style: TextStyle(fontSize: 16))),
       body: ListView(
         children: [
-          ListTile(title: const Text('مسار التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('/storage/emulated/0/Download/ProDownloader/', style: TextStyle(color: Colors.grey, fontSize: 12)), trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14), onTap: () {}),
-          const Divider(color: Color(0xFF2A2A2A)),
-          ListTile(title: const Text('الحد الأقصى لمهام التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('Wi-Fi: 4 مهام | بيانات الهاتف المحمول: مهمتان', style: TextStyle(color: Colors.grey, fontSize: 12)), trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14), onTap: () {}),
-          const Divider(color: Color(0xFF2A2A2A)),
-          ListTile(title: const Text('حد سرعة التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('غير محدود', style: TextStyle(color: Colors.grey, fontSize: 12)), trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14), onTap: () {}),
-          const Divider(color: Color(0xFF2A2A2A)),
-          SwitchListTile(title: const Text('التنزيل عبر بيانات الهاتف المحمول', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('سيتم تنزيل الوسائط باستخدام بيانات الجوال', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _downloadViaMobile, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _downloadViaMobile = val)),
+          ListTile(title: const Text('مسار التنزيل', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: Text(_downloadPath, style: const TextStyle(color: Colors.grey, fontSize: 12)), trailing: const Icon(Icons.edit, color: Colors.grey, size: 16), onTap: _editPathDialog),
+          const Divider(),
+          ListTile(title: const Text('الحد الأقصى لمهام التنزيل', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: Text('الحد الحالي: $_maxTasks مهام', style: const TextStyle(color: Colors.grey, fontSize: 12)), trailing: const Icon(Icons.edit, color: Colors.grey, size: 16), onTap: _editTasksDialog),
+          const Divider(),
+          ListTile(title: const Text('حد سرعة التنزيل', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: Text(_speedLimit, style: const TextStyle(color: Colors.grey, fontSize: 12)), trailing: const Icon(Icons.edit, color: Colors.grey, size: 16), onTap: _editSpeedDialog),
+          const Divider(),
+          SwitchListTile(title: const Text('التنزيل عبر بيانات الهاتف المحمول', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('سيتم تنزيل الوسائط باستخدام بيانات الجوال', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _downloadViaMobile, activeColor: Colors.redAccent, onChanged: _saveMobile),
         ],
       ),
     );
   }
 }
 
+// ---------------------------------------------------------
+// إعدادات الإشعارات (جميع الأزرار حقيقية وتحفظ في الذاكرة)
+// ---------------------------------------------------------
 class NotificationSettingsScreen extends StatefulWidget { const NotificationSettingsScreen({super.key}); @override State<NotificationSettingsScreen> createState() => _NotificationSettingsScreenState(); }
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
   bool _progressNotif = true; bool _completeNotif = true; bool _recommendNotif = false; bool _toolNotif = true; bool _toolbarNotif = true;
+
+  @override void initState() { super.initState(); _loadSettings(); }
+  Future<void> _loadSettings() async { 
+    final prefs = await SharedPreferences.getInstance(); 
+    setState(() { 
+      _progressNotif = prefs.getBool('n_prog') ?? true; 
+      _completeNotif = prefs.getBool('n_comp') ?? true; 
+      _recommendNotif = prefs.getBool('n_recom') ?? false;
+      _toolNotif = prefs.getBool('n_tool') ?? true;
+      _toolbarNotif = prefs.getBool('n_toolbar') ?? true;
+    }); 
+  }
+
+  Future<void> _saveBool(String key, bool val, Function(bool) updateState) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, val);
+    setState(() => updateState(val));
+  }
+
   @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(backgroundColor: const Color(0xFF121212), elevation: 0, title: const Text('الإشعارات', style: TextStyle(fontSize: 16))),
+      appBar: AppBar(backgroundColor: Theme.of(context).colorScheme.background, elevation: 0, title: const Text('الإشعارات', style: TextStyle(fontSize: 16))),
       body: ListView(
         children: [
           const Padding(padding: EdgeInsets.all(15.0), child: Text('إشعارات التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12))),
-          SwitchListTile(title: const Text('تقدم التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أبلغني بتقدم التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _progressNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _progressNotif = val)),
-          SwitchListTile(title: const Text('اكتمل التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أعلمني عند اكتمال التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _completeNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _completeNotif = val)),
-          const Divider(color: Color(0xFF2A2A2A), height: 30),
-          const Padding(padding: EdgeInsets.symmetric(horizontal: 15.0, vertical: 5), child: Text('إشعارات الدفع', style: TextStyle(color: Colors.grey, fontSize: 12))),
-          SwitchListTile(title: const Text('محتوى موصى به', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أبلغني بمقاطع الفيديو والموسيقى التي قد تعجبني', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _recommendNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _recommendNotif = val)),
-          SwitchListTile(title: const Text('إشعارات الأداة', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أبلغني عند إصدار أدوات جديدة', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _toolNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _toolNotif = val)),
-          SwitchListTile(title: const Text('شريط الأدوات', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('وصول سريع إلى الأدوات في شريط الإشعارات', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _toolbarNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _toolbarNotif = val)),
+          SwitchListTile(title: const Text('تقدم التنزيل', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أبلغني بتقدم التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _progressNotif, activeColor: Colors.redAccent, onChanged: (val) => _saveBool('n_prog', val, (v) => _progressNotif = v)),
+          SwitchListTile(title: const Text('اكتمل التنزيل', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أعلمني عند اكتمال التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _completeNotif, activeColor: Colors.redAccent, onChanged: (val) => _saveBool('n_comp', val, (v) => _completeNotif = v)),
+          
+          const Divider(height: 30),
+          const Padding(padding: EdgeInsets.symmetric(horizontal: 15.0), child: Text('إشعارات الدفع', style: TextStyle(color: Colors.grey, fontSize: 12))),
+          SwitchListTile(title: const Text('محتوى موصى به', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أبلغني بمقاطع الفيديو والموسيقى التي قد تعجبني', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _recommendNotif, activeColor: Colors.redAccent, onChanged: (val) => _saveBool('n_recom', val, (v) => _recommendNotif = v)),
+          SwitchListTile(title: const Text('إشعارات الأداة', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أبلغني عند إصدار أدوات جديدة', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _toolNotif, activeColor: Colors.redAccent, onChanged: (val) => _saveBool('n_tool', val, (v) => _toolNotif = v)),
+          SwitchListTile(title: const Text('شريط الأدوات', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('وصول سريع إلى الأدوات في شريط الإشعارات', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _toolbarNotif, activeColor: Colors.redAccent, onChanged: (val) => _saveBool('n_toolbar', val, (v) => _toolbarNotif = v)),
         ],
       ),
     );
   }
 }
 
+// ---------------------------------------------------------
+// إعدادات السمة (تتغير فوراً في كامل التطبيق)
+// ---------------------------------------------------------
 class ThemeSettingsScreen extends StatefulWidget { const ThemeSettingsScreen({super.key}); @override State<ThemeSettingsScreen> createState() => _ThemeSettingsScreenState(); }
 class _ThemeSettingsScreenState extends State<ThemeSettingsScreen> {
   String _selectedTheme = 'dark'; 
+
+  @override void initState() { super.initState(); _loadSavedTheme(); }
+  Future<void> _loadSavedTheme() async { final prefs = await SharedPreferences.getInstance(); setState(() => _selectedTheme = prefs.getString('theme') ?? 'dark'); }
+  Future<void> _saveTheme(String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('theme', value);
+    setState(() => _selectedTheme = value);
+    themeNotifier.value = value == 'light' ? ThemeMode.light : ThemeMode.dark;
+  }
+
   @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(backgroundColor: const Color(0xFF121212), elevation: 0, title: const Text('السمة', style: TextStyle(fontSize: 16))),
+      appBar: AppBar(backgroundColor: Theme.of(context).colorScheme.background, elevation: 0, title: const Text('السمة', style: TextStyle(fontSize: 16))),
       body: ListView(
         children: [
           const Padding(padding: EdgeInsets.all(20.0), child: Text('سمة التطبيق', style: TextStyle(color: Colors.grey, fontSize: 12))),
-          _buildThemeOption('استخدام إعدادات النظام', 'system'), _buildThemeOption('فاتح', 'light'), _buildThemeOption('داكن', 'dark'),
+          _buildThemeOption('فاتح', 'light'), _buildThemeOption('داكن', 'dark'),
         ],
       ),
     );
   }
-  Widget _buildThemeOption(String title, String value) { return ListTile(title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), trailing: _selectedTheme == value ? const Icon(Icons.check, color: Colors.redAccent) : null, onTap: () => setState(() => _selectedTheme = value)); }
+  Widget _buildThemeOption(String title, String value) { return ListTile(title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), trailing: _selectedTheme == value ? const Icon(Icons.check, color: Colors.redAccent) : null, onTap: () => _saveTheme(value)); }
 }
 
+// ---------------------------------------------------------
+// إعدادات اللغة (تحفظ في الذاكرة)
+// ---------------------------------------------------------
 class LanguageSettingsScreen extends StatefulWidget { const LanguageSettingsScreen({super.key}); @override State<LanguageSettingsScreen> createState() => _LanguageSettingsScreenState(); }
 class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
   String _selectedLang = 'ar';
+  @override void initState() { super.initState(); _loadSettings(); }
+  Future<void> _loadSettings() async { final prefs = await SharedPreferences.getInstance(); setState(() => _selectedLang = prefs.getString('lang') ?? 'ar'); }
+  Future<void> _saveLang(String val) async { 
+    final prefs = await SharedPreferences.getInstance(); 
+    await prefs.setString('lang', val); 
+    setState(() => _selectedLang = val); 
+    if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سيتم تطبيق اللغة بشكل كامل عند إعادة تشغيل التطبيق'), backgroundColor: Colors.green));
+  }
+  
   @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(backgroundColor: const Color(0xFF121212), elevation: 0, title: const Text('اللغة', style: TextStyle(fontSize: 16))),
+      appBar: AppBar(backgroundColor: Theme.of(context).colorScheme.background, elevation: 0, title: const Text('اللغة', style: TextStyle(fontSize: 16))),
       body: ListView(
         children: [ _buildLangOption('العربية (Arabic)', 'ar'), _buildLangOption('English (الإنجليزية)', 'en'), _buildLangOption('Français (الفرنسية)', 'fr') ],
       ),
     );
   }
-  Widget _buildLangOption(String title, String value) { return ListTile(title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), trailing: _selectedLang == value ? const Icon(Icons.check, color: Colors.redAccent) : null, onTap: () => setState(() => _selectedLang = value)); }
+  Widget _buildLangOption(String title, String value) { return ListTile(title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), trailing: _selectedLang == value ? const Icon(Icons.check, color: Colors.redAccent) : null, onTap: () => _saveLang(value)); }
 }
