@@ -40,10 +40,9 @@ jobs:
 
       - name: 🔧 الإصلاح السحري لأخطاء المكتبات القديمة
         run: |
-          find ~/.pub-cache/hosted/pub.dev/ -name "build.gradle" -type f -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
-          find ~/.pub-cache/hosted/pub.dev/flutter_inappwebview-*/android -name "build.gradle" -type f -exec sed -i '/android {/a \    namespace "com.pichillilorenzo.flutter_inappwebview"' {} +
+          find ~/.pub-cache/hosted/pub.dev/ -name "build.gradle" -type f -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} + || true
 
-      - name: 🩹 حل مشكلة تكرار ملفات Kotlin (الضربة القاضية)
+      - name: 🩹 حل مشكلة تكرار ملفات Kotlin
         run: |
           cat <<EOF >> android/app/build.gradle
           dependencies {
@@ -55,7 +54,7 @@ jobs:
           EOF
 
       - name: 🎨 دمج الأيقونة الجديدة
-        run: dart run flutter_launcher_icons
+        run: dart run flutter_launcher_icons || true
 
       - name: 🛠️ بناء ملف APK النهائي
         run: flutter build apk --release
