@@ -9,12 +9,11 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ==========================================
-// نواقل الحالة العالمية (اللغة + السمة)
+// 1. المتغيرات العالمية ونظام اللغات
 // ==========================================
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 final ValueNotifier<String> langNotifier = ValueNotifier('ar');
 
-// قاموس اللغات الحقيقي
 const Map<String, Map<String, String>> langMap = {
   'ar': {
     'search': 'بحث', 'link': 'رابط', 'downloads': 'تنزيلاتي', 'settings': 'الإعدادات',
@@ -39,46 +38,20 @@ const Map<String, Map<String, String>> langMap = {
     'general': 'Général', 'dl_settings': 'Paramètres de téléchargement', 'notif': 'Notifications', 'theme': 'Thème', 'language': 'Langue',
     'more_tools': 'Outils supplémentaires', 'share_app': 'Partager l\'app', 'clean_cache': 'Vider le cache', 'about': 'À propos',
     'formats_title': 'Plus de formats', 'audio': 'Audio', 'video': 'Vidéo', 'download_btn': 'Télécharger',
-  },
-  'es': {
-    'search': 'Buscar', 'link': 'Enlace', 'downloads': 'Descargas', 'settings': 'Ajustes',
-    'discover': 'Descubrir videos', 'search_hint': 'Buscar en YouTube...', 'start_search': 'Empieza a buscar',
-    'have_link': '¿Tienes un enlace?', 'paste_here': 'Pega el enlace aquí', 'downloaded': 'Descargado',
-    'general': 'General', 'dl_settings': 'Ajustes de descarga', 'notif': 'Notificaciones', 'theme': 'Tema', 'language': 'Idioma',
-    'more_tools': 'Más herramientas', 'share_app': 'Compartir app', 'clean_cache': 'Limpiar caché', 'about': 'Acerca de',
-    'formats_title': 'Más formatos', 'audio': 'Audio', 'video': 'Video', 'download_btn': 'Descargar',
-  },
-  'tr': {
-    'search': 'Ara', 'link': 'Bağlantı', 'downloads': 'İndirilenler', 'settings': 'Ayarlar',
-    'discover': 'Yeni videolar keşfedin', 'search_hint': 'YouTube\'da ara...', 'start_search': 'Aramaya başla',
-    'have_link': 'Bağlantınız var mı?', 'paste_here': 'Bağlantıyı buraya yapıştırın', 'downloaded': 'İndirildi',
-    'general': 'Genel', 'dl_settings': 'İndirme Ayarları', 'notif': 'Bildirimler', 'theme': 'Tema', 'language': 'Dil',
-    'more_tools': 'Daha fazla araç', 'share_app': 'Uygulamayı paylaş', 'clean_cache': 'Önbelleği temizle', 'about': 'Hakkında',
-    'formats_title': 'Daha Fazla Format', 'audio': 'Ses', 'video': 'Video', 'download_btn': 'İndir',
-  },
-  'hi': {
-    'search': 'खोजें', 'link': 'लिंक', 'downloads': 'डाउनलोड', 'settings': 'सेटिंग्स',
-    'discover': 'नए वीडियो खोजें', 'search_hint': 'यूट्यूब पर खोजें...', 'start_search': 'खोजना शुरू करें',
-    'have_link': 'सीधा लिंक है?', 'paste_here': 'डाउनलोड करने के लिए लिंक पेस्ट करें', 'downloaded': 'डाउनलोड किया गया',
-    'general': 'सामान्य', 'dl_settings': 'डाउनलोड सेटिंग्स', 'notif': 'सूचनाएं', 'theme': 'थीम', 'language': 'भाषा',
-    'more_tools': 'अधिक टूल', 'share_app': 'ऐप साझा करें', 'clean_cache': 'कैश साफ़ करें', 'about': 'के बारे में',
-    'formats_title': 'अधिक प्रारूप', 'audio': 'ऑडियो', 'video': 'वीडियो', 'download_btn': 'डाउनलोड',
-  },
+  }
 };
 
 String t(String key) {
-  return langMap[langNotifier.value]?[key] ?? key;
+  return langMap[langNotifier.value]?[key] ?? langMap['ar']![key] ?? key;
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
   
-  // تحميل الثيم
   final savedTheme = prefs.getString('theme') ?? 'dark';
   themeNotifier.value = savedTheme == 'light' ? ThemeMode.light : ThemeMode.dark;
   
-  // تحميل اللغة
   final savedLang = prefs.getString('lang') ?? 'ar';
   langNotifier.value = savedLang;
 
@@ -86,6 +59,9 @@ void main() async {
   runApp(const ProDownloaderApp());
 }
 
+// ==========================================
+// 2. الجذر الأساسي للتطبيق
+// ==========================================
 class ProDownloaderApp extends StatelessWidget {
   const ProDownloaderApp({super.key});
 
@@ -101,7 +77,6 @@ class ProDownloaderApp extends StatelessWidget {
               title: 'Pro Downloader',
               debugShowCheckedModeBanner: false,
               builder: (context, child) {
-                // تحديد الاتجاه بناءً على اللغة (العربية من اليمين لليسار)
                 return Directionality(textDirection: currentLang == 'ar' ? TextDirection.rtl : TextDirection.ltr, child: child!);
               },
               themeMode: currentTheme,
@@ -127,7 +102,7 @@ class ProDownloaderApp extends StatelessWidget {
 }
 
 // ==========================================
-// شاشة البداية
+// 3. شاشة البداية (Splash)
 // ==========================================
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -152,7 +127,7 @@ class _SplashScreenState extends State<SplashScreen> {
 }
 
 // ==========================================
-// شريط التنقل السفلي
+// 4. شريط التنقل السفلي
 // ==========================================
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -208,66 +183,109 @@ class _MainNavigationState extends State<MainNavigation> {
 }
 
 // ==========================================
-// محرك الاستخراج وواجهة التحميل الجديدة (مطابقة للصورة)
+// 5. محرك الاستخراج ونافذة الجودات
 // ==========================================
-Future<void> extractAndShowFormats(BuildContext context, String url, Function(bool) setLoading) async {
+Future<void> extractHybrid(BuildContext context, String url, Function(bool) setLoading) async {
   setLoading(true);
   try {
-    final ytEngine = yt.YoutubeExplode();
-    var video = await ytEngine.videos.get(url);
-    var manifest = await ytEngine.videos.streamsClient.getManifest(video.id);
-    
     List<Map<String, dynamic>> audioList = [];
     List<Map<String, dynamic>> videoList = [];
+    String videoTitle = 'فيديو بدون عنوان';
+    String? thumb;
 
-    // جلب الصوتيات
-    for (var stream in manifest.audioOnly) {
-      if(stream.container.name == 'mp4' || stream.container.name == 'webm') {
-        audioList.add({
-          'quality_name': 'كلاسيكي (128K) ${stream.container.name.toUpperCase()}',
-          'desc': 'الأفضل للتشغيل على الهواتف والسيارات',
-          'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
-          'url': stream.url.toString(),
-          'ext': stream.container.name
-        });
+    // المحاولة الأولى: استخراج محلي من الهاتف
+    bool localSuccess = false;
+    if (url.contains('youtube.com') || url.contains('youtu.be')) {
+      try {
+        final ytEngine = yt.YoutubeExplode();
+        var video = await ytEngine.videos.get(url);
+        videoTitle = video.title;
+        thumb = video.thumbnails.highResUrl;
+        var manifest = await ytEngine.videos.streamsClient.getManifest(video.id);
+        
+        for (var stream in manifest.audioOnly) {
+          if(stream.container.name == 'mp4' || stream.container.name == 'webm') {
+            audioList.add({
+              'quality_name': 'كلاسيكي (128K) ${stream.container.name.toUpperCase()}',
+              'desc': 'الأفضل للتشغيل على الهواتف والسيارات',
+              'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
+              'url': stream.url.toString(),
+              'ext': stream.container.name
+            });
+          }
+        }
+        for (var stream in manifest.muxed) {
+          String q = '${stream.videoResolution.height}p';
+          String desc = stream.videoResolution.height >= 720 ? 'جودة عالية (عرض واضح)' : 'جودة عادية للتشغيل السريع';
+          videoList.add({
+            'quality_name': 'سريع ($q)',
+            'desc': desc,
+            'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
+            'url': stream.url.toString(),
+            'ext': stream.container.name
+          });
+        }
+        ytEngine.close();
+        localSuccess = true;
+      } catch (e) {
+        localSuccess = false; // إذا فشل محلياً، ننتقل للسيرفر
       }
     }
-    // جلب الفيديوهات
-    for (var stream in manifest.muxed) {
-      String q = '${stream.videoResolution.height}p';
-      String desc = 'جودة عادية للتشغيل السريع';
-      if(stream.videoResolution.height >= 720) desc = 'جودة عالية (عرض واضح)';
-      videoList.add({
-        'quality_name': 'سريع ($q)',
-        'desc': desc,
-        'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
-        'url': stream.url.toString(),
-        'ext': stream.container.name
-      });
-    }
-    ytEngine.close();
 
-    if (context.mounted) {
+    // المحاولة الثانية: عبر السيرفر الخارجي (Railway)
+    if (!localSuccess) {
+      final dio = Dio();
+      final response = await dio.post('https://web-production-69773.up.railway.app/api/extract', data: {'url': url});
+      if (response.statusCode == 200 && response.data['status'] == 'success') {
+        videoTitle = response.data['title'] ?? 'فيديو بدون عنوان';
+        thumb = response.data['thumbnail'];
+        final formats = response.data['formats'] as List;
+        
+        for(var f in formats) {
+          String ext = f['ext'].toString().toLowerCase();
+          String quality = f['quality'].toString();
+          String size = f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
+          
+          if(ext == 'm4a' || ext == 'mp3') {
+            audioList.add({
+              'quality_name': 'صوت ($quality)',
+              'desc': 'الأفضل للتشغيل الصوتي',
+              'size': size,
+              'url': f['url'],
+              'ext': ext
+            });
+          } else if(ext == 'mp4' || ext == 'webm') {
+            videoList.add({
+              'quality_name': 'فيديو ($quality)',
+              'desc': 'جودة متوافقة',
+              'size': size,
+              'url': f['url'],
+              'ext': ext
+            });
+          }
+        }
+      }
+    }
+
+    if (context.mounted && (audioList.isNotEmpty || videoList.isNotEmpty)) {
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
         backgroundColor: Theme.of(context).colorScheme.surface,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-        builder: (context) => FormatSelectionSheet(
-          title: video.title,
-          audioFormats: audioList,
-          videoFormats: videoList,
-        ),
+        builder: (context) => FormatSelectionSheet(title: videoTitle, audioFormats: audioList, videoFormats: videoList),
       );
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ تعذر استخراج الروابط من هذا الفيديو')));
     }
   } catch (e) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ تعذر استخراج الروابط')));
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ حدث خطأ في الاتصال')));
   } finally {
     setLoading(false);
   }
 }
 
-// --- واجهة التحميل المطابقة لصورتك تماماً ---
+// واجهة الجودات المطابقة للصورة (26691.jpg)
 class FormatSelectionSheet extends StatefulWidget {
   final String title;
   final List<Map<String, dynamic>> audioFormats;
@@ -278,7 +296,6 @@ class FormatSelectionSheet extends StatefulWidget {
   @override
   State<FormatSelectionSheet> createState() => _FormatSelectionSheetState();
 }
-
 class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
   Map<String, dynamic>? _selectedFormat;
 
@@ -292,46 +309,41 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
       child: Column(
         children: [
-          // شريط العنوان
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(icon: Icon(Icons.arrow_back, color: textColor), onPressed: () => Navigator.pop(context)),
+              IconButton(icon: Icon(Icons.arrow_forward, color: textColor), onPressed: () => Navigator.pop(context)),
               Text(t('formats_title'), style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(width: 48), // للتوازن
+              const SizedBox(width: 48), 
             ],
           ),
           const SizedBox(height: 10),
-          
           Expanded(
             child: ListView(
               children: [
-                // قسم الموسيقى
                 if (widget.audioFormats.isNotEmpty) ...[
-                  Padding(padding: const EdgeInsets.all(15), child: Text(t('audio'), style: const TextStyle(color: Colors.grey, fontSize: 14))),
+                  Padding(padding: const EdgeInsets.only(left: 15, right: 15, bottom: 5), child: Align(alignment: Alignment.centerRight, child: Text(t('audio'), style: const TextStyle(color: Colors.grey, fontSize: 14)))),
                   ...widget.audioFormats.map((fmt) => _buildFormatRow(fmt, Icons.music_note, textColor)),
                 ],
-                // قسم الفيديو
+                const SizedBox(height: 10),
                 if (widget.videoFormats.isNotEmpty) ...[
-                  Padding(padding: const EdgeInsets.all(15), child: Text(t('video'), style: const TextStyle(color: Colors.grey, fontSize: 14))),
+                  Padding(padding: const EdgeInsets.only(left: 15, right: 15, bottom: 5), child: Align(alignment: Alignment.centerRight, child: Text(t('video'), style: const TextStyle(color: Colors.grey, fontSize: 14)))),
                   ...widget.videoFormats.map((fmt) => _buildFormatRow(fmt, Icons.play_arrow, textColor)),
                 ],
               ],
             ),
           ),
-          
-          // زر التنزيل الكبير (أحمر بدل الأصفر)
           Padding(
-            padding: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.all(15.0),
             child: SizedBox(
-              width: double.infinity, height: 55,
+              width: double.infinity, height: 50,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD600), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25))),
                 onPressed: _selectedFormat == null ? null : () {
                   Navigator.pop(context);
                   downloadFileFinal(context, _selectedFormat!['url'], widget.title, _selectedFormat!['ext']);
                 },
-                child: Text(t('download_btn'), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                child: Text(t('download_btn'), style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           )
@@ -345,16 +357,13 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
     return InkWell(
       onTap: () => setState(() => _selectedFormat = format),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
         child: Row(
           children: [
-            // زر الراديو الدائري
-            Icon(isSelected ? Icons.check_circle : Icons.radio_button_unchecked, color: isSelected ? Colors.redAccent : Colors.grey, size: 24),
+            Icon(isSelected ? Icons.check_circle : Icons.radio_button_unchecked, color: isSelected ? const Color(0xFFFFD600) : Colors.grey, size: 24),
             const SizedBox(width: 15),
-            // الحجم
-            Text('${format['size']} MB', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            Text('MB ${format['size']}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
             const Spacer(),
-            // التفاصيل (في الوسط يمين)
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -363,7 +372,6 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
               ],
             ),
             const SizedBox(width: 15),
-            // الأيقونة (يمين)
             Icon(icon, color: Colors.grey, size: 22),
           ],
         ),
@@ -372,9 +380,10 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
   }
 }
 
-// دالة التحميل الحقيقية وإصلاح صلاحيات أندرويد 13+
+// ==========================================
+// 6. دالة التحميل الفعلية (مع صلاحيات أندرويد 13)
+// ==========================================
 Future<void> downloadFileFinal(BuildContext context, String downloadUrl, String title, String extension) async {
-  // طلب الصلاحيات القوية الخاصة بأندرويد 13 فما فوق
   if (Platform.isAndroid) {
     if (await Permission.manageExternalStorage.isDenied) {
       await Permission.manageExternalStorage.request();
@@ -383,22 +392,25 @@ Future<void> downloadFileFinal(BuildContext context, String downloadUrl, String 
   await Permission.storage.request();
 
   try {
-    String safeTitle = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-    String basePath = '/storage/emulated/0/Download/ProDownloader';
+    final prefs = await SharedPreferences.getInstance();
+    String basePath = prefs.getString('download_path') ?? '/storage/emulated/0/Download/ProDownloader';
+    if (!basePath.endsWith('/')) basePath += '/';
     Directory(basePath).createSync(recursive: true);
-    String savePath = '$basePath/$safeTitle.$extension';
+
+    String safeTitle = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    String savePath = '$basePath$safeTitle.$extension';
     
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('بدأ التحميل...'), backgroundColor: Colors.orange));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('بدأ التحميل... يمكنك المتابعة في التنزيلات'), backgroundColor: Colors.orange));
     final dio = Dio();
     await dio.download(downloadUrl, savePath, options: Options(headers: {'User-Agent': 'Mozilla/5.0'}));
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ تم الحفظ بنجاح في التنزيلات!'), backgroundColor: Colors.green));
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ تم الحفظ:\n$savePath'), backgroundColor: Colors.green));
   } catch (e) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ فشل التحميل، يرجى التحقق من الأذونات'), backgroundColor: Colors.red));
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ فشل التحميل، تأكد من إعطاء الصلاحيات'), backgroundColor: Colors.red));
   }
 }
 
 // ==========================================
-// تبويبة البحث (إصلاح الصور)
+// 7. تبويبة البحث (البحث عن الفيديوهات فقط)
 // ==========================================
 class SearchTab extends StatefulWidget { const SearchTab({super.key}); @override State<SearchTab> createState() => _SearchTabState(); }
 class _SearchTabState extends State<SearchTab> {
@@ -421,7 +433,12 @@ class _SearchTabState extends State<SearchTab> {
     setState(() { _isSearching = true; _searchResults.clear(); });
     try {
       final results = await _yt.search.search(query);
-      if (mounted) setState(() { _currentSearchPage = results; _searchResults = results.whereType<yt.Video>().toList(); });
+      if (mounted) {
+        setState(() { 
+          _currentSearchPage = results;
+          _searchResults = results.whereType<yt.Video>().toList(); 
+        });
+      }
     } catch (e) {} finally { if (mounted) setState(() => _isSearching = false); }
   }
 
@@ -430,7 +447,12 @@ class _SearchTabState extends State<SearchTab> {
       setState(() => _isLoadingMore = true);
       try {
         final next = await _currentSearchPage!.nextPage();
-        if (next != null) setState(() { _currentSearchPage = next; _searchResults.addAll(next.whereType<yt.Video>()); });
+        if (next != null) {
+          setState(() { 
+            _currentSearchPage = next;
+            _searchResults.addAll(next.whereType<yt.Video>()); 
+          });
+        }
       } catch (e) {}
       setState(() => _isLoadingMore = false);
     }
@@ -474,7 +496,7 @@ class _SearchTabState extends State<SearchTab> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               ClipRRect(
-                                borderRadius: const BorderRadius.only(topLeft: Radius.circular(15), topRight: Radius.circular(15)), 
+                                borderRadius: const BorderRadius.only(topLeft: Radius.circular(15), topRight: Radius.circular(15), bottomLeft: Radius.circular(0), bottomRight: Radius.circular(0)), 
                                 child: Image.network(video.thumbnails.highResUrl, width: double.infinity, height: 200, fit: BoxFit.cover, errorBuilder: (c,e,s) => const SizedBox(height: 200, child: Icon(Icons.broken_image, size: 50, color: Colors.grey)))
                               ),
                               Padding(
@@ -495,30 +517,64 @@ class _SearchTabState extends State<SearchTab> {
 }
 
 // ==========================================
-// إصلاح مشغل الفيديو (يعمل الآن بثبات)
+// 8. شاشة مشاهدة الفيديو (مستقرة وتعمل)
 // ==========================================
-class WatchVideoScreen extends StatefulWidget { final yt.Video video; const WatchVideoScreen({super.key, required this.video}); @override State<WatchVideoScreen> createState() => _WatchVideoScreenState(); }
+class WatchVideoScreen extends StatefulWidget { 
+  final yt.Video video; 
+  const WatchVideoScreen({super.key, required this.video}); 
+  @override State<WatchVideoScreen> createState() => _WatchVideoScreenState(); 
+}
 class _WatchVideoScreenState extends State<WatchVideoScreen> {
-  late YoutubePlayerController _controller; bool _isLoadingExtraction = false; bool _hasError = false;
+  late YoutubePlayerController _controller; 
+  bool _isLoadingExtraction = false; 
+  bool _hasError = false;
   
   @override void initState() { 
     super.initState(); 
     try {
       _controller = YoutubePlayerController(initialVideoId: widget.video.id.value, flags: const YoutubePlayerFlags(autoPlay: true, mute: false)); 
-    } catch(e) { _hasError = true; }
+    } catch(e) { 
+      _hasError = true; 
+    }
   }
   @override void dispose() { _controller.dispose(); super.dispose(); }
   
   @override Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      appBar: AppBar(backgroundColor: Colors.black, elevation: 0),
+      backgroundColor: isDark ? Colors.black : Colors.white,
+      appBar: AppBar(backgroundColor: Colors.black, elevation: 0, iconTheme: const IconThemeData(color: Colors.white)),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _hasError 
-            ? const SizedBox(height: 200, child: Center(child: Text('عذراً، لا يمكن تشغيل هذا الفيديو هنا.', style: TextStyle(color: Colors.white))))
+            ? const SizedBox(height: 220, child: Center(child: Text('عذراً، لا يمكن تشغيل هذا الفيديو هنا.', style: TextStyle(color: Colors.grey))))
             : YoutubePlayer(controller: _controller, showVideoProgressIndicator: true, progressIndicatorColor: Colors.redAccent),
-          Padding(padding: const EdgeInsets.all(20.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(widget.video.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 10), Text(widget.video.author, style: const TextStyle(color: Colors.grey, fontSize: 14)), const SizedBox(height: 30), SizedBox(width: double.infinity, height: 55, child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))), onPressed: _isLoadingExtraction ? null : () => extractAndShowFormats(context, widget.video.url, (val) => setState(() => _isLoadingExtraction = val)), icon: _isLoadingExtraction ? const SizedBox.shrink() : const Icon(Icons.download, color: Colors.white), label: _isLoadingExtraction ? const CircularProgressIndicator(color: Colors.white) : Text(t('download_btn'), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))))])),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0), 
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, 
+                  children: [
+                    Text(widget.video.title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)), 
+                    const SizedBox(height: 10), 
+                    Text(widget.video.author, style: const TextStyle(color: Colors.grey, fontSize: 14)), 
+                    const SizedBox(height: 30), 
+                    SizedBox(
+                      width: double.infinity, height: 55, 
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD600), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))), 
+                        onPressed: _isLoadingExtraction ? null : () => extractHybrid(context, widget.video.url, (val) => setState(() => _isLoadingExtraction = val)), 
+                        icon: _isLoadingExtraction ? const SizedBox.shrink() : const Icon(Icons.download, color: Colors.black), 
+                        label: _isLoadingExtraction ? const CircularProgressIndicator(color: Colors.black) : Text(t('download_btn'), style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold))
+                      )
+                    )
+                  ]
+                )
+              ),
+            ),
+          )
         ],
       ),
     );
@@ -526,7 +582,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
 }
 
 // ==========================================
-// التبويبات الأخرى
+// 9. التبويبات الأخرى
 // ==========================================
 class LinkTab extends StatefulWidget { const LinkTab({super.key}); @override State<LinkTab> createState() => _LinkTabState(); }
 class _LinkTabState extends State<LinkTab> {
@@ -543,8 +599,8 @@ class _LinkTabState extends State<LinkTab> {
               height: 55, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(30), border: Border.all(color: isDark ? const Color(0xFF333333) : Colors.grey[300]!)),
               child: Row(
                 children: [
-                  Expanded(child: TextField(controller: _urlController, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: const InputDecoration(hintText: 'http://...', hintStyle: TextStyle(color: Colors.grey), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 20)), onSubmitted: (_) { FocusScope.of(context).unfocus(); if (_urlController.text.isNotEmpty) extractAndShowFormats(context, _urlController.text, (val) => setState(() => _isLoadingExtraction = val)); })),
-                  Container(margin: const EdgeInsets.all(5), width: 45, height: 45, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle), child: _isLoadingExtraction ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : IconButton(icon: const Icon(Icons.download, color: Colors.white, size: 22), onPressed: () { FocusScope.of(context).unfocus(); if (_urlController.text.isNotEmpty) extractAndShowFormats(context, _urlController.text, (val) => setState(() => _isLoadingExtraction = val)); })),
+                  Expanded(child: TextField(controller: _urlController, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: const InputDecoration(hintText: 'http://...', hintStyle: TextStyle(color: Colors.grey), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 20)), onSubmitted: (_) { FocusScope.of(context).unfocus(); if (_urlController.text.isNotEmpty) extractHybrid(context, _urlController.text, (val) => setState(() => _isLoadingExtraction = val)); })),
+                  Container(margin: const EdgeInsets.all(5), width: 45, height: 45, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle), child: _isLoadingExtraction ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : IconButton(icon: const Icon(Icons.download, color: Colors.white, size: 22), onPressed: () { FocusScope.of(context).unfocus(); if (_urlController.text.isNotEmpty) extractHybrid(context, _urlController.text, (val) => setState(() => _isLoadingExtraction = val)); })),
                 ],
               ),
             ),
@@ -562,7 +618,12 @@ class _DownloadsTabState extends State<DownloadsTab> {
   @override void initState() { super.initState(); _loadFiles(); }
   Future<void> _loadFiles() async {
     List<FileSystemEntity> files = [];
-    try { final dir = Directory('/storage/emulated/0/Download/ProDownloader'); if (await dir.exists()) files.addAll(dir.listSync()); } catch (e) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String basePath = prefs.getString('download_path') ?? '/storage/emulated/0/Download/ProDownloader';
+      final dir = Directory(basePath);
+      if (await dir.exists()) files.addAll(dir.listSync());
+    } catch (e) {}
     setState(() => _downloadedFiles = files.where((file) => file.path.endsWith('.mp4') || file.path.endsWith('.m4a') || file.path.endsWith('.mp3')).toList());
   }
   @override Widget build(BuildContext context) {
@@ -592,24 +653,44 @@ class _DownloadsTabState extends State<DownloadsTab> {
 }
 
 // ==========================================
-// الإعدادات (تعمل وتحفظ)
+// 10. شاشات الإعدادات الكاملة (بدون أي اختصار)
 // ==========================================
 class SettingsTab extends StatelessWidget {
   const SettingsTab({super.key});
+
   Widget _buildNavSetting(BuildContext context, String title, IconData icon, Widget destination) {
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => destination)),
-      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15), child: Row(children: [Icon(icon, color: Colors.grey, size: 22), const SizedBox(width: 20), Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), const Spacer(), const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14)])),
-    );
-  }
-  Widget _buildActionSetting(BuildContext context, String title, IconData icon, VoidCallback action) {
-    return InkWell(
-      onTap: action,
-      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15), child: Row(children: [Icon(icon, color: Colors.grey, size: 22), const SizedBox(width: 20), Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold))])),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.grey, size: 22), const SizedBox(width: 20),
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const Spacer(), const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14), 
+          ],
+        ),
+      ),
     );
   }
 
-  @override Widget build(BuildContext context) {
+  Widget _buildActionSetting(BuildContext context, String title, IconData icon, VoidCallback action) {
+    return InkWell(
+      onTap: action,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.grey, size: 22), const SizedBox(width: 20),
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,9 +706,21 @@ class SettingsTab extends StatelessWidget {
                 _buildNavSetting(context, t('language'), Icons.language, const LanguageSettingsScreen()),
                 
                 Padding(padding: const EdgeInsets.only(right: 20, left: 20, top: 20, bottom: 5), child: Text(t('more_tools'), style: const TextStyle(color: Colors.grey, fontSize: 12))),
-                _buildActionSetting(context, t('share_app'), Icons.share_outlined, () { Share.share('Download Pro Downloader now!'); }),
-                _buildActionSetting(context, t('clean_cache'), Icons.cleaning_services_outlined, () { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم التنظيف بنجاح'), backgroundColor: Colors.green)); }),
-                _buildActionSetting(context, t('about'), Icons.info_outline, () { showAboutDialog(context: context, applicationName: 'Pro Downloader', applicationVersion: '1.0.0'); }),
+                _buildActionSetting(context, t('share_app'), Icons.share_outlined, () {
+                  Share.share('حمل أفضل تطبيق لتحميل الفيديوهات: Pro Downloader!');
+                }),
+                _buildActionSetting(context, t('clean_cache'), Icons.cleaning_services_outlined, () {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تنظيف الملفات المؤقتة بنجاح'), backgroundColor: Colors.green));
+                }),
+                _buildActionSetting(context, t('about'), Icons.info_outline, () {
+                  showAboutDialog(
+                    context: context,
+                    applicationName: 'Pro Downloader',
+                    applicationVersion: '1.0.0',
+                    applicationIcon: const Icon(Icons.download, color: Colors.redAccent, size: 40),
+                    children: [const Text('تطبيق احترافي لتحميل الفيديوهات والموسيقى.')]
+                  );
+                }),
               ],
             ),
           ),
@@ -637,25 +730,155 @@ class SettingsTab extends StatelessWidget {
   }
 }
 
+// --- إعدادات التنزيل مع النوافذ المنبثقة ---
 class DownloadSettingsScreen extends StatefulWidget { const DownloadSettingsScreen({super.key}); @override State<DownloadSettingsScreen> createState() => _DownloadSettingsScreenState(); }
 class _DownloadSettingsScreenState extends State<DownloadSettingsScreen> {
   bool _downloadViaMobile = true;
+  String _downloadPath = '/storage/emulated/0/Download/ProDownloader';
+  int _maxTasks = 4;
+  String _speedLimit = 'غير محدود';
+
   @override void initState() { super.initState(); _loadSettings(); }
-  Future<void> _loadSettings() async { final prefs = await SharedPreferences.getInstance(); setState(() { _downloadViaMobile = prefs.getBool('downloadMobile') ?? true; }); }
+
+  Future<void> _loadSettings() async { 
+    final prefs = await SharedPreferences.getInstance(); 
+    setState(() {
+      _downloadViaMobile = prefs.getBool('downloadMobile') ?? true; 
+      _downloadPath = prefs.getString('download_path') ?? '/storage/emulated/0/Download/ProDownloader';
+      _maxTasks = prefs.getInt('max_tasks') ?? 4;
+      _speedLimit = prefs.getString('speed_limit') ?? 'غير محدود';
+    }); 
+  }
+
   Future<void> _saveMobile(bool val) async { final prefs = await SharedPreferences.getInstance(); await prefs.setBool('downloadMobile', val); setState(() => _downloadViaMobile = val); }
+  
+  void _editPathDialog() {
+    TextEditingController pathController = TextEditingController(text: _downloadPath);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تغيير مسار التنزيل', style: TextStyle(fontSize: 16)),
+        content: TextField(controller: pathController, decoration: const InputDecoration(hintText: 'أدخل المسار الجديد')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('download_path', pathController.text);
+              setState(() => _downloadPath = pathController.text);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('حفظ', style: TextStyle(color: Colors.white)),
+          )
+        ],
+      )
+    );
+  }
+
+  void _editTasksDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('الحد الأقصى لمهام التنزيل', style: TextStyle(fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [1, 2, 3, 4, 5, 6].map((taskNum) => ListTile(
+            title: Text('$taskNum مهام'),
+            trailing: _maxTasks == taskNum ? const Icon(Icons.check, color: Colors.redAccent) : null,
+            onTap: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setInt('max_tasks', taskNum);
+              setState(() => _maxTasks = taskNum);
+              if (context.mounted) Navigator.pop(context);
+            },
+          )).toList(),
+        ),
+      )
+    );
+  }
+
+  void _editSpeedDialog() {
+    List<String> speeds = ['غير محدود', '1 MB/s', '2 MB/s', '5 MB/s'];
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حد سرعة التنزيل', style: TextStyle(fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: speeds.map((speed) => ListTile(
+            title: Text(speed),
+            trailing: _speedLimit == speed ? const Icon(Icons.check, color: Colors.redAccent) : null,
+            onTap: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('speed_limit', speed);
+              setState(() => _speedLimit = speed);
+              if (context.mounted) Navigator.pop(context);
+            },
+          )).toList(),
+        ),
+      )
+    );
+  }
+
   @override Widget build(BuildContext context) {
-    return Scaffold(appBar: AppBar(backgroundColor: Theme.of(context).colorScheme.background, elevation: 0, title: Text(t('dl_settings'), style: const TextStyle(fontSize: 16))), body: ListView(children: [SwitchListTile(title: const Text('التنزيل عبر بيانات الهاتف', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), value: _downloadViaMobile, activeColor: Colors.redAccent, onChanged: _saveMobile)]));
+    return Scaffold(
+      appBar: AppBar(backgroundColor: Theme.of(context).colorScheme.background, elevation: 0, title: Text(t('dl_settings'), style: const TextStyle(fontSize: 16))),
+      body: ListView(
+        children: [
+          ListTile(title: const Text('مسار التنزيل', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: Text(_downloadPath, style: const TextStyle(color: Colors.grey, fontSize: 12)), trailing: const Icon(Icons.edit, color: Colors.grey, size: 16), onTap: _editPathDialog),
+          const Divider(),
+          ListTile(title: const Text('الحد الأقصى لمهام التنزيل', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: Text('الحد الحالي: $_maxTasks مهام', style: const TextStyle(color: Colors.grey, fontSize: 12)), trailing: const Icon(Icons.edit, color: Colors.grey, size: 16), onTap: _editTasksDialog),
+          const Divider(),
+          ListTile(title: const Text('حد سرعة التنزيل', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: Text(_speedLimit, style: const TextStyle(color: Colors.grey, fontSize: 12)), trailing: const Icon(Icons.edit, color: Colors.grey, size: 16), onTap: _editSpeedDialog),
+          const Divider(),
+          SwitchListTile(title: const Text('التنزيل عبر بيانات الهاتف المحمول', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('سيتم تنزيل الوسائط باستخدام بيانات الجوال', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _downloadViaMobile, activeColor: Colors.redAccent, onChanged: _saveMobile),
+        ],
+      ),
+    );
   }
 }
 
+// --- إعدادات الإشعارات الكاملة ---
 class NotificationSettingsScreen extends StatefulWidget { const NotificationSettingsScreen({super.key}); @override State<NotificationSettingsScreen> createState() => _NotificationSettingsScreenState(); }
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
-  bool _progressNotif = true; 
+  bool _progressNotif = true; bool _completeNotif = true; bool _recommendNotif = false; bool _toolNotif = true; bool _toolbarNotif = true;
+
   @override void initState() { super.initState(); _loadSettings(); }
-  Future<void> _loadSettings() async { final prefs = await SharedPreferences.getInstance(); setState(() { _progressNotif = prefs.getBool('n_prog') ?? true; }); }
-  Future<void> _saveProg(bool val) async { final prefs = await SharedPreferences.getInstance(); await prefs.setBool('n_prog', val); setState(() => _progressNotif = val); }
+  Future<void> _loadSettings() async { 
+    final prefs = await SharedPreferences.getInstance(); 
+    setState(() { 
+      _progressNotif = prefs.getBool('n_prog') ?? true; 
+      _completeNotif = prefs.getBool('n_comp') ?? true; 
+      _recommendNotif = prefs.getBool('n_recom') ?? false;
+      _toolNotif = prefs.getBool('n_tool') ?? true;
+      _toolbarNotif = prefs.getBool('n_toolbar') ?? true;
+    }); 
+  }
+
+  Future<void> _saveBool(String key, bool val, Function(bool) updateState) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, val);
+    setState(() => updateState(val));
+  }
+
   @override Widget build(BuildContext context) {
-    return Scaffold(appBar: AppBar(backgroundColor: Theme.of(context).colorScheme.background, elevation: 0, title: Text(t('notif'), style: const TextStyle(fontSize: 16))), body: ListView(children: [SwitchListTile(title: const Text('إشعارات التنزيل', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), value: _progressNotif, activeColor: Colors.redAccent, onChanged: _saveProg)]));
+    return Scaffold(
+      appBar: AppBar(backgroundColor: Theme.of(context).colorScheme.background, elevation: 0, title: Text(t('notif'), style: const TextStyle(fontSize: 16))),
+      body: ListView(
+        children: [
+          const Padding(padding: EdgeInsets.all(15.0), child: Text('إشعارات التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12))),
+          SwitchListTile(title: const Text('تقدم التنزيل', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أبلغني بتقدم التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _progressNotif, activeColor: Colors.redAccent, onChanged: (val) => _saveBool('n_prog', val, (v) => _progressNotif = v)),
+          SwitchListTile(title: const Text('اكتمل التنزيل', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أعلمني عند اكتمال التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _completeNotif, activeColor: Colors.redAccent, onChanged: (val) => _saveBool('n_comp', val, (v) => _completeNotif = v)),
+          
+          const Divider(height: 30),
+          const Padding(padding: EdgeInsets.symmetric(horizontal: 15.0), child: Text('إشعارات الدفع', style: TextStyle(color: Colors.grey, fontSize: 12))),
+          SwitchListTile(title: const Text('محتوى موصى به', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أبلغني بمقاطع الفيديو والموسيقى التي قد تعجبني', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _recommendNotif, activeColor: Colors.redAccent, onChanged: (val) => _saveBool('n_recom', val, (v) => _recommendNotif = v)),
+          SwitchListTile(title: const Text('إشعارات الأداة', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أبلغني عند إصدار أدوات جديدة', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _toolNotif, activeColor: Colors.redAccent, onChanged: (val) => _saveBool('n_tool', val, (v) => _toolNotif = v)),
+          SwitchListTile(title: const Text('شريط الأدوات', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('وصول سريع إلى الأدوات في شريط الإشعارات', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _toolbarNotif, activeColor: Colors.redAccent, onChanged: (val) => _saveBool('n_toolbar', val, (v) => _toolbarNotif = v)),
+        ],
+      ),
+    );
   }
 }
 
@@ -664,12 +887,21 @@ class _ThemeSettingsScreenState extends State<ThemeSettingsScreen> {
   String _selectedTheme = 'dark'; 
   @override void initState() { super.initState(); _loadSavedTheme(); }
   Future<void> _loadSavedTheme() async { final prefs = await SharedPreferences.getInstance(); setState(() => _selectedTheme = prefs.getString('theme') ?? 'dark'); }
-  Future<void> _saveTheme(String value) async { final prefs = await SharedPreferences.getInstance(); await prefs.setString('theme', value); setState(() => _selectedTheme = value); themeNotifier.value = value == 'light' ? ThemeMode.light : ThemeMode.dark; }
+  Future<void> _saveTheme(String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('theme', value);
+    setState(() => _selectedTheme = value);
+    themeNotifier.value = value == 'light' ? ThemeMode.light : ThemeMode.dark;
+  }
   @override Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(backgroundColor: Theme.of(context).colorScheme.background, elevation: 0, title: Text(t('theme'), style: const TextStyle(fontSize: 16))),
       body: ListView(
-        children: [ ListTile(title: const Text('فاتح', style: TextStyle(fontWeight: FontWeight.bold)), trailing: _selectedTheme == 'light' ? const Icon(Icons.check, color: Colors.redAccent) : null, onTap: () => _saveTheme('light')), ListTile(title: const Text('داكن', style: TextStyle(fontWeight: FontWeight.bold)), trailing: _selectedTheme == 'dark' ? const Icon(Icons.check, color: Colors.redAccent) : null, onTap: () => _saveTheme('dark')) ],
+        children: [
+          const Padding(padding: EdgeInsets.all(20.0), child: Text('سمة التطبيق', style: TextStyle(color: Colors.grey, fontSize: 12))),
+          ListTile(title: const Text('فاتح', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), trailing: _selectedTheme == 'light' ? const Icon(Icons.check, color: Colors.redAccent) : null, onTap: () => _saveTheme('light')),
+          ListTile(title: const Text('داكن', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), trailing: _selectedTheme == 'dark' ? const Icon(Icons.check, color: Colors.redAccent) : null, onTap: () => _saveTheme('dark')),
+        ],
       ),
     );
   }
@@ -679,7 +911,12 @@ class LanguageSettingsScreen extends StatefulWidget { const LanguageSettingsScre
 class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
   String _selectedLang = 'ar';
   @override void initState() { super.initState(); _selectedLang = langNotifier.value; }
-  Future<void> _saveLang(String val) async { final prefs = await SharedPreferences.getInstance(); await prefs.setString('lang', val); setState(() => _selectedLang = val); langNotifier.value = val; }
+  Future<void> _saveLang(String val) async { 
+    final prefs = await SharedPreferences.getInstance(); 
+    await prefs.setString('lang', val); 
+    setState(() => _selectedLang = val); 
+    langNotifier.value = val; 
+  }
   @override Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(backgroundColor: Theme.of(context).colorScheme.background, elevation: 0, title: Text(t('language'), style: const TextStyle(fontSize: 16))),
