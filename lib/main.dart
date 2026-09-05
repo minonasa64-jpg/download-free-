@@ -129,6 +129,19 @@ Future<void> extractHybrid(BuildContext context, String url, Function(bool) setL
   try {
     final ytEngine = yt.YoutubeExplode();
     if (url.contains('youtube.com') || url.contains('youtu.be')) {
+      
+      // إذا كان الرابط لقائمة تشغيل وليس لفيديو واحد
+      if (url.contains('list=') && !url.contains('v=')) {
+        var playlist = await ytEngine.playlists.get(url);
+        ytEngine.close();
+        setLoading(false);
+        if (context.mounted) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => PlaylistScreen(playlistId: playlist.id.value, title: playlist.title)));
+        }
+        return;
+      }
+
+      // إذا كان فيديو عادي
       var video = await ytEngine.videos.get(url);
       var manifest = await ytEngine.videos.streamsClient.getManifest(video.id);
       List<Map<String, dynamic>> formats = [];
@@ -151,7 +164,7 @@ Future<void> extractHybrid(BuildContext context, String url, Function(bool) setL
       }
     }
   } catch (e) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ تعذر استخراج الرابط')));
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ تعذر استخراج الرابط، تأكد من صحته')));
   } finally {
     setLoading(false);
   }
@@ -219,14 +232,16 @@ Future<void> downloadFile(BuildContext context, String downloadUrl, String title
 }
 
 // ==========================================
-// 4. التبويبات (البحث، الروابط، التنزيلات)
+// 4. التبويبات (البحث الشامل)
 // ==========================================
 class SearchTab extends StatefulWidget { const SearchTab({super.key}); @override State<SearchTab> createState() => _SearchTabState(); }
 class _SearchTabState extends State<SearchTab> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isSearching = false; bool _isLoadingMore = false;
-  List<yt.Video> _searchResults = []; yt.SearchList? _currentSearchPage;
+  
+  List<dynamic> _searchResults = []; // يدعم الفيديوهات والقوائم
+  yt.SearchList? _currentSearchPage; // تم استخدام SearchList لجلب كل شيء
   final yt.YoutubeExplode _yt = yt.YoutubeExplode();
 
   @override void initState() {
@@ -239,7 +254,7 @@ class _SearchTabState extends State<SearchTab> {
     if (query.isEmpty) return; FocusScope.of(context).unfocus();
     setState(() { _isSearching = true; _searchResults.clear(); });
     try {
-      _currentSearchPage = await _yt.search.search(query);
+      _currentSearchPage = await _yt.search.searchContent(query); // دالة البحث الشاملة
       if (mounted) setState(() { _searchResults = _currentSearchPage!.toList(); });
     } catch (e) {} finally { if (mounted) setState(() => _isSearching = false); }
   }
@@ -270,7 +285,7 @@ class _SearchTabState extends State<SearchTab> {
                     margin: const EdgeInsets.all(5), width: 45, height: 45, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
                     child: _isSearching ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)) : IconButton(icon: const Icon(Icons.search, color: Colors.black, size: 22), onPressed: _searchYouTube),
                   ),
-                  Expanded(child: TextField(controller: _searchController, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'ابحث في يوتيوب...', hintStyle: TextStyle(color: Colors.grey), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 15)), onSubmitted: (_) => _searchYouTube())),
+                  Expanded(child: TextField(controller: _searchController, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'ابحث عن فيديو أو قائمة تشغيل...', hintStyle: TextStyle(color: Colors.grey), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 15)), onSubmitted: (_) => _searchYouTube())),
                 ],
               ),
             ),
@@ -283,16 +298,59 @@ class _SearchTabState extends State<SearchTab> {
                     controller: _scrollController, padding: const EdgeInsets.only(top: 10), itemCount: _searchResults.length + (_isLoadingMore ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (index == _searchResults.length) return const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.redAccent)));
-                      final video = _searchResults[index];
+                      
+                      final dynamic item = _searchResults[index];
+                      String title = 'محتوى غير معروف';
+                      String author = '';
+                      String imageUrl = '';
+                      String badgeText = '';
+                      
+                      bool isVideo = item is yt.Video;
+                      bool isPlaylist = !isVideo && item.runtimeType.toString().contains('Playlist');
+                      bool isChannel = !isVideo && !isPlaylist && item.runtimeType.toString().contains('Channel');
+
+                      try {
+                        if (isVideo) {
+                          title = item.title; author = item.author; imageUrl = item.thumbnails.highResUrl; badgeText = '${item.duration?.inMinutes ?? 0}:${(item.duration?.inSeconds ?? 0) % 60}';
+                        } else if (isPlaylist) {
+                          title = item.title; author = item.author; badgeText = '${item.videoCount} فيديو';
+                          try { imageUrl = item.thumbnails.first.url.toString(); } catch (_) { imageUrl = ''; }
+                        } else if (isChannel) {
+                          title = item.name; author = 'قناة'; badgeText = 'قناة يوتيوب';
+                        }
+                      } catch (e) { }
+
                       return GestureDetector(
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => WatchVideoScreen(video: video))),
+                        onTap: () {
+                          if (isVideo) {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => WatchVideoScreen(video: item)));
+                          } else if (isPlaylist) {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => PlaylistScreen(playlistId: item.id.value.toString(), title: title)));
+                          }
+                        },
                         child: Container(
                           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10), decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFF2A2A2A))),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ClipRRect(borderRadius: const BorderRadius.only(topLeft: Radius.circular(15), topRight: Radius.circular(15)), child: Image.network(video.thumbnails.highResUrl, width: double.infinity, height: 200, fit: BoxFit.cover)),
-                              Padding(padding: const EdgeInsets.all(15.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(video.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(height: 5), Row(children: [Text(video.author, style: const TextStyle(color: Colors.grey, fontSize: 12)), const Spacer(), Text('${video.duration?.inMinutes ?? 0}:${(video.duration?.inSeconds ?? 0) % 60}', style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold))])])),
+                              Stack(
+                                children: [
+                                  if (imageUrl.isNotEmpty)
+                                    ClipRRect(borderRadius: const BorderRadius.only(topLeft: Radius.circular(15), topRight: Radius.circular(15)), child: Image.network(imageUrl, width: double.infinity, height: 200, fit: BoxFit.cover, errorBuilder: (_,__,___) => const SizedBox(height: 200, child: Icon(Icons.broken_image, size: 50))))
+                                  else
+                                    const SizedBox(height: 150, child: Center(child: Icon(Icons.account_circle, size: 80, color: Colors.grey))),
+                                  
+                                  if (isPlaylist)
+                                    Positioned(
+                                      right: 10, bottom: 10,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(10)),
+                                        child: Row(children: [const Icon(Icons.playlist_play, color: Colors.white, size: 16), const SizedBox(width: 5), Text(badgeText, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))]),
+                                      ),
+                                    ),
+                                ]
+                              ),
+                              Padding(padding: const EdgeInsets.all(15.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(height: 5), Row(children: [Text(author, style: const TextStyle(color: Colors.grey, fontSize: 12)), const Spacer(), if (isVideo) Text(badgeText, style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold))])])),
                             ],
                           ),
                         ),
@@ -306,6 +364,59 @@ class _SearchTabState extends State<SearchTab> {
   }
 }
 
+// ==========================================
+// شاشة عرض قائمة التشغيل (الجديدة كلياً)
+// ==========================================
+class PlaylistScreen extends StatefulWidget {
+  final String playlistId;
+  final String title;
+  const PlaylistScreen({super.key, required this.playlistId, required this.title});
+  @override
+  State<PlaylistScreen> createState() => _PlaylistScreenState();
+}
+class _PlaylistScreenState extends State<PlaylistScreen> {
+  final yt.YoutubeExplode _yt = yt.YoutubeExplode();
+  List<yt.Video> _videos = [];
+  bool _isLoading = true;
+
+  @override void initState() {
+    super.initState();
+    _loadPlaylist();
+  }
+  Future<void> _loadPlaylist() async {
+    try {
+      var playlistVideos = await _yt.playlists.getVideos(widget.playlistId).toList();
+      if (mounted) setState(() { _videos = playlistVideos; _isLoading = false; });
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+  @override Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.title, style: const TextStyle(fontSize: 16)), backgroundColor: const Color(0xFF121212), elevation: 0),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator(color: Colors.redAccent))
+        : ListView.builder(
+            itemCount: _videos.length,
+            itemBuilder: (context, index) {
+              final video = _videos[index];
+              return ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                leading: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(video.thumbnails.lowResUrl, width: 70, height: 50, fit: BoxFit.cover)),
+                title: Text(video.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                subtitle: Text(video.author, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                trailing: const Icon(Icons.play_circle_fill, color: Colors.redAccent),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WatchVideoScreen(video: video))),
+              );
+            },
+          ),
+    );
+  }
+}
+
+// ==========================================
+// شاشة مشاهدة الفيديو
+// ==========================================
 class WatchVideoScreen extends StatefulWidget { final yt.Video video; const WatchVideoScreen({super.key, required this.video}); @override State<WatchVideoScreen> createState() => _WatchVideoScreenState(); }
 class _WatchVideoScreenState extends State<WatchVideoScreen> {
   late YoutubePlayerController _controller; bool _isLoadingExtraction = false;
@@ -325,6 +436,9 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   }
 }
 
+// ==========================================
+// التبويبات الأخرى (الرابط، التنزيلات، الإعدادات)
+// ==========================================
 class LinkTab extends StatefulWidget { const LinkTab({super.key}); @override State<LinkTab> createState() => _LinkTabState(); }
 class _LinkTabState extends State<LinkTab> {
   final TextEditingController _urlController = TextEditingController(); bool _isLoadingExtraction = false;
@@ -332,7 +446,7 @@ class _LinkTabState extends State<LinkTab> {
     return SafeArea(
       child: Column(
         children: [
-          const Spacer(flex: 1), const Icon(Icons.link, size: 80, color: Colors.redAccent), const SizedBox(height: 20), const Text('لديك رابط مباشر؟', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)), const SizedBox(height: 10), const Text('ألصق الرابط هنا لتحميله بسرعة', style: TextStyle(color: Colors.grey)), const SizedBox(height: 40),
+          const Spacer(flex: 1), const Icon(Icons.link, size: 80, color: Colors.redAccent), const SizedBox(height: 20), const Text('لديك رابط مباشر؟', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)), const SizedBox(height: 10), const Text('ألصق الرابط (فيديو أو قائمة تشغيل) هنا', style: TextStyle(color: Colors.grey)), const SizedBox(height: 40),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 25),
             child: Container(
@@ -387,40 +501,23 @@ class _DownloadsTabState extends State<DownloadsTab> {
   }
 }
 
-// ==========================================
-// 5. قسم الإعدادات (نظام كامل متطابق مع الصور)
-// ==========================================
+// ------------------------------------------
+// قسم الإعدادات
+// ------------------------------------------
 class SettingsTab extends StatelessWidget {
   const SettingsTab({super.key});
-
   Widget _buildSettingItem(BuildContext context, String title, IconData icon, Widget destination) {
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => destination)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        child: Row(
-          children: [
-            Icon(icon, color: Colors.grey[400], size: 22),
-            const SizedBox(width: 20),
-            Text(title, style: const TextStyle(color: Colors.white, fontSize: 14)),
-            const Spacer(),
-            const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14), // السهم معكوس ليتناسب مع RTL
-          ],
-        ),
-      ),
+      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15), child: Row(children: [Icon(icon, color: Colors.grey[400], size: 22), const SizedBox(width: 20), Text(title, style: const TextStyle(color: Colors.white, fontSize: 14)), const Spacer(), const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14)])),
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
+  @override Widget build(BuildContext context) {
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(20.0),
-            child: Text('الإعدادات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-          ),
+          const Padding(padding: EdgeInsets.all(20.0), child: Text('الإعدادات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white))),
           Expanded(
             child: ListView(
               children: [
@@ -438,195 +535,76 @@ class SettingsTab extends StatelessWidget {
   }
 }
 
-// ------------------------------------------
-// شاشة إعدادات التنزيل
-// ------------------------------------------
-class DownloadSettingsScreen extends StatefulWidget {
-  const DownloadSettingsScreen({super.key});
-  @override
-  State<DownloadSettingsScreen> createState() => _DownloadSettingsScreenState();
-}
-
+class DownloadSettingsScreen extends StatefulWidget { const DownloadSettingsScreen({super.key}); @override State<DownloadSettingsScreen> createState() => _DownloadSettingsScreenState(); }
 class _DownloadSettingsScreenState extends State<DownloadSettingsScreen> {
   bool _downloadViaMobile = true;
-
-  @override
-  Widget build(BuildContext context) {
+  @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF121212), elevation: 0,
-        title: const Text('إعدادات التنزيل', style: TextStyle(fontSize: 16)),
-      ),
+      appBar: AppBar(backgroundColor: const Color(0xFF121212), elevation: 0, title: const Text('إعدادات التنزيل', style: TextStyle(fontSize: 16))),
       body: ListView(
         children: [
-          ListTile(
-            title: const Text('مسار التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-            subtitle: const Text('/storage/emulated/0/Download/ProDownloader/', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14),
-            onTap: () {},
-          ),
+          ListTile(title: const Text('مسار التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('/storage/emulated/0/Download/ProDownloader/', style: TextStyle(color: Colors.grey, fontSize: 12)), trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14), onTap: () {}),
           const Divider(color: Color(0xFF2A2A2A)),
-          ListTile(
-            title: const Text('الحد الأقصى لمهام التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-            subtitle: const Text('Wi-Fi: 4 مهام | بيانات الهاتف المحمول: مهمتان', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14),
-            onTap: () {},
-          ),
+          ListTile(title: const Text('الحد الأقصى لمهام التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('Wi-Fi: 4 مهام | بيانات الهاتف المحمول: مهمتان', style: TextStyle(color: Colors.grey, fontSize: 12)), trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14), onTap: () {}),
           const Divider(color: Color(0xFF2A2A2A)),
-          ListTile(
-            title: const Text('حد سرعة التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-            subtitle: const Text('غير محدود', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14),
-            onTap: () {},
-          ),
+          ListTile(title: const Text('حد سرعة التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('غير محدود', style: TextStyle(color: Colors.grey, fontSize: 12)), trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14), onTap: () {}),
           const Divider(color: Color(0xFF2A2A2A)),
-          SwitchListTile(
-            title: const Text('التنزيل عبر بيانات الهاتف المحمول', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-            subtitle: const Text('سيتم تنزيل الوسائط باستخدام بيانات الجوال', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            value: _downloadViaMobile,
-            activeColor: Colors.redAccent,
-            onChanged: (val) => setState(() => _downloadViaMobile = val),
-          ),
+          SwitchListTile(title: const Text('التنزيل عبر بيانات الهاتف المحمول', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('سيتم تنزيل الوسائط باستخدام بيانات الجوال', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _downloadViaMobile, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _downloadViaMobile = val)),
         ],
       ),
     );
   }
 }
 
-// ------------------------------------------
-// شاشة إعدادات الإشعارات
-// ------------------------------------------
-class NotificationSettingsScreen extends StatefulWidget {
-  const NotificationSettingsScreen({super.key});
-  @override
-  State<NotificationSettingsScreen> createState() => _NotificationSettingsScreenState();
-}
-
+class NotificationSettingsScreen extends StatefulWidget { const NotificationSettingsScreen({super.key}); @override State<NotificationSettingsScreen> createState() => _NotificationSettingsScreenState(); }
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
-  bool _progressNotif = true;
-  bool _completeNotif = true;
-  bool _recommendNotif = false;
-  bool _toolNotif = true;
-  bool _toolbarNotif = true;
-
-  @override
-  Widget build(BuildContext context) {
+  bool _progressNotif = true; bool _completeNotif = true; bool _recommendNotif = false; bool _toolNotif = true; bool _toolbarNotif = true;
+  @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF121212), elevation: 0,
-        title: const Text('الإشعارات', style: TextStyle(fontSize: 16)),
-      ),
+      appBar: AppBar(backgroundColor: const Color(0xFF121212), elevation: 0, title: const Text('الإشعارات', style: TextStyle(fontSize: 16))),
       body: ListView(
         children: [
           const Padding(padding: EdgeInsets.all(15.0), child: Text('إشعارات التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12))),
-          SwitchListTile(
-            title: const Text('تقدم التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-            subtitle: const Text('أبلغني بتقدم التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            value: _progressNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _progressNotif = val),
-          ),
-          SwitchListTile(
-            title: const Text('اكتمل التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-            subtitle: const Text('أعلمني عند اكتمال التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            value: _completeNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _completeNotif = val),
-          ),
-          
+          SwitchListTile(title: const Text('تقدم التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أبلغني بتقدم التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _progressNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _progressNotif = val)),
+          SwitchListTile(title: const Text('اكتمل التنزيل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أعلمني عند اكتمال التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _completeNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _completeNotif = val)),
           const Divider(color: Color(0xFF2A2A2A), height: 30),
           const Padding(padding: EdgeInsets.symmetric(horizontal: 15.0, vertical: 5), child: Text('إشعارات الدفع', style: TextStyle(color: Colors.grey, fontSize: 12))),
-          
-          SwitchListTile(
-            title: const Text('محتوى موصى به', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-            subtitle: const Text('أبلغني بمقاطع الفيديو والموسيقى التي قد تعجبني', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            value: _recommendNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _recommendNotif = val),
-          ),
-          SwitchListTile(
-            title: const Text('إشعارات الأداة', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-            subtitle: const Text('أبلغني عند إصدار أدوات جديدة', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            value: _toolNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _toolNotif = val),
-          ),
-          SwitchListTile(
-            title: const Text('شريط الأدوات', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-            subtitle: const Text('وصول سريع إلى الأدوات في شريط الإشعارات', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            value: _toolbarNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _toolbarNotif = val),
-          ),
+          SwitchListTile(title: const Text('محتوى موصى به', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أبلغني بمقاطع الفيديو والموسيقى التي قد تعجبني', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _recommendNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _recommendNotif = val)),
+          SwitchListTile(title: const Text('إشعارات الأداة', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('أبلغني عند إصدار أدوات جديدة', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _toolNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _toolNotif = val)),
+          SwitchListTile(title: const Text('شريط الأدوات', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), subtitle: const Text('وصول سريع إلى الأدوات في شريط الإشعارات', style: TextStyle(color: Colors.grey, fontSize: 12)), value: _toolbarNotif, activeColor: Colors.redAccent, onChanged: (val) => setState(() => _toolbarNotif = val)),
         ],
       ),
     );
   }
 }
 
-// ------------------------------------------
-// شاشة إعدادات السمة
-// ------------------------------------------
-class ThemeSettingsScreen extends StatefulWidget {
-  const ThemeSettingsScreen({super.key});
-  @override
-  State<ThemeSettingsScreen> createState() => _ThemeSettingsScreenState();
-}
-
+class ThemeSettingsScreen extends StatefulWidget { const ThemeSettingsScreen({super.key}); @override State<ThemeSettingsScreen> createState() => _ThemeSettingsScreenState(); }
 class _ThemeSettingsScreenState extends State<ThemeSettingsScreen> {
-  String _selectedTheme = 'dark'; // افتراضياً داكن ليتطابق مع صورك
-
-  @override
-  Widget build(BuildContext context) {
+  String _selectedTheme = 'dark'; 
+  @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF121212), elevation: 0,
-        title: const Text('السمة', style: TextStyle(fontSize: 16)),
-      ),
+      appBar: AppBar(backgroundColor: const Color(0xFF121212), elevation: 0, title: const Text('السمة', style: TextStyle(fontSize: 16))),
       body: ListView(
         children: [
           const Padding(padding: EdgeInsets.all(20.0), child: Text('سمة التطبيق', style: TextStyle(color: Colors.grey, fontSize: 12))),
-          _buildThemeOption('استخدام إعدادات النظام', 'system'),
-          _buildThemeOption('فاتح', 'light'),
-          _buildThemeOption('داكن', 'dark'),
+          _buildThemeOption('استخدام إعدادات النظام', 'system'), _buildThemeOption('فاتح', 'light'), _buildThemeOption('داكن', 'dark'),
         ],
       ),
     );
   }
-
-  Widget _buildThemeOption(String title, String value) {
-    return ListTile(
-      title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-      trailing: _selectedTheme == value ? const Icon(Icons.check, color: Colors.redAccent) : null,
-      onTap: () => setState(() => _selectedTheme = value),
-    );
-  }
+  Widget _buildThemeOption(String title, String value) { return ListTile(title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), trailing: _selectedTheme == value ? const Icon(Icons.check, color: Colors.redAccent) : null, onTap: () => setState(() => _selectedTheme = value)); }
 }
 
-// ------------------------------------------
-// شاشة إعدادات اللغة
-// ------------------------------------------
-class LanguageSettingsScreen extends StatefulWidget {
-  const LanguageSettingsScreen({super.key});
-  @override
-  State<LanguageSettingsScreen> createState() => _LanguageSettingsScreenState();
-}
-
+class LanguageSettingsScreen extends StatefulWidget { const LanguageSettingsScreen({super.key}); @override State<LanguageSettingsScreen> createState() => _LanguageSettingsScreenState(); }
 class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
   String _selectedLang = 'ar';
-
-  @override
-  Widget build(BuildContext context) {
+  @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF121212), elevation: 0,
-        title: const Text('اللغة', style: TextStyle(fontSize: 16)),
-      ),
+      appBar: AppBar(backgroundColor: const Color(0xFF121212), elevation: 0, title: const Text('اللغة', style: TextStyle(fontSize: 16))),
       body: ListView(
-        children: [
-          _buildLangOption('العربية (Arabic)', 'ar'),
-          _buildLangOption('English (الإنجليزية)', 'en'),
-          _buildLangOption('Français (الفرنسية)', 'fr'),
-        ],
+        children: [ _buildLangOption('العربية (Arabic)', 'ar'), _buildLangOption('English (الإنجليزية)', 'en'), _buildLangOption('Français (الفرنسية)', 'fr') ],
       ),
     );
   }
-
-  Widget _buildLangOption(String title, String value) {
-    return ListTile(
-      title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-      trailing: _selectedLang == value ? const Icon(Icons.check, color: Colors.redAccent) : null,
-      onTap: () => setState(() => _selectedLang = value),
-    );
-  }
+  Widget _buildLangOption(String title, String value) { return ListTile(title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)), trailing: _selectedLang == value ? const Icon(Icons.check, color: Colors.redAccent) : null, onTap: () => setState(() => _selectedLang = value)); }
 }
