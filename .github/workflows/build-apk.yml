@@ -37,6 +37,10 @@ jobs:
       - name: 📦 تحميل الحزم والمكتبات
         run: flutter pub get
 
+      - name: 🔧 الإصلاح السحري لخطأ مكتبة WebView
+        run: |
+          find ~/.pub-cache/hosted/pub.dev/ -name "build.gradle" -type f -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
+
       - name: 🎨 دمج الأيقونة الجديدة
         run: dart run flutter_launcher_icons
 
