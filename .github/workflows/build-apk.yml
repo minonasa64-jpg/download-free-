@@ -37,9 +37,12 @@ jobs:
       - name: 📦 تحميل الحزم والمكتبات
         run: flutter pub get
 
-      - name: 🔧 الإصلاح السحري لخطأ مكتبة WebView
+      - name: 🔧 الإصلاح السحري لأخطاء المكتبات القديمة (Namespace + Proguard)
         run: |
+          # 1. إصلاح خطأ Proguard
           find ~/.pub-cache/hosted/pub.dev/ -name "build.gradle" -type f -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
+          # 2. إصلاح خطأ Namespace لمكتبة inappwebview
+          find ~/.pub-cache/hosted/pub.dev/flutter_inappwebview-*/android -name "build.gradle" -type f -exec sed -i '/android {/a \    namespace "com.pichillilorenzo.flutter_inappwebview"' {} +
 
       - name: 🎨 دمج الأيقونة الجديدة
         run: dart run flutter_launcher_icons
