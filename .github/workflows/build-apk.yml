@@ -22,14 +22,14 @@ jobs:
           distribution: 'zulu'
           java-version: '17' 
 
-      - name: 🐦 إعداد بيئة فلاتر (إصدار مستقر لتجنب أخطاء المكتبات)
+      - name: 🐦 إعداد بيئة فلاتر (إصدار مستقر)
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.6'
           channel: 'stable' 
 
-      - name: 🏗️ بناء هياكل فلاتر الأساسية
-        run: flutter create --platforms=android .
+      - name: 🏗️ بناء هياكل فلاتر الأساسية مع تحديد الاسم الصحيح
+        run: flutter create --project-name pro_downloader --platforms=android .
 
       - name: 🌐 حقن جميع الصلاحيات إجبارياً
         run: |
@@ -38,7 +38,7 @@ jobs:
       - name: 📦 تحميل الحزم والمكتبات
         run: flutter pub get
 
-      - name: 🔧 الإصلاح السحري لأخطاء المكتبات القديمة (Namespace + Proguard)
+      - name: 🔧 الإصلاح السحري لأخطاء المكتبات القديمة
         run: |
           find ~/.pub-cache/hosted/pub.dev/ -name "build.gradle" -type f -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
           find ~/.pub-cache/hosted/pub.dev/flutter_inappwebview-*/android -name "build.gradle" -type f -exec sed -i '/android {/a \    namespace "com.pichillilorenzo.flutter_inappwebview"' {} +
