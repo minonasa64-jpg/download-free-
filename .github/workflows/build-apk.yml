@@ -28,7 +28,7 @@ jobs:
           flutter-version: '3.19.6'
           channel: 'stable' 
 
-      - name: 🏗️ بناء هياكل فلاتر الأساسية مع تحديد الاسم الصحيح
+      - name: 🏗️ بناء هياكل فلاتر الأساسية مع تحديد الاسم
         run: flutter create --project-name pro_downloader --platforms=android .
 
       - name: 🌐 حقن جميع الصلاحيات إجبارياً
@@ -42,6 +42,17 @@ jobs:
         run: |
           find ~/.pub-cache/hosted/pub.dev/ -name "build.gradle" -type f -exec sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' {} +
           find ~/.pub-cache/hosted/pub.dev/flutter_inappwebview-*/android -name "build.gradle" -type f -exec sed -i '/android {/a \    namespace "com.pichillilorenzo.flutter_inappwebview"' {} +
+
+      - name: 🩹 حل مشكلة تكرار ملفات Kotlin (الضربة القاضية)
+        run: |
+          cat <<EOF >> android/app/build.gradle
+          dependencies {
+              constraints {
+                  implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22")
+                  implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22")
+              }
+          }
+          EOF
 
       - name: 🎨 دمج الأيقونة الجديدة
         run: dart run flutter_launcher_icons
