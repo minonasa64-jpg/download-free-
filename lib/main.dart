@@ -299,6 +299,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                     barrierDismissible: false,
                     builder: (context) => DownloadProgressDialog(
                       downloadUrl: _selectedFormat!['url'],
+                      audioUrl: _selectedFormat!['audio_url'], // تمرير مسار الصوت إن وُجد
                       title: widget.title,
                       extension: _selectedFormat!['ext'],
                     )
@@ -362,7 +363,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
               ],
             ),
             const SizedBox(width: 15),
-            const Icon(Icons.play_arrow, color: Colors.grey, size: 22),
+            Icon(format['audio_url'] != null ? Icons.auto_awesome : Icons.play_arrow, color: Colors.grey, size: 22),
           ],
         ),
       ),
@@ -372,12 +373,14 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
 
 class DownloadProgressDialog extends StatefulWidget {
   final String downloadUrl;
+  final String? audioUrl;
   final String title;
   final String extension;
 
   const DownloadProgressDialog({
     super.key,
     required this.downloadUrl,
+    this.audioUrl,
     required this.title,
     required this.extension,
   });
@@ -403,6 +406,7 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
   Future<void> _initiateDownload() async {
     await _backend.startDownloadProcess(
       downloadUrl: widget.downloadUrl,
+      audioUrl: widget.audioUrl,
       title: widget.title,
       extension: widget.extension,
       onProgress: (progress, downloaded, total) {
@@ -465,7 +469,7 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
               color: Colors.redAccent,
             ),
             const SizedBox(height: 10),
-            Text('$_downloadedSize MB / $_totalSize MB', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            Text('$_downloadedSize MB / $_totalSize', style: const TextStyle(color: Colors.grey, fontSize: 12)),
           ]
         ],
       ),
