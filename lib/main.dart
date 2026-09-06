@@ -816,21 +816,16 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     }
   }
 
-  // نظام البحث الاحتياطي الذكي للفيديوهات ذات الصلة
   Future<void> _fetchRelatedVideos() async {
     try {
-      // 1. محاولة البحث بالعنوان الكامل أولاً
       var results = await _yt.search.search(widget.video.title);
-      // تجنب استبعاد الفيديو الأول بشكل أعمى، بل استبعاد الفيديو الحالي إذا تطابق مع النتائج
       var filteredList = results.whereType<yt.Video>().where((v) => v.id.value != widget.video.id.value).toList();
       
-      // 2. إذا كانت القائمة فارغة، قم بالبحث الاحتياطي عبر اسم القناة أو الناشر
       if (filteredList.isEmpty) {
         results = await _yt.search.search(widget.video.author);
         filteredList = results.whereType<yt.Video>().where((v) => v.id.value != widget.video.id.value).toList();
       }
 
-      // 3. إذا ظلت فارغة، اعرض فيديوهات منوعة عامة لضمان وجود محتوى دائمًا
       if (filteredList.isEmpty) {
         results = await _yt.search.search("أحدث الفيديوهات المنوعة");
         filteredList = results.whereType<yt.Video>().toList();
