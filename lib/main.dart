@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'services/backend_service.dart';
@@ -755,6 +756,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   
   bool _isLoadingExtraction = false;
   bool _hasPlayerError = false;
+  bool _isVideoBlocked = false; // مستشعر الفيديوهات المحمية الجديد
   
   final yt.YoutubeExplode _yt = yt.YoutubeExplode();
   List<yt.Video> _relatedVideos = [];
@@ -770,6 +772,25 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
         initialVideoId: widget.video.id.value,
         flags: const YoutubePlayerFlags(autoPlay: true, mute: false, enableCaption: false),
       );
+
+      // استشعار أخطاء التشغيل
+      _controller.addListener(() {
+        if (_controller.value.hasError) {
+          if (mounted && !_hasPlayerError) {
+            setState(() { _hasPlayerError = true; });
+          }
+        }
+      });
+
+      // نظام حماية: إذا استمرت الشاشة السوداء (بسبب أغاني Vevo وغيرها) لأكثر من 4 ثوانٍ
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted && (_controller.value.playerState == PlayerState.unStarted || _controller.value.playerState == PlayerState.unknown)) {
+          setState(() {
+            _isVideoBlocked = true;
+          });
+        }
+      });
+
     } catch (e) {
       _hasPlayerError = true;
     }
@@ -831,15 +852,19 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _hasPlayerError
+          // إظهار الرسالة بدلاً من المشغل العالق إذا كان الفيديو محمي
+          _hasPlayerError || _isVideoBlocked
             ? Container(
                 height: 220,
                 color: Colors.black,
                 child: const Center(
-                  child: Text(
-                    'هذا الفيديو محمي من العرض خارج يوتيوب.\nلكن يمكنك تحميله بالأسفل!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, fontSize: 14),
+                  child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: Text(
+                      'يوتيوب يمنع تشغيل الأغاني والفيديوهات المحمية خارج تطبيقه الرسمي.\n\nلكن يمكنك تنزيلها من الزر بالأسفل بحرية!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
+                    ),
                   ),
                 ),
               )
@@ -974,7 +999,7 @@ class _LinkTabState extends State<LinkTab> {
 }
 
 // ==========================================
-// شاشة تشغيل الفيديو المحلي في التنزيلات
+// شاشة تشغيل الفيديو المحلي بأدوات تحكم احترافية (Chewie)
 // ==========================================
 class LocalVideoPlayerScreen extends StatefulWidget {
   final FileSystemEntity file;
@@ -985,24 +1010,37 @@ class LocalVideoPlayerScreen extends StatefulWidget {
 }
 
 class _LocalVideoPlayerScreenState extends State<LocalVideoPlayerScreen> {
-  late VideoPlayerController _controller;
-  bool _isInitialized = false;
+  late VideoPlayerController _videoPlayerController;
+  ChewieController? _chewieController;
 
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.file(File(widget.file.path))
-      ..initialize().then((_) {
-        setState(() {
-          _isInitialized = true;
-          _controller.play();
-        });
+    _videoPlayerController = VideoPlayerController.file(File(widget.file.path));
+    _videoPlayerController.initialize().then((_) {
+      setState(() {
+        _chewieController = ChewieController(
+          videoPlayerController: _videoPlayerController,
+          autoPlay: true,
+          looping: false,
+          allowFullScreen: true,
+          allowMuting: true,
+          showControls: true,
+          materialProgressColors: ChewieProgressColors(
+            playedColor: Colors.redAccent,
+            handleColor: Colors.red,
+            backgroundColor: Colors.grey,
+            bufferedColor: Colors.white,
+          ),
+        );
       });
+    });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _videoPlayerController.dispose();
+    _chewieController?.dispose();
     super.dispose();
   }
 
@@ -1010,26 +1048,15 @@ class _LocalVideoPlayerScreenState extends State<LocalVideoPlayerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(backgroundColor: Colors.black, title: Text(widget.file.path.split('/').last, style: const TextStyle(fontSize: 14))),
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        title: Text(widget.file.path.split('/').last, style: const TextStyle(fontSize: 14)),
+      ),
       body: Center(
-        child: _isInitialized
-            ? AspectRatio(
-                aspectRatio: _controller.value.aspectRatio,
-                child: VideoPlayer(_controller),
-              )
+        child: _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
+            ? Chewie(controller: _chewieController!)
             : const CircularProgressIndicator(color: Colors.redAccent),
       ),
-      floatingActionButton: _isInitialized
-          ? FloatingActionButton(
-              backgroundColor: Colors.redAccent,
-              onPressed: () {
-                setState(() {
-                  _controller.value.isPlaying ? _controller.pause() : _controller.play();
-                });
-              },
-              child: Icon(_controller.value.isPlaying ? Icons.pause : Icons.play_arrow),
-            )
-          : null,
     );
   }
 }
@@ -1082,8 +1109,8 @@ class _DownloadsTabState extends State<DownloadsTab> {
                 return ListTile(
                   leading: const Icon(Icons.play_circle_fill, color: Colors.redAccent, size: 30),
                   title: Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  // الضغط على الفيديو يفتحه في المشغل الداخلي الجديد
                   onTap: () {
+                    // الانتقال إلى شاشة المشغل الاحترافي
                     Navigator.push(context, MaterialPageRoute(builder: (_) => LocalVideoPlayerScreen(file: file)));
                   },
                   trailing: IconButton(
@@ -1201,7 +1228,7 @@ class DownloadSettingsScreen extends StatefulWidget {
 class _DownloadSettingsScreenState extends State<DownloadSettingsScreen> {
   final BackendService _backend = BackendService();
   bool _downloadViaMobile = true;
-  String _downloadPath = '/storage/emulated/0/Download/ProDownloader';
+  String _downloadPath = '/storage/emulated/0/Download';
   int _maxTasks = 4;
   String _speedLimit = 'غير محدود';
 
