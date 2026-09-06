@@ -163,7 +163,8 @@ class BackendService {
     try {
       Directory? directory;
       if (Platform.isAndroid) {
-        directory = Directory('/storage/emulated/0/Download/ProDownloader');
+        // الحفظ مباشرة في مجلد Download العام ليظهر في الهاتف
+        directory = Directory('/storage/emulated/0/Download');
       } else {
         directory = await getApplicationDocumentsDirectory();
       }
@@ -199,7 +200,8 @@ class BackendService {
   Future<List<FileSystemEntity>> getDownloadedFiles() async {
     List<FileSystemEntity> files = [];
     try {
-      Directory directory = Directory('/storage/emulated/0/Download/ProDownloader');
+      // قراءة الملفات من المجلد العام مباشرة
+      Directory directory = Directory('/storage/emulated/0/Download');
       if (await directory.exists()) {
         files = directory.listSync().where((file) {
           return file.path.endsWith('.mp4') || file.path.endsWith('.webm');
@@ -223,7 +225,7 @@ class BackendService {
     final prefs = await SharedPreferences.getInstance();
     return {
       'downloadMobile': prefs.getBool('downloadMobile') ?? true,
-      'download_path': prefs.getString('download_path') ?? '/storage/emulated/0/Download/ProDownloader',
+      'download_path': prefs.getString('download_path') ?? '/storage/emulated/0/Download',
       'max_tasks': prefs.getInt('max_tasks') ?? 4,
       'speed_limit': prefs.getString('speed_limit') ?? 'غير محدود',
     };
