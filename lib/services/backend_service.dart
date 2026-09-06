@@ -79,6 +79,7 @@ class BackendService {
         videoTitle = video.title;
         var manifest = await ytEngine.videos.streamsClient.getManifest(video.id);
         
+        // استخراج فقط الفيديوهات المدمجة (صوت وصورة) من يوتيوب
         for (var stream in manifest.muxed) {
           String quality = '${stream.videoResolution.height}p';
           videoList.add({
@@ -107,7 +108,7 @@ class BackendService {
         if (mainUrl != null && mainUrl.isNotEmpty) {
           videoList.add({
             'quality_name': 'تنزيل رئيسي (مستحسن)',
-            'desc': 'أفضل جودة متوفرة (صوت وصورة)',
+            'desc': 'أفضل جودة مدمجة (صوت وصورة)',
             'size': 'تلقائي',
             'url': mainUrl,
             'ext': 'mp4'
@@ -118,29 +119,33 @@ class BackendService {
         if (formats != null) {
           for (var f in formats) {
             String ext = f['ext']?.toString().toLowerCase() ?? '';
-            // نأخذ فقط الفيديوهات mp4 و webm
             if (ext != 'mp4' && ext != 'webm') continue;
 
-            String formatNote = f['format_note']?.toString() ?? '';
+            String formatNote = f['format_note']?.toString().toLowerCase() ?? '';
             String formatId = f['format_id']?.toString().toLowerCase() ?? '';
             String resolution = f['resolution']?.toString() ?? f['quality']?.toString() ?? '';
             
-            String quality = formatNote.isNotEmpty ? formatNote : (resolution.isNotEmpty ? resolution : formatId);
+            String quality = formatNote.isNotEmpty ? formatNote.toUpperCase() : (resolution.isNotEmpty ? resolution : formatId.toUpperCase());
             if (quality.isEmpty) quality = 'متوسطة';
 
+            // قراءة الكوديكات بذكاء
             String acodec = f['acodec']?.toString().toLowerCase() ?? '';
             String vcodec = f['vcodec']?.toString().toLowerCase() ?? '';
             
-            // الفلتر العكسي الذكي: نطرد الفيديو فقط إذا صرّح السيرفر أنه "بدون صوت" أو "بدون صورة"
-            bool isExplicitlyMuted = acodec == 'none';
-            bool isExplicitlyAudioOnly = vcodec == 'none';
+            // يجب أن يحتوي الرابط بوضوح على صوت وصورة
+            bool hasAudio = acodec != 'none' && acodec.isNotEmpty;
+            bool hasVideo = vcodec != 'none' && vcodec.isNotEmpty;
+            
+            // استثناء لجودات الفيسبوك التلقائية (HD و SD) لأنها دائماً تكون مدمجة بالصوت
+            bool isNativeFb = formatId == 'hd' || formatId == 'sd' || formatNote == 'hd' || formatNote == 'sd';
 
-            if (!isExplicitlyMuted && !isExplicitlyAudioOnly) {
-              if (f['url'] != mainUrl) { // تجنب تكرار الخيار الرئيسي
+            // الفلتر الذهبي الصارم لحجب الفيديوهات الصامتة
+            if ((hasAudio && hasVideo) || isNativeFb) {
+              if (f['url'] != mainUrl) { 
                 String size = f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
                 videoList.add({
                   'quality_name': 'فيديو ($quality)',
-                  'desc': 'جودة مدمجة',
+                  'desc': 'مضمون بصوت وصورة',
                   'size': size,
                   'url': f['url'],
                   'ext': ext
@@ -150,13 +155,14 @@ class BackendService {
           }
         }
         
-        // خطة الإنقاذ القصوى: إذا بقيت القائمة فارغة بسبب خلل في الرد، نأخذ أي فيديو متاح لمنع الانهيار
+        // خطة إنقاذ إذا كانت كل الفيديوهات صامتة
         if (videoList.isEmpty && formats != null) {
           for (var f in formats) {
-            if (f['ext']?.toString().toLowerCase() == 'mp4') {
+            String acodec = f['acodec']?.toString().toLowerCase() ?? '';
+            if (f['ext']?.toString().toLowerCase() == 'mp4' && acodec != 'none') {
               videoList.add({
-                'quality_name': 'فيديو (استخراج إجباري)',
-                'desc': 'تم السحب للحماية من الخطأ',
+                'quality_name': 'فيديو (استخراج بديل)',
+                'desc': 'جودة متوفرة',
                 'size': 'تلقائي',
                 'url': f['url'],
                 'ext': 'mp4'
