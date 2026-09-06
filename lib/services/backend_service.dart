@@ -5,6 +5,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter/return_code.dart';
 
 class BackendService {
   static final BackendService _instance = BackendService._internal();
@@ -79,16 +81,32 @@ class BackendService {
         videoTitle = video.title;
         var manifest = await ytEngine.videos.streamsClient.getManifest(video.id);
         
-        // استخراج فقط الفيديوهات المدمجة (صوت وصورة) من يوتيوب
+        // 1. استخراج الفيديوهات المدمجة العادية (عادة حتى 720p)
         for (var stream in manifest.muxed) {
           String quality = '${stream.videoResolution.height}p';
           videoList.add({
-            'quality_name': 'سريع ($quality)',
+            'quality_name': 'عادية ($quality)',
             'desc': 'جودة فيديو مع صوت مدمج',
             'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
             'url': stream.url.toString(),
             'ext': stream.container.name,
           });
+        }
+
+        // 2. استخراج الجودات الفائقة (1080p فأكثر) وتجهيزها للدمج
+        var bestAudio = manifest.audioOnly.withHighestBitrate();
+        for (var stream in manifest.videoOnly) {
+          if (stream.videoResolution.height >= 1080 && stream.container.name == 'mp4') {
+            String quality = '${stream.videoResolution.height}p';
+            videoList.insert(0, {
+              'quality_name': 'فائقة الدقة ($quality)',
+              'desc': 'دمج احترافي (صوت وصورة)',
+              'size': 'تلقائي',
+              'url': stream.url.toString(),
+              'audio_url': bestAudio.url.toString(), // حفظ مسار الصوت للدمج لاحقاً
+              'ext': 'mp4',
+            });
+          }
         }
       } finally {
         ytEngine.close();
@@ -103,12 +121,11 @@ class BackendService {
       if (response.statusCode == 200 && response.data['status'] == 'success') {
         videoTitle = response.data['title'] ?? 'فيديو بدون عنوان';
         
-        // 1. إضافة الرابط الرئيسي (غالباً يكون مدمجاً وأفضل جودة)
         String? mainUrl = response.data['url'];
         if (mainUrl != null && mainUrl.isNotEmpty) {
           videoList.add({
             'quality_name': 'تنزيل رئيسي (مستحسن)',
-            'desc': 'أفضل جودة مدمجة (صوت وصورة)',
+            'desc': 'أفضل جودة متوفرة (صوت وصورة)',
             'size': 'تلقائي',
             'url': mainUrl,
             'ext': 'mp4'
@@ -128,18 +145,13 @@ class BackendService {
             String quality = formatNote.isNotEmpty ? formatNote.toUpperCase() : (resolution.isNotEmpty ? resolution : formatId.toUpperCase());
             if (quality.isEmpty) quality = 'متوسطة';
 
-            // قراءة الكوديكات بذكاء
             String acodec = f['acodec']?.toString().toLowerCase() ?? '';
             String vcodec = f['vcodec']?.toString().toLowerCase() ?? '';
             
-            // يجب أن يحتوي الرابط بوضوح على صوت وصورة
             bool hasAudio = acodec != 'none' && acodec.isNotEmpty;
             bool hasVideo = vcodec != 'none' && vcodec.isNotEmpty;
-            
-            // استثناء لجودات الفيسبوك التلقائية (HD و SD) لأنها دائماً تكون مدمجة بالصوت
             bool isNativeFb = formatId == 'hd' || formatId == 'sd' || formatNote == 'hd' || formatNote == 'sd';
 
-            // الفلتر الذهبي الصارم لحجب الفيديوهات الصامتة
             if ((hasAudio && hasVideo) || isNativeFb) {
               if (f['url'] != mainUrl) { 
                 String size = f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
@@ -155,7 +167,6 @@ class BackendService {
           }
         }
         
-        // خطة إنقاذ إذا كانت كل الفيديوهات صامتة
         if (videoList.isEmpty && formats != null) {
           for (var f in formats) {
             String acodec = f['acodec']?.toString().toLowerCase() ?? '';
@@ -199,6 +210,7 @@ class BackendService {
 
   Future<void> startDownloadProcess({
     required String downloadUrl,
+    String? audioUrl, // متغير جديد لاستقبال رابط الصوت للدمج
     required String title,
     required String extension,
     required Function(double progress, String downloaded, String total) onProgress,
@@ -235,21 +247,58 @@ class BackendService {
       String savePath = '${directory.path}/$safeTitle.$validExt';
       
       final dio = Dio();
-      await dio.download(
-        downloadUrl,
-        savePath,
-        options: Options(headers: {'User-Agent': 'Mozilla/5.0'}),
-        onReceiveProgress: (received, total) {
+
+      // مسار الدمج الاحترافي باستخدام FFmpeg (للجودات 1080p فما فوق)
+      if (audioUrl != null && audioUrl.isNotEmpty) {
+        final tempDir = await getTemporaryDirectory();
+        String tempVideo = '${tempDir.path}/temp_vid_$safeTitle.mp4';
+        String tempAudio = '${tempDir.path}/temp_aud_$safeTitle.m4a';
+
+        // 1. تنزيل الفيديو (يأخذ 45% من شريط التقدم)
+        await dio.download(downloadUrl, tempVideo, onReceiveProgress: (rec, total) {
           if (total != -1) {
-            double progress = received / total;
-            String downloadedStr = (received / (1024 * 1024)).toStringAsFixed(1);
-            String totalStr = (total / (1024 * 1024)).toStringAsFixed(1);
-            onProgress(progress, downloadedStr, totalStr);
+            onProgress((rec / total) * 0.45, (rec / (1024 * 1024)).toStringAsFixed(1), (total / (1024 * 1024)).toStringAsFixed(1) + ' (صورة)');
           }
-        },
-      );
-      
-      onComplete();
+        });
+
+        // 2. تنزيل الصوت (يأخذ 45% أخرى)
+        await dio.download(audioUrl, tempAudio, onReceiveProgress: (rec, total) {
+          if (total != -1) {
+            onProgress(0.45 + ((rec / total) * 0.45), (rec / (1024 * 1024)).toStringAsFixed(1), (total / (1024 * 1024)).toStringAsFixed(1) + ' (صوت)');
+          }
+        });
+
+        // 3. دمج الملفين (الـ 10% الأخيرة)
+        onProgress(0.95, 'جاري الدمج...', 'يتم المعالجة');
+        final session = await FFmpegKit.execute('-i "$tempVideo" -i "$tempAudio" -c:v copy -c:a aac "$savePath"');
+        final returnCode = await session.getReturnCode();
+        
+        // تنظيف الملفات المؤقتة لتوفير المساحة
+        try { File(tempVideo).deleteSync(); File(tempAudio).deleteSync(); } catch(e){}
+
+        if (ReturnCode.isSuccess(returnCode)) {
+          onComplete();
+        } else {
+          onError();
+        }
+      } 
+      // مسار التنزيل العادي (للفيديوهات المدمجة جاهزة)
+      else {
+        await dio.download(
+          downloadUrl,
+          savePath,
+          options: Options(headers: {'User-Agent': 'Mozilla/5.0'}),
+          onReceiveProgress: (received, total) {
+            if (total != -1) {
+              double progress = received / total;
+              String downloadedStr = (received / (1024 * 1024)).toStringAsFixed(1);
+              String totalStr = (total / (1024 * 1024)).toStringAsFixed(1);
+              onProgress(progress, downloadedStr, totalStr);
+            }
+          },
+        );
+        onComplete();
+      }
     } catch (e) {
       onError();
     }
