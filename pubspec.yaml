@@ -18,6 +18,7 @@ dependencies:
   video_player: ^2.8.2
   chewie: 1.7.5
   shared_preferences: ^2.2.2
+  ffmpeg_kit_flutter: ^6.0.3
 
 dev_dependencies:
   flutter_test:
