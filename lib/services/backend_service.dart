@@ -102,43 +102,60 @@ class BackendService {
       if (response.statusCode == 200 && response.data['status'] == 'success') {
         videoTitle = response.data['title'] ?? 'فيديو بدون عنوان';
         
-        // جلب أفضل جودة مدمجة (الرابط الرئيسي) والذي يكون مضموناً بصوت وصورة
-        if (response.data['url'] != null) {
+        // 1. جلب الرابط المباشر الرئيسي كخيار مضمون (خطة طوارئ)
+        String? mainUrl = response.data['url'];
+        if (mainUrl != null && mainUrl.isNotEmpty) {
           videoList.add({
-            'quality_name': 'أفضل جودة (Best)',
-            'desc': 'فيديو مع الصوت الأصلي',
+            'quality_name': 'تنزيل مباشر (مستحسن)',
+            'desc': 'أفضل جودة متوفرة (صوت وصورة)',
             'size': 'تلقائي',
-            'url': response.data['url'],
+            'url': mainUrl,
             'ext': 'mp4'
           });
         }
 
+        // 2. فلترة الجودات المتاحة بذكاء (السماح للروابط التي لا تذكر الصوت صراحة)
         final formats = response.data['formats'] as List?;
         if (formats != null) {
           for (var f in formats) {
-            String ext = f['ext'].toString().toLowerCase();
-            String quality = f['format_note']?.toString() ?? f['resolution']?.toString() ?? f['quality']?.toString() ?? 'متوسطة';
-            String size = f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
+            String ext = f['ext']?.toString().toLowerCase() ?? '';
+            String formatNote = f['format_note']?.toString() ?? '';
+            String resolution = f['resolution']?.toString() ?? f['quality']?.toString() ?? 'متوسطة';
+            String quality = formatNote.isNotEmpty ? formatNote : resolution;
             
-            // الفلتر الذكي: التحقق من كوديك الصوت (acodec) وكوديك الفيديو (vcodec)
+            // قراءة الكوديك لمعرفة هل هو صامت أم لا
             String acodec = f['acodec']?.toString().toLowerCase() ?? '';
             String vcodec = f['vcodec']?.toString().toLowerCase() ?? '';
             
-            // يجب ألا يكون الصوت معدوماً (none) لضمان عدم تنزيل فيديو صامت
-            if ((ext == 'mp4' || ext == 'webm') && 
-                acodec != 'none' && acodec != '' && 
-                vcodec != 'none' && vcodec != '') {
-              
-              // منع تكرار الرابط إذا كان هو نفسه الرابط الرئيسي الأفضل المضاف مسبقاً
-              if (response.data['url'] != f['url']) {
+            // الفلتر الذكي: نحذف فقط ما يتم التصريح بأنه "none"
+            if ((ext == 'mp4' || ext == 'webm') && acodec != 'none' && vcodec != 'none') {
+              if (f['url'] != mainUrl) { // لتجنب تكرار الرابط الرئيسي
+                String size = f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
                 videoList.add({
                   'quality_name': 'فيديو ($quality)',
-                  'desc': 'فيديو مع صوت مدمج',
+                  'desc': 'جودة مدمجة',
                   'size': size,
                   'url': f['url'],
                   'ext': ext
                 });
               }
+            }
+          }
+        }
+        
+        // 3. خطة الإنقاذ القصوى: إذا بقيت القائمة فارغة، اسحب أي ملف mp4 متاح لمنع الانهيار
+        if (videoList.isEmpty && formats != null) {
+          for (var f in formats) {
+            String ext = f['ext']?.toString().toLowerCase() ?? '';
+            if (ext == 'mp4') {
+              videoList.add({
+                'quality_name': 'فيديو إضافي',
+                'desc': 'جودة استثنائية',
+                'size': 'تلقائي',
+                'url': f['url'],
+                'ext': ext
+              });
+              break; 
             }
           }
         }
