@@ -9,7 +9,7 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ==========================================
-// 1. المتغيرات العالمية ونظام اللغات
+// 1. المتغيرات العالمية ونظام اللغات الكامل
 // ==========================================
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 final ValueNotifier<String> langNotifier = ValueNotifier('ar');
@@ -161,7 +161,7 @@ class _SplashScreenState extends State<SplashScreen> {
 }
 
 // ==========================================
-// 4. شريط التنقل السفلي
+// 4. شريط التنقل السفلي الكامل
 // ==========================================
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -256,45 +256,32 @@ Future<void> extractHybridFast(BuildContext context, String url, Function(bool) 
       thumb = video.thumbnails.highResUrl;
       var manifest = await ytEngine.videos.streamsClient.getManifest(video.id);
       
-      // -- استخراج جودات الفيديو مع الصوت (Muxed) --
+      // استخراج الفيديوهات التي تحتوي على صوت (Muxed) لحل مشكلة عدم ظهور الفيديوهات
       for (var stream in manifest.muxed) {
         String quality = '${stream.videoResolution.height}p';
         videoList.add({
           'quality_name': 'سريع ($quality)',
-          'desc': 'جودة متوافقة مع جميع الأجهزة (يحتوي على صوت)',
+          'desc': 'فيديو متوافق مع الصوت',
           'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
           'url': stream.url.toString(),
-          'ext': stream.container.name,
+          'ext': stream.container.name, 
         });
       }
 
-      // -- استخراج جودات الفيديو العالية جداً (بدون صوت عادة) لخيارات أكثر --
-      for (var stream in manifest.videoOnly) {
-        if (stream.videoResolution.height >= 1080) {
-          String quality = '${stream.videoResolution.height}p';
-          videoList.add({
-            'quality_name': 'جودة عالية ($quality)',
-            'desc': 'فيديو بدقة فائقة الوضوح (HD)',
+      // استخراج الصوتيات 
+      for (var stream in manifest.audioOnly) {
+        if (stream.container.name == 'mp4' || stream.container.name == 'm4a') {
+          audioList.add({
+            'quality_name': 'صوت (128K) M4A',
+            'desc': 'الأفضل للتشغيل على الهاتف',
             'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
             'url': stream.url.toString(),
-            'ext': stream.container.name,
+            'ext': 'm4a',
           });
         }
       }
-
-      // -- استخراج الصوت فقط (Audio Only) --
-      for (var stream in manifest.audioOnly) {
-        audioList.add({
-          'quality_name': 'صوت (Audio) ${stream.container.name.toUpperCase()}',
-          'desc': 'يدعم سماعات السيارة والأجهزة الذكية',
-          'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
-          'url': stream.url.toString(),
-          'ext': stream.container.name == 'webm' ? 'mp3' : stream.container.name,
-        });
-      }
       ytEngine.close();
     } else {
-      // للمواقع الأخرى كفيسبوك وانستغرام
       final dio = Dio();
       final response = await dio.post(
         'https://web-production-69773.up.railway.app/api/extract',
@@ -309,7 +296,10 @@ Future<void> extractHybridFast(BuildContext context, String url, Function(bool) 
         for (var f in formats) {
           String ext = f['ext'].toString().toLowerCase();
           String quality = f['quality'].toString();
-          String size = f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
+          String size = 'غير محدد';
+          if (f['filesize'] != null) {
+            size = (f['filesize'] / (1024 * 1024)).toStringAsFixed(1);
+          }
           
           if (ext == 'm4a' || ext == 'mp3') {
             audioList.add({
@@ -468,7 +458,6 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                 ),
                 onPressed: _selectedFormat == null ? null : () {
                   Navigator.pop(context);
-                  // استدعاء دالة التحميل المرئية الجديدة
                   showDialog(
                     context: context,
                     barrierDismissible: false,
@@ -546,7 +535,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
 }
 
 // ------------------------------------------
-// نافذة تقدم التحميل الحية (لحل مشكلة اختفاء الإشعار)
+// نافذة تقدم التحميل الحية والحقيقية لحل مشكلة التنزيل
 // ------------------------------------------
 class DownloadProgressDialog extends StatefulWidget {
   final String downloadUrl;
@@ -578,12 +567,19 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
   }
 
   Future<void> _startDownload() async {
-    // معالجة قوية للصلاحيات في أندرويد 13+
+    // 1. طلب صلاحيات التخزين الصارمة التي تمنع التحميل في أندرويد الحديث
     if (Platform.isAndroid) {
-      if (await Permission.manageExternalStorage.isDenied) {
-        await Permission.manageExternalStorage.request();
+      var statusManage = await Permission.manageExternalStorage.request();
+      var statusStorage = await Permission.storage.request();
+      
+      if (!statusManage.isGranted && !statusStorage.isGranted) {
+        if (mounted) {
+          setState(() {
+            _hasError = true;
+          });
+        }
+        return;
       }
-      await Permission.storage.request();
     }
 
     try {
@@ -641,7 +637,7 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
           if (_hasError) ...[
             const Icon(Icons.error_outline, color: Colors.red, size: 50),
             const SizedBox(height: 15),
-            const Text('فشل التنزيل. يرجى التحقق من الأذونات والمساحة.', textAlign: TextAlign.center),
+            const Text('فشل التنزيل. يرجى إعطاء صلاحية التخزين من إعدادات الهاتف.', textAlign: TextAlign.center),
             const SizedBox(height: 15),
             ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('إغلاق'))
           ] else if (_isFinished) ...[
@@ -948,7 +944,7 @@ class _SearchTabState extends State<SearchTab> {
 }
 
 // ==========================================
-// 7. شاشة المشاهدة والفيديوهات ذات الصلة (بدون أخطاء)
+// 7. شاشة المشاهدة والفيديوهات ذات الصلة (بدون انهيار ومع التمرير اللانهائي)
 // ==========================================
 class WatchVideoScreen extends StatefulWidget { 
   final yt.Video video; 
@@ -964,19 +960,23 @@ class WatchVideoScreen extends StatefulWidget {
 
 class _WatchVideoScreenState extends State<WatchVideoScreen> {
   late YoutubePlayerController _controller; 
+  final ScrollController _relatedScrollController = ScrollController();
+  
   bool _isLoadingExtraction = false;
   bool _hasPlayerError = false;
   
   // متغيرات الفيديوهات ذات الصلة
   final yt.YoutubeExplode _yt = yt.YoutubeExplode();
   List<yt.Video> _relatedVideos = [];
+  yt.VideoSearchList? _relatedSearchPage;
   bool _isLoadingRelated = true;
+  bool _isLoadingMoreRelated = false;
   
   @override
   void initState() { 
     super.initState(); 
     
-    // محاولة تهيئة المشغل بأمان
+    // تهيئة المشغل مع تجنب الانهيار
     try {
       _controller = YoutubePlayerController(
         initialVideoId: widget.video.id.value,
@@ -991,6 +991,13 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     }
     
     _fetchRelatedVideos();
+
+    // مستمع للتمرير اللانهائي للفيديوهات المشابهة
+    _relatedScrollController.addListener(() {
+      if (_relatedScrollController.position.pixels >= _relatedScrollController.position.maxScrollExtent - 200 && !_isLoadingMoreRelated) {
+        _loadMoreRelatedVideos();
+      }
+    });
   }
 
   Future<void> _fetchRelatedVideos() async {
@@ -998,7 +1005,8 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       final results = await _yt.search.search(widget.video.title);
       if (mounted) {
         setState(() {
-          _relatedVideos = results.whereType<yt.Video>().skip(1).take(10).toList();
+          _relatedSearchPage = results;
+          _relatedVideos = results.whereType<yt.Video>().skip(1).toList();
           _isLoadingRelated = false;
         });
       }
@@ -1011,11 +1019,34 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     }
   }
 
+  Future<void> _loadMoreRelatedVideos() async {
+    if (_relatedSearchPage?.nextPage != null) {
+      setState(() {
+        _isLoadingMoreRelated = true;
+      });
+      try {
+        final next = await _relatedSearchPage!.nextPage();
+        if (next != null) {
+          setState(() {
+            _relatedSearchPage = next;
+            _relatedVideos.addAll(next.whereType<yt.Video>());
+          });
+        }
+      } catch (e) {
+        // صمت
+      }
+      setState(() {
+        _isLoadingMoreRelated = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
     if (!_hasPlayerError) {
       _controller.dispose();
     }
+    _relatedScrollController.dispose();
     super.dispose();
   }
   
@@ -1033,14 +1064,14 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // عرض الفيديو أو رسالة خطأ آمنة
+          // عرض الفيديو أو رسالة خطأ الحماية
           _hasPlayerError
             ? Container(
                 height: 220,
                 color: Colors.black,
                 child: const Center(
                   child: Text(
-                    'هذا الفيديو محمي من العرض خارج يوتيوب.\nلكن لا يزال بإمكانك تحميله!',
+                    'هذا الفيديو محمي من العرض خارج يوتيوب.\nلكن يمكنك تحميله من الزر بالأسفل!',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white, fontSize: 14),
                   ),
@@ -1053,148 +1084,157 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
               ),
               
           Expanded(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(20.0), 
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, 
-                  children: [
-                    Text(
-                      widget.video.title,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                    ), 
-                    const SizedBox(height: 10), 
-                    Text(
-                      widget.video.author,
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 14,
-                      ),
-                    ), 
-                    const SizedBox(height: 25), 
-                    
-                    // زر التحميل الرئيسي
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55, 
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFFD600),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
+            child: ListView.builder(
+              controller: _relatedScrollController,
+              itemCount: _relatedVideos.length + 2, // 1 للتفاصيل العلوية + 1 للتحميل
+              itemBuilder: (context, index) {
+                // القسم العلوي (العنوان + زر التحميل)
+                if (index == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.all(20.0), 
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start, 
+                      children: [
+                        Text(
+                          widget.video.title,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black,
                           ),
                         ), 
-                        onPressed: _isLoadingExtraction ? null : () {
-                          extractHybridFast(
-                            context,
-                            widget.video.url,
-                            (val) {
-                              setState(() {
-                                _isLoadingExtraction = val;
-                              });
-                            },
-                          );
-                        }, 
-                        icon: _isLoadingExtraction
-                            ? const SizedBox.shrink()
-                            : const Icon(Icons.download, color: Colors.black), 
-                        label: _isLoadingExtraction
-                            ? const CircularProgressIndicator(color: Colors.black)
-                            : Text(
-                                t('download_btn'),
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                        const SizedBox(height: 10), 
+                        Text(
+                          widget.video.author,
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14,
+                          ),
+                        ), 
+                        const SizedBox(height: 25), 
+                        
+                        SizedBox(
+                          width: double.infinity,
+                          height: 55, 
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFFD600),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
                               ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
-                    const Divider(color: Colors.grey),
-                    const SizedBox(height: 15),
-                    
-                    // قسم الفيديوهات ذات الصلة
-                    Text(
-                      t('related'),
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    
-                    if (_isLoadingRelated)
-                      const Center(
-                        child: CircularProgressIndicator(color: Colors.redAccent),
-                      )
-                    else if (_relatedVideos.isEmpty)
-                      const Text(
-                        'لا توجد فيديوهات ذات صلة.',
-                        style: TextStyle(color: Colors.grey),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _relatedVideos.length,
-                        itemBuilder: (context, index) {
-                          final v = _relatedVideos[index];
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                            leading: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                v.thumbnails.lowResUrl,
-                                width: 80,
-                                height: 50,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            title: Text(
-                              v.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: isDark ? Colors.white : Colors.black,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Text(
-                              v.author,
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 11,
-                              ),
-                            ),
-                            trailing: const Icon(
-                              Icons.play_circle_outline,
-                              color: Colors.redAccent,
-                            ),
-                            onTap: () {
-                              if (!_hasPlayerError) {
-                                _controller.pause();
-                              }
-                              Navigator.pushReplacement(
+                            ), 
+                            onPressed: _isLoadingExtraction ? null : () {
+                              extractHybridFast(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (context) => WatchVideoScreen(video: v),
-                                ),
+                                widget.video.url,
+                                (val) {
+                                  setState(() {
+                                    _isLoadingExtraction = val;
+                                  });
+                                },
                               );
-                            },
-                          );
-                        },
+                            }, 
+                            icon: _isLoadingExtraction
+                                ? const SizedBox.shrink()
+                                : const Icon(Icons.download, color: Colors.black), 
+                            label: _isLoadingExtraction
+                                ? const CircularProgressIndicator(color: Colors.black)
+                                : Text(
+                                    t('download_btn'),
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 30),
+                        const Divider(color: Colors.grey),
+                        const SizedBox(height: 15),
+                        
+                        Text(
+                          t('related'),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        
+                        if (_isLoadingRelated)
+                          const Center(
+                            child: CircularProgressIndicator(color: Colors.redAccent),
+                          )
+                        else if (_relatedVideos.isEmpty)
+                          const Text(
+                            'لا توجد فيديوهات ذات صلة.',
+                            style: TextStyle(color: Colors.grey),
+                          )
+                      ]
+                    )
+                  );
+                }
+                
+                // مؤشر التحميل الإضافي في الأسفل
+                if (index == _relatedVideos.length + 1) {
+                  return _isLoadingMoreRelated 
+                    ? const Padding(
+                        padding: EdgeInsets.all(20.0),
+                        child: Center(child: CircularProgressIndicator(color: Colors.redAccent)),
                       )
-                  ]
-                )
-              ),
+                    : const SizedBox.shrink();
+                }
+                
+                // الفيديوهات ذات الصلة
+                final v = _relatedVideos[index - 1];
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      v.thumbnails.lowResUrl,
+                      width: 80,
+                      height: 50,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  title: Text(
+                    v.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(
+                    v.author,
+                    style: const TextStyle(
+                      color: Colors.grey,
+                      fontSize: 11,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.play_circle_outline,
+                    color: Colors.redAccent,
+                  ),
+                  onTap: () {
+                    if (!_hasPlayerError) {
+                      _controller.pause();
+                    }
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => WatchVideoScreen(video: v),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           )
         ],
@@ -1323,7 +1363,7 @@ class _LinkTabState extends State<LinkTab> {
 }
 
 // ==========================================
-// 9. تبويبة التنزيلات
+// 9. تبويبة التنزيلات (قارئ الملفات الحقيقي)
 // ==========================================
 class DownloadsTab extends StatefulWidget {
   const DownloadsTab({super.key});
@@ -1351,7 +1391,7 @@ class _DownloadsTabState extends State<DownloadsTab> {
         files.addAll(dir.listSync());
       }
     } catch (e) {
-      // تجاهل الخطأ 
+      // تجاهل الخطأ في حال عدم وجود المجلد
     }
     setState(() {
       _downloadedFiles = files.where((file) {
@@ -1380,7 +1420,9 @@ class _DownloadsTabState extends State<DownloadsTab> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
+            child: _downloadedFiles.isEmpty 
+            ? const Center(child: Text('لا توجد تنزيلات بعد', style: TextStyle(color: Colors.grey)))
+            : ListView.builder(
               itemCount: _downloadedFiles.length,
               itemBuilder: (context, index) {
                 final file = _downloadedFiles[index];
