@@ -101,21 +101,45 @@ class BackendService {
       
       if (response.statusCode == 200 && response.data['status'] == 'success') {
         videoTitle = response.data['title'] ?? 'فيديو بدون عنوان';
-        final formats = response.data['formats'] as List;
         
-        for (var f in formats) {
-          String ext = f['ext'].toString().toLowerCase();
-          String quality = f['quality'].toString();
-          String size = f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
-          
-          if (ext == 'mp4' || ext == 'webm') {
-            videoList.add({
-              'quality_name': 'فيديو ($quality)',
-              'desc': 'جودة فيديو متوافقة',
-              'size': size,
-              'url': f['url'],
-              'ext': ext
-            });
+        // جلب أفضل جودة مدمجة (الرابط الرئيسي) والذي يكون مضموناً بصوت وصورة
+        if (response.data['url'] != null) {
+          videoList.add({
+            'quality_name': 'أفضل جودة (Best)',
+            'desc': 'فيديو مع الصوت الأصلي',
+            'size': 'تلقائي',
+            'url': response.data['url'],
+            'ext': 'mp4'
+          });
+        }
+
+        final formats = response.data['formats'] as List?;
+        if (formats != null) {
+          for (var f in formats) {
+            String ext = f['ext'].toString().toLowerCase();
+            String quality = f['format_note']?.toString() ?? f['resolution']?.toString() ?? f['quality']?.toString() ?? 'متوسطة';
+            String size = f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
+            
+            // الفلتر الذكي: التحقق من كوديك الصوت (acodec) وكوديك الفيديو (vcodec)
+            String acodec = f['acodec']?.toString().toLowerCase() ?? '';
+            String vcodec = f['vcodec']?.toString().toLowerCase() ?? '';
+            
+            // يجب ألا يكون الصوت معدوماً (none) لضمان عدم تنزيل فيديو صامت
+            if ((ext == 'mp4' || ext == 'webm') && 
+                acodec != 'none' && acodec != '' && 
+                vcodec != 'none' && vcodec != '') {
+              
+              // منع تكرار الرابط إذا كان هو نفسه الرابط الرئيسي الأفضل المضاف مسبقاً
+              if (response.data['url'] != f['url']) {
+                videoList.add({
+                  'quality_name': 'فيديو ($quality)',
+                  'desc': 'فيديو مع صوت مدمج',
+                  'size': size,
+                  'url': f['url'],
+                  'ext': ext
+                });
+              }
+            }
           }
         }
       }
@@ -170,7 +194,6 @@ class BackendService {
         directory.createSync(recursive: true);
       }
 
-      // فلتر تنظيف الأسماء الطويلة جداً (مثل منشورات الفيسبوك) وإزالة الرموز
       String safeTitle = title.replaceAll(RegExp(r'[\\/:*?"<>|\n\r]'), '_').trim();
       if (safeTitle.length > 50) {
         safeTitle = safeTitle.substring(0, 50);
