@@ -85,7 +85,7 @@ class BackendService {
   // ==========================================
   // 3. محرك الاستخراج الدقيق (الفصل بين الصوت والفيديو)
   // ==========================================
-  Future<Map<String, List<Map<String, dynamic>>>> extractMediaLinks(String url) async {
+  Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     List<Map<String, dynamic>> audioList = [];
     List<Map<String, dynamic>> videoList = [];
     String videoTitle = 'فيديو بدون عنوان';
@@ -163,7 +163,7 @@ class BackendService {
     }
 
     return {
-      'title': [videoTitle], // تخزين العنوان في القائمة لتمريره للواجهة
+      'title': videoTitle, 
       'audio': audioList,
       'video': videoList,
     };
