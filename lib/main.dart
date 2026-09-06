@@ -299,7 +299,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                     barrierDismissible: false,
                     builder: (context) => DownloadProgressDialog(
                       downloadUrl: _selectedFormat!['url'],
-                      audioUrl: _selectedFormat!['audio_url'], // تمرير مسار الصوت إن وُجد
+                      audioUrl: _selectedFormat!['audio_url'],
                       title: widget.title,
                       extension: _selectedFormat!['ext'],
                     )
@@ -363,7 +363,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
               ],
             ),
             const SizedBox(width: 15),
-            Icon(format['audio_url'] != null ? Icons.auto_awesome : Icons.play_arrow, color: Colors.grey, size: 22),
+            const Icon(Icons.play_arrow, color: Colors.grey, size: 22),
           ],
         ),
       ),
