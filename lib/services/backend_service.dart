@@ -68,7 +68,6 @@ class BackendService {
     langNotifier.value = value;
   }
 
-  // استخراج الفيديوهات فقط (بدون صوت)
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     List<Map<String, dynamic>> videoList = [];
     String videoTitle = 'فيديو بدون عنوان';
@@ -128,7 +127,6 @@ class BackendService {
     };
   }
 
-  // طلب الأذن مرة واحدة فقط وحفظ الحالة
   Future<bool> checkAndRequestPermission() async {
     final prefs = await SharedPreferences.getInstance();
     bool alreadyGranted = prefs.getBool('permission_granted') ?? false;
@@ -163,7 +161,6 @@ class BackendService {
     try {
       Directory? directory;
       if (Platform.isAndroid) {
-        // الحفظ مباشرة في مجلد Download العام ليظهر في الهاتف
         directory = Directory('/storage/emulated/0/Download');
       } else {
         directory = await getApplicationDocumentsDirectory();
@@ -200,7 +197,6 @@ class BackendService {
   Future<List<FileSystemEntity>> getDownloadedFiles() async {
     List<FileSystemEntity> files = [];
     try {
-      // قراءة الملفات من المجلد العام مباشرة
       Directory directory = Directory('/storage/emulated/0/Download');
       if (await directory.exists()) {
         files = directory.listSync().where((file) {
