@@ -207,9 +207,10 @@ Future<void> handleExtraction(BuildContext context, String url, Function(bool) s
     // استدعاء الباك إند للقيام بالعمل الشاق
     final result = await backend.extractMediaLinks(url);
     
-    final String videoTitle = result['title']!.first;
-    final List<Map<String, dynamic>> audioList = result['audio']!;
-    final List<Map<String, dynamic>> videoList = result['video']!;
+    // استقبال البيانات بالنوع الصحيح وتصنيفها
+    final String videoTitle = result['title'] as String;
+    final List<Map<String, dynamic>> audioList = List<Map<String, dynamic>>.from(result['audio']);
+    final List<Map<String, dynamic>> videoList = List<Map<String, dynamic>>.from(result['video']);
 
     if (context.mounted && (audioList.isNotEmpty || videoList.isNotEmpty)) {
       showModalBottomSheet(
