@@ -3,15 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:video_player/video_player.dart';
 import 'package:share_plus/share_plus.dart';
 
-// استدعاء ملف الباك إند الذي قمنا بإنشائه
 import 'services/backend_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // تهيئة الباك إند (تحميل اللغة والسمة المحفوظة)
   await BackendService().initBackend();
 
   SystemChrome.setSystemUIOverlayStyle(
@@ -23,9 +21,6 @@ void main() async {
   runApp(const ProDownloaderApp());
 }
 
-// ==========================================
-// 1. الجذر الأساسي للتطبيق
-// ==========================================
 class ProDownloaderApp extends StatelessWidget {
   const ProDownloaderApp({super.key});
 
@@ -78,9 +73,6 @@ class ProDownloaderApp extends StatelessWidget {
   }
 }
 
-// ==========================================
-// 2. شاشة البداية (Splash)
-// ==========================================
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -118,9 +110,6 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-// ==========================================
-// 3. شريط التنقل السفلي الكامل
-// ==========================================
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
@@ -197,22 +186,16 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 }
 
-// ==========================================
-// 4. مساعدات الواجهة: معالج الاستخراج ونافذة الجودات
-// ==========================================
 Future<void> handleExtraction(BuildContext context, String url, Function(bool) setLoading) async {
   setLoading(true);
   try {
     final backend = BackendService();
-    // استدعاء الباك إند للقيام بالعمل الشاق
     final result = await backend.extractMediaLinks(url);
     
-    // استقبال البيانات بالنوع الصحيح وتصنيفها
     final String videoTitle = result['title'] as String;
-    final List<Map<String, dynamic>> audioList = List<Map<String, dynamic>>.from(result['audio']);
     final List<Map<String, dynamic>> videoList = List<Map<String, dynamic>>.from(result['video']);
 
-    if (context.mounted && (audioList.isNotEmpty || videoList.isNotEmpty)) {
+    if (context.mounted && videoList.isNotEmpty) {
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -223,7 +206,6 @@ Future<void> handleExtraction(BuildContext context, String url, Function(bool) s
         builder: (context) {
           return FormatSelectionSheet(
             title: videoTitle,
-            audioFormats: audioList,
             videoFormats: videoList,
           );
         },
@@ -246,13 +228,11 @@ Future<void> handleExtraction(BuildContext context, String url, Function(bool) s
 
 class FormatSelectionSheet extends StatefulWidget {
   final String title;
-  final List<Map<String, dynamic>> audioFormats;
   final List<Map<String, dynamic>> videoFormats;
 
   const FormatSelectionSheet({
     super.key,
     required this.title,
-    required this.audioFormats,
     required this.videoFormats,
   });
 
@@ -270,7 +250,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
     final textColor = isDark ? Colors.white : Colors.black;
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
+      height: MediaQuery.of(context).size.height * 0.7,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
       child: Column(
         children: [
@@ -279,9 +259,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
             children: [
               IconButton(
                 icon: Icon(Icons.arrow_forward, color: textColor),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
+                onPressed: () => Navigator.pop(context),
               ),
               Text(
                 _backend.t('formats_title'),
@@ -297,39 +275,9 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
           const SizedBox(height: 10),
           Expanded(
             child: ListView(
-              children: [
-                if (widget.audioFormats.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.only(left: 15, right: 15, bottom: 5),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        _backend.t('audio'),
-                        style: const TextStyle(color: Colors.grey, fontSize: 14),
-                      ),
-                    ),
-                  ),
-                  ...widget.audioFormats.map((fmt) {
-                    return _buildFormatRow(fmt, Icons.music_note, textColor);
-                  }),
-                ],
-                const SizedBox(height: 20),
-                if (widget.videoFormats.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.only(left: 15, right: 15, bottom: 5),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        _backend.t('video'),
-                        style: const TextStyle(color: Colors.grey, fontSize: 14),
-                      ),
-                    ),
-                  ),
-                  ...widget.videoFormats.map((fmt) {
-                    return _buildFormatRow(fmt, Icons.play_arrow, textColor);
-                  }),
-                ],
-              ],
+              children: widget.videoFormats.map((fmt) {
+                return _buildFormatRow(fmt, textColor);
+              }).toList(),
             ),
           ),
           Padding(
@@ -372,7 +320,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
     );
   }
 
-  Widget _buildFormatRow(Map<String, dynamic> format, IconData icon, Color textColor) {
+  Widget _buildFormatRow(Map<String, dynamic> format, Color textColor) {
     bool isSelected = _selectedFormat == format;
     return InkWell(
       onTap: () {
@@ -414,7 +362,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
               ],
             ),
             const SizedBox(width: 15),
-            Icon(icon, color: Colors.grey, size: 22),
+            const Icon(Icons.play_arrow, color: Colors.grey, size: 22),
           ],
         ),
       ),
@@ -422,9 +370,6 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
   }
 }
 
-// ------------------------------------------
-// نافذة تقدم التحميل الحية (متصلة بالباك إند)
-// ------------------------------------------
 class DownloadProgressDialog extends StatefulWidget {
   final String downloadUrl;
   final String title;
@@ -496,7 +441,7 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
           if (_hasError) ...[
             const Icon(Icons.error_outline, color: Colors.red, size: 50),
             const SizedBox(height: 15),
-            const Text('فشل التنزيل. يرجى إعطاء صلاحية التخزين من إعدادات الهاتف.', textAlign: TextAlign.center),
+            const Text('فشل التنزيل. يرجى التحقق من مساحة التخزين أو الأذونات.', textAlign: TextAlign.center),
             const SizedBox(height: 15),
             ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('إغلاق'))
           ] else if (_isFinished) ...[
@@ -528,9 +473,6 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
   }
 }
 
-// ==========================================
-// 5. تبويبة البحث 
-// ==========================================
 class SearchTab extends StatefulWidget {
   const SearchTab({super.key});
 
@@ -563,14 +505,11 @@ class _SearchTabState extends State<SearchTab> {
   Future<void> _searchYouTube() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
-    
     FocusScope.of(context).unfocus();
-    
     setState(() {
       _isSearching = true;
       _searchResults.clear();
     });
-    
     try {
       final results = await _yt.search.search(query);
       if (mounted) {
@@ -673,9 +612,7 @@ class _SearchTabState extends State<SearchTab> {
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 15),
                       ),
-                      onSubmitted: (_) {
-                        _searchYouTube();
-                      },
+                      onSubmitted: (_) => _searchYouTube(),
                     ),
                   ),
                 ],
@@ -804,17 +741,9 @@ class _SearchTabState extends State<SearchTab> {
   }
 }
 
-// ==========================================
-// 6. شاشة المشاهدة والفيديوهات ذات الصلة
-// ==========================================
 class WatchVideoScreen extends StatefulWidget { 
   final yt.Video video; 
-  
-  const WatchVideoScreen({
-    super.key,
-    required this.video,
-  }); 
-  
+  const WatchVideoScreen({super.key, required this.video}); 
   @override
   State<WatchVideoScreen> createState() => _WatchVideoScreenState(); 
 }
@@ -836,15 +765,10 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   @override
   void initState() { 
     super.initState(); 
-    
     try {
       _controller = YoutubePlayerController(
         initialVideoId: widget.video.id.value,
-        flags: const YoutubePlayerFlags(
-          autoPlay: true,
-          mute: false,
-          enableCaption: false,
-        ),
+        flags: const YoutubePlayerFlags(autoPlay: true, mute: false, enableCaption: false),
       );
     } catch (e) {
       _hasPlayerError = true;
@@ -870,19 +794,13 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
         });
       }
     } catch(e) {
-      if (mounted) {
-        setState(() {
-          _isLoadingRelated = false;
-        });
-      }
+      if (mounted) setState(() => _isLoadingRelated = false);
     }
   }
 
   Future<void> _loadMoreRelatedVideos() async {
     if (_relatedSearchPage?.nextPage != null) {
-      setState(() {
-        _isLoadingMoreRelated = true;
-      });
+      setState(() => _isLoadingMoreRelated = true);
       try {
         final next = await _relatedSearchPage!.nextPage();
         if (next != null) {
@@ -891,20 +809,14 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
             _relatedVideos.addAll(next.whereType<yt.Video>());
           });
         }
-      } catch (e) {
-        // صمت
-      }
-      setState(() {
-        _isLoadingMoreRelated = false;
-      });
+      } catch (e) {}
+      setState(() => _isLoadingMoreRelated = false);
     }
   }
 
   @override
   void dispose() {
-    if (!_hasPlayerError) {
-      _controller.dispose();
-    }
+    if (!_hasPlayerError) _controller.dispose();
     _relatedScrollController.dispose();
     super.dispose();
   }
@@ -915,11 +827,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     
     return Scaffold(
       backgroundColor: isDark ? Colors.black : Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
+      appBar: AppBar(backgroundColor: Colors.black, elevation: 0, iconTheme: const IconThemeData(color: Colors.white)),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -929,17 +837,13 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                 color: Colors.black,
                 child: const Center(
                   child: Text(
-                    'هذا الفيديو محمي من العرض خارج يوتيوب.\nلكن يمكنك تحميله من الزر بالأسفل!',
+                    'هذا الفيديو محمي من العرض خارج يوتيوب.\nلكن يمكنك تحميله بالأسفل!',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white, fontSize: 14),
                   ),
                 ),
               )
-            : YoutubePlayer(
-                controller: _controller,
-                showVideoProgressIndicator: true,
-                progressIndicatorColor: Colors.redAccent,
-              ),
+            : YoutubePlayer(controller: _controller, showVideoProgressIndicator: true, progressIndicatorColor: Colors.redAccent),
               
           Expanded(
             child: ListView.builder(
@@ -952,141 +856,48 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start, 
                       children: [
-                        Text(
-                          widget.video.title,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black,
-                          ),
-                        ), 
+                        Text(widget.video.title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)), 
                         const SizedBox(height: 10), 
-                        Text(
-                          widget.video.author,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
-                        ), 
+                        Text(widget.video.author, style: const TextStyle(color: Colors.grey, fontSize: 14)), 
                         const SizedBox(height: 25), 
-                        
                         SizedBox(
                           width: double.infinity,
                           height: 55, 
                           child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFFFD600),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                            ), 
-                            onPressed: _isLoadingExtraction ? null : () {
-                              handleExtraction(
-                                context,
-                                widget.video.url,
-                                (val) {
-                                  setState(() {
-                                    _isLoadingExtraction = val;
-                                  });
-                                },
-                              );
-                            }, 
-                            icon: _isLoadingExtraction
-                                ? const SizedBox.shrink()
-                                : const Icon(Icons.download, color: Colors.black), 
-                            label: _isLoadingExtraction
-                                ? const CircularProgressIndicator(color: Colors.black)
-                                : Text(
-                                    _backend.t('download_btn'),
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD600), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))), 
+                            onPressed: _isLoadingExtraction ? null : () => handleExtraction(context, widget.video.url, (val) => setState(() => _isLoadingExtraction = val)), 
+                            icon: _isLoadingExtraction ? const SizedBox.shrink() : const Icon(Icons.download, color: Colors.black), 
+                            label: _isLoadingExtraction ? const CircularProgressIndicator(color: Colors.black) : Text(_backend.t('download_btn'), style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold))
                           ),
                         ),
-
                         const SizedBox(height: 30),
                         const Divider(color: Colors.grey),
                         const SizedBox(height: 15),
-                        
-                        Text(
-                          _backend.t('related'),
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black,
-                          ),
-                        ),
+                        Text(_backend.t('related'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                         const SizedBox(height: 15),
-                        
                         if (_isLoadingRelated)
-                          const Center(
-                            child: CircularProgressIndicator(color: Colors.redAccent),
-                          )
+                          const Center(child: CircularProgressIndicator(color: Colors.redAccent))
                         else if (_relatedVideos.isEmpty)
-                          const Text(
-                            'لا توجد فيديوهات ذات صلة.',
-                            style: TextStyle(color: Colors.grey),
-                          )
+                          const Text('لا توجد فيديوهات ذات صلة.', style: TextStyle(color: Colors.grey))
                       ]
                     )
                   );
                 }
                 
                 if (index == _relatedVideos.length + 1) {
-                  return _isLoadingMoreRelated 
-                    ? const Padding(
-                        padding: EdgeInsets.all(20.0),
-                        child: Center(child: CircularProgressIndicator(color: Colors.redAccent)),
-                      )
-                    : const SizedBox.shrink();
+                  return _isLoadingMoreRelated ? const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.redAccent))) : const SizedBox.shrink();
                 }
                 
                 final v = _relatedVideos[index - 1];
                 return ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  leading: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      v.thumbnails.lowResUrl,
-                      width: 80,
-                      height: 50,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  title: Text(
-                    v.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: isDark ? Colors.white : Colors.black,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(
-                    v.author,
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 11,
-                    ),
-                  ),
-                  trailing: const Icon(
-                    Icons.play_circle_outline,
-                    color: Colors.redAccent,
-                  ),
+                  leading: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(v.thumbnails.lowResUrl, width: 80, height: 50, fit: BoxFit.cover)),
+                  title: Text(v.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 13, fontWeight: FontWeight.bold)),
+                  subtitle: Text(v.author, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                  trailing: const Icon(Icons.play_circle_outline, color: Colors.redAccent),
                   onTap: () {
-                    if (!_hasPlayerError) {
-                      _controller.pause();
-                    }
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => WatchVideoScreen(video: v),
-                      ),
-                    );
+                    if (!_hasPlayerError) _controller.pause();
+                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => WatchVideoScreen(video: v)));
                   },
                 );
               },
@@ -1098,12 +909,8 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   }
 }
 
-// ==========================================
-// 7. تبويبة الروابط المباشرة 
-// ==========================================
 class LinkTab extends StatefulWidget {
   const LinkTab({super.key});
-
   @override
   State<LinkTab> createState() => _LinkTabState();
 }
@@ -1116,96 +923,44 @@ class _LinkTabState extends State<LinkTab> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     return SafeArea(
       child: Column(
         children: [
           const Spacer(flex: 1),
           const Icon(Icons.link, size: 80, color: Colors.redAccent),
           const SizedBox(height: 20),
-          Text(
-            _backend.t('have_link'),
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black,
-            ),
-          ),
+          Text(_backend.t('have_link'), style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
           const SizedBox(height: 10),
-          Text(
-            _backend.t('paste_here'),
-            style: const TextStyle(color: Colors.grey),
-          ),
+          Text(_backend.t('paste_here'), style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 40),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 25),
             child: Container(
               height: 55,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF333333) : Colors.grey[300]!,
-                ),
-              ),
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(30), border: Border.all(color: isDark ? const Color(0xFF333333) : Colors.grey[300]!)),
               child: Row(
                 children: [
                   Expanded(
                     child: TextField(
                       controller: _urlController,
                       style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                      decoration: const InputDecoration(
-                        hintText: 'http://...',
-                        hintStyle: TextStyle(color: Colors.grey),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 20),
-                      ),
+                      decoration: const InputDecoration(hintText: 'http://...', hintStyle: TextStyle(color: Colors.grey), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 20)),
                       onSubmitted: (_) {
                         FocusScope.of(context).unfocus();
-                        if (_urlController.text.isNotEmpty) {
-                          handleExtraction(
-                            context,
-                            _urlController.text,
-                            (val) {
-                              setState(() {
-                                _isLoadingExtraction = val;
-                              });
-                            },
-                          );
-                        }
+                        if (_urlController.text.isNotEmpty) handleExtraction(context, _urlController.text, (val) => setState(() => _isLoadingExtraction = val));
                       },
                     ),
                   ),
                   Container(
                     margin: const EdgeInsets.all(5),
-                    width: 45,
-                    height: 45,
-                    decoration: const BoxDecoration(
-                      color: Colors.redAccent,
-                      shape: BoxShape.circle,
-                    ),
+                    width: 45, height: 45,
+                    decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
                     child: _isLoadingExtraction
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : IconButton(
-                            icon: const Icon(Icons.download, color: Colors.white, size: 22),
-                            onPressed: () {
-                              FocusScope.of(context).unfocus();
-                              if (_urlController.text.isNotEmpty) {
-                                handleExtraction(
-                                  context,
-                                  _urlController.text,
-                                  (val) {
-                                    setState(() {
-                                      _isLoadingExtraction = val;
-                                    });
-                                  },
-                                );
-                              }
-                            },
-                          ),
+                        ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : IconButton(icon: const Icon(Icons.download, color: Colors.white, size: 22), onPressed: () {
+                            FocusScope.of(context).unfocus();
+                            if (_urlController.text.isNotEmpty) handleExtraction(context, _urlController.text, (val) => setState(() => _isLoadingExtraction = val));
+                          }),
                   ),
                 ],
               ),
@@ -1219,8 +974,66 @@ class _LinkTabState extends State<LinkTab> {
 }
 
 // ==========================================
-// 8. تبويبة التنزيلات (قارئ الملفات من الباك إند)
+// شاشة تشغيل الفيديو المحلي في التنزيلات
 // ==========================================
+class LocalVideoPlayerScreen extends StatefulWidget {
+  final FileSystemEntity file;
+  const LocalVideoPlayerScreen({super.key, required this.file});
+
+  @override
+  State<LocalVideoPlayerScreen> createState() => _LocalVideoPlayerScreenState();
+}
+
+class _LocalVideoPlayerScreenState extends State<LocalVideoPlayerScreen> {
+  late VideoPlayerController _controller;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(File(widget.file.path))
+      ..initialize().then((_) {
+        setState(() {
+          _isInitialized = true;
+          _controller.play();
+        });
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(backgroundColor: Colors.black, title: Text(widget.file.path.split('/').last, style: const TextStyle(fontSize: 14))),
+      body: Center(
+        child: _isInitialized
+            ? AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: VideoPlayer(_controller),
+              )
+            : const CircularProgressIndicator(color: Colors.redAccent),
+      ),
+      floatingActionButton: _isInitialized
+          ? FloatingActionButton(
+              backgroundColor: Colors.redAccent,
+              onPressed: () {
+                setState(() {
+                  _controller.value.isPlaying ? _controller.pause() : _controller.play();
+                });
+              },
+              child: Icon(_controller.value.isPlaying ? Icons.pause : Icons.play_arrow),
+            )
+          : null,
+    );
+  }
+}
+
 class DownloadsTab extends StatefulWidget {
   const DownloadsTab({super.key});
 
@@ -1254,13 +1067,7 @@ class _DownloadsTabState extends State<DownloadsTab> {
             padding: const EdgeInsets.all(15.0),
             child: Row(
               children: [
-                Text(
-                  _backend.t('downloaded'),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text(_backend.t('downloaded'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
@@ -1272,18 +1079,13 @@ class _DownloadsTabState extends State<DownloadsTab> {
               itemBuilder: (context, index) {
                 final file = _downloadedFiles[index];
                 final fileName = file.path.split('/').last;
-                final isAudio = fileName.endsWith('.m4a') || fileName.endsWith('.mp3');
                 return ListTile(
-                  leading: Icon(
-                    isAudio ? Icons.music_note : Icons.play_circle_fill,
-                    color: Colors.redAccent,
-                    size: 30,
-                  ),
-                  title: Text(
-                    fileName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  leading: const Icon(Icons.play_circle_fill, color: Colors.redAccent, size: 30),
+                  title: Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  // الضغط على الفيديو يفتحه في المشغل الداخلي الجديد
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => LocalVideoPlayerScreen(file: file)));
+                  },
                   trailing: IconButton(
                     icon: const Icon(Icons.delete, color: Colors.redAccent),
                     onPressed: () async {
@@ -1301,33 +1103,19 @@ class _DownloadsTabState extends State<DownloadsTab> {
   }
 }
 
-// ==========================================
-// 9. قسم الإعدادات الكامل
-// ==========================================
 class SettingsTab extends StatelessWidget {
   const SettingsTab({super.key});
 
   Widget _buildNavSetting(BuildContext context, String title, IconData icon, Widget destination) {
     return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => destination),
-        );
-      },
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => destination)),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         child: Row(
           children: [
             Icon(icon, color: Colors.grey, size: 22),
             const SizedBox(width: 20),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             const Spacer(),
             const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14), 
           ],
@@ -1345,13 +1133,7 @@ class SettingsTab extends StatelessWidget {
           children: [
             Icon(icon, color: Colors.grey, size: 22),
             const SizedBox(width: 20),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -1367,23 +1149,14 @@ class SettingsTab extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.all(20.0),
-            child: Text(
-              backend.t('settings'),
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: Text(backend.t('settings'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           ),
           Expanded(
             child: ListView(
               children: [
                 Padding(
                   padding: const EdgeInsets.only(right: 20, left: 20, bottom: 5),
-                  child: Text(
-                    backend.t('general'),
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
+                  child: Text(backend.t('general'), style: const TextStyle(color: Colors.grey, fontSize: 12)),
                 ),
                 _buildNavSetting(context, backend.t('dl_settings'), Icons.download_outlined, const DownloadSettingsScreen()),
                 _buildNavSetting(context, backend.t('notif'), Icons.notifications_none, const NotificationSettingsScreen()),
@@ -1392,21 +1165,13 @@ class SettingsTab extends StatelessWidget {
                 
                 Padding(
                   padding: const EdgeInsets.only(right: 20, left: 20, top: 20, bottom: 5),
-                  child: Text(
-                    backend.t('more_tools'),
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
+                  child: Text(backend.t('more_tools'), style: const TextStyle(color: Colors.grey, fontSize: 12)),
                 ),
                 _buildActionSetting(context, backend.t('share_app'), Icons.share_outlined, () {
                   Share.share('قم بتجربة Pro Downloader الأفضل لتحميل المقاطع');
                 }),
                 _buildActionSetting(context, backend.t('clean_cache'), Icons.cleaning_services_outlined, () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('تم تنظيف الملفات المؤقتة بنجاح'),
-                      backgroundColor: Colors.green,
-                    )
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تنظيف الملفات المؤقتة بنجاح'), backgroundColor: Colors.green));
                 }),
                 _buildActionSetting(context, backend.t('about'), Icons.info_outline, () {
                   showAboutDialog(
@@ -1414,9 +1179,7 @@ class SettingsTab extends StatelessWidget {
                     applicationName: 'Pro Downloader',
                     applicationVersion: '1.0.0',
                     applicationIcon: const Icon(Icons.download, color: Colors.redAccent, size: 40),
-                    children: [
-                      const Text('تطبيق احترافي لتحميل الفيديوهات والموسيقى.')
-                    ]
+                    children: [const Text('تطبيق احترافي لتحميل الفيديوهات.')]
                   );
                 }),
               ],
@@ -1428,9 +1191,6 @@ class SettingsTab extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------
-// إعدادات التنزيل
-// ---------------------------------------------------------
 class DownloadSettingsScreen extends StatefulWidget {
   const DownloadSettingsScreen({super.key});
 
@@ -1475,16 +1235,9 @@ class _DownloadSettingsScreenState extends State<DownloadSettingsScreen> {
       builder: (context) {
         return AlertDialog(
           title: const Text('تغيير مسار التنزيل', style: TextStyle(fontSize: 16)),
-          content: TextField(
-            controller: pathController,
-          ),
+          content: TextField(controller: pathController),
           actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('إلغاء'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
               onPressed: () async {
@@ -1601,9 +1354,6 @@ class _DownloadSettingsScreenState extends State<DownloadSettingsScreen> {
   }
 }
 
-// ---------------------------------------------------------
-// إعدادات الإشعارات
-// ---------------------------------------------------------
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
 
@@ -1662,60 +1412,21 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             subtitle: const Text('أبلغني بتقدم التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12)),
             value: _progressNotif,
             activeColor: Colors.redAccent,
-            onChanged: (val) {
-              _saveBool('n_prog', val, (v) => _progressNotif = v);
-            }
+            onChanged: (val) => _saveBool('n_prog', val, (v) => _progressNotif = v),
           ),
           SwitchListTile(
             title: const Text('اكتمل التنزيل', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             subtitle: const Text('أعلمني عند اكتمال التنزيل', style: TextStyle(color: Colors.grey, fontSize: 12)),
             value: _completeNotif,
             activeColor: Colors.redAccent,
-            onChanged: (val) {
-              _saveBool('n_comp', val, (v) => _completeNotif = v);
-            }
+            onChanged: (val) => _saveBool('n_comp', val, (v) => _completeNotif = v),
           ),
-          const Divider(height: 30),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 15.0),
-            child: Text('إشعارات الدفع', style: TextStyle(color: Colors.grey, fontSize: 12)),
-          ),
-          SwitchListTile(
-            title: const Text('محتوى موصى به', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-            subtitle: const Text('أبلغني بمقاطع الفيديو والموسيقى التي قد تعجبني', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            value: _recommendNotif,
-            activeColor: Colors.redAccent,
-            onChanged: (val) {
-              _saveBool('n_recom', val, (v) => _recommendNotif = v);
-            }
-          ),
-          SwitchListTile(
-            title: const Text('إشعارات الأداة', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-            subtitle: const Text('أبلغني عند إصدار أدوات جديدة', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            value: _toolNotif,
-            activeColor: Colors.redAccent,
-            onChanged: (val) {
-              _saveBool('n_tool', val, (v) => _toolNotif = v);
-            }
-          ),
-          SwitchListTile(
-            title: const Text('شريط الأدوات', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-            subtitle: const Text('وصول سريع إلى الأدوات في شريط الإشعارات', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            value: _toolbarNotif,
-            activeColor: Colors.redAccent,
-            onChanged: (val) {
-              _saveBool('n_toolbar', val, (v) => _toolbarNotif = v);
-            }
-          )
         ],
-      )
+      ),
     );
   }
 }
 
-// ---------------------------------------------------------
-// إعدادات السمة 
-// ---------------------------------------------------------
 class ThemeSettingsScreen extends StatefulWidget {
   const ThemeSettingsScreen({super.key});
 
@@ -1757,16 +1468,12 @@ class _ThemeSettingsScreenState extends State<ThemeSettingsScreen> {
           ListTile(
             title: const Text('فاتح', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             trailing: _selectedTheme == 'light' ? const Icon(Icons.check, color: Colors.redAccent) : null,
-            onTap: () {
-              _saveTheme('light');
-            }
+            onTap: () => _saveTheme('light'),
           ),
           ListTile(
             title: const Text('داكن', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             trailing: _selectedTheme == 'dark' ? const Icon(Icons.check, color: Colors.redAccent) : null,
-            onTap: () {
-              _saveTheme('dark');
-            }
+            onTap: () => _saveTheme('dark'),
           )
         ],
       ),
@@ -1774,9 +1481,6 @@ class _ThemeSettingsScreenState extends State<ThemeSettingsScreen> {
   }
 }
 
-// ---------------------------------------------------------
-// إعدادات اللغة 
-// ---------------------------------------------------------
 class LanguageSettingsScreen extends StatefulWidget {
   const LanguageSettingsScreen({super.key});
 
@@ -1821,11 +1525,9 @@ class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
 
   Widget _buildLangOption(String title, String value) {
     return ListTile(
-      title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+      title: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
       trailing: _selectedLang == value ? const Icon(Icons.check, color: Colors.redAccent) : null,
-      onTap: () {
-        _saveLang(value);
-      }
+      onTap: () => _saveLang(value),
     );
   }
 }
