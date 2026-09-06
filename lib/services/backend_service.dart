@@ -68,109 +68,110 @@ class BackendService {
     langNotifier.value = value;
   }
 
+  // المحرك المستقل والمجاني تماماً (بدون سيرفر)
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     List<Map<String, dynamic>> videoList = [];
-    String videoTitle = 'فيديو بدون عنوان';
+    String videoTitle = 'فيديو مستخرج';
 
-    if (url.contains('youtube.com') || url.contains('youtu.be')) {
-      final ytEngine = yt.YoutubeExplode();
-      try {
-        var video = await ytEngine.videos.get(url);
-        videoTitle = video.title;
-        var manifest = await ytEngine.videos.streamsClient.getManifest(video.id);
-        
-        // استخراج الفيديوهات المدمجة من الهاتف لتوفير بيانات السيرفر (عادة الجودات حتى 720p)
-        for (var stream in manifest.muxed) {
-          String quality = '${stream.videoResolution.height}p';
-          videoList.add({
-            'quality_name': 'عادية ($quality)',
-            'desc': 'جودة فيديو مع صوت مدمج',
-            'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
-            'url': stream.url.toString(),
-            'ext': stream.container.name,
-          });
-        }
-        
-        // ملاحظة: لطلب جودة 1080p مدمجة، سنعتمد على أن يرسل التطبيق رابط اليوتيوب للسيرفر الخارجي إذا أراد المستخدم،
-        // لكننا حالياً سنكتفي بالجودات المدمجة من المكتبة المحلية لتوفير استهلاك السيرفر، أو يمكنك تفعيل طلب السيرفر ليوتيوب لاحقاً.
-      } finally {
-        ytEngine.close();
-      }
-    } else {
-      // الاتصال بسيرفرك المرفوع على Railway ليقوم بدمج الفيديوهات العالية الجودة وإرجاع رابط واحد جاهز!
-      final dio = Dio();
-      final response = await dio.post(
-        'https://web-production-69773.up.railway.app/api/extract',
-        data: {'url': url}
-      );
-      
-      if (response.statusCode == 200 && response.data['status'] == 'success') {
-        videoTitle = response.data['title'] ?? 'فيديو بدون عنوان';
-        
-        // سيرفرك سيُرجع هذا الرابط بعد أن يدمج الفيديو بالصوت داخلياً
-        String? mainUrl = response.data['url'];
-        if (mainUrl != null && mainUrl.isNotEmpty) {
-          videoList.add({
-            'quality_name': 'تنزيل رئيسي (مستحسن)',
-            'desc': 'أفضل جودة مدمجة من السيرفر',
-            'size': 'تلقائي',
-            'url': mainUrl,
-            'ext': 'mp4'
-          });
-        }
+    try {
+      // 1. استخراج يوتيوب (محلياً بالكامل عبر مكتبة التطبيق)
+      if (url.contains('youtube.com') || url.contains('youtu.be')) {
+        final ytEngine = yt.YoutubeExplode();
+        try {
+          var video = await ytEngine.videos.get(url);
+          videoTitle = video.title;
+          var manifest = await ytEngine.videos.streamsClient.getManifest(video.id);
+          
+          // الاعتماد فقط على الفيديوهات المدمجة (Muxed) لضمان وجود الصوت والصورة معاً
+          // وأقصى جودة مدمجة مجانية يتيحها يوتيوب هي 720p HD
+          var muxedStreams = manifest.muxed.toList();
+          muxedStreams.sort((a, b) => b.videoResolution.height.compareTo(a.videoResolution.height));
 
-        final formats = response.data['formats'] as List?;
-        if (formats != null) {
-          for (var f in formats) {
-            String ext = f['ext']?.toString().toLowerCase() ?? '';
-            if (ext != 'mp4' && ext != 'webm') continue;
-
-            String formatNote = f['format_note']?.toString().toLowerCase() ?? '';
-            String formatId = f['format_id']?.toString().toLowerCase() ?? '';
-            String resolution = f['resolution']?.toString() ?? f['quality']?.toString() ?? '';
-            
-            String quality = formatNote.isNotEmpty ? formatNote.toUpperCase() : (resolution.isNotEmpty ? resolution : formatId.toUpperCase());
-            if (quality.isEmpty) quality = 'متوسطة';
-
-            String acodec = f['acodec']?.toString().toLowerCase() ?? '';
-            String vcodec = f['vcodec']?.toString().toLowerCase() ?? '';
-            
-            bool hasAudio = acodec != 'none' && acodec.isNotEmpty;
-            bool hasVideo = vcodec != 'none' && vcodec.isNotEmpty;
-            bool isNativeFb = formatId == 'hd' || formatId == 'sd' || formatNote == 'hd' || formatNote == 'sd';
-
-            // نقبل فقط الجودات المدمجة
-            if ((hasAudio && hasVideo) || isNativeFb) {
-              if (f['url'] != mainUrl) { 
-                String size = f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
-                videoList.add({
-                  'quality_name': 'فيديو ($quality)',
-                  'desc': 'مضمون بصوت وصورة',
-                  'size': size,
-                  'url': f['url'],
-                  'ext': ext
-                });
-              }
-            }
+          for (var stream in muxedStreams) {
+            String quality = '${stream.videoResolution.height}p';
+            String desc = quality == '720p' ? 'جودة عالية HD (صوت وصورة)' : 'جودة قياسية (صوت وصورة)';
+            videoList.add({
+              'quality_name': 'يوتيوب ($quality)',
+              'desc': desc,
+              'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
+              'url': stream.url.toString(),
+              'ext': stream.container.name,
+            });
           }
+        } finally {
+          ytEngine.close();
         }
+      } 
+      // 2. استخراج فيسبوك وتيك توك (عبر APIs عامة مجانية أو اختراق الواجهة محلياً)
+      else {
+        final dio = Dio();
         
-        if (videoList.isEmpty && formats != null) {
-          for (var f in formats) {
-            String acodec = f['acodec']?.toString().toLowerCase() ?? '';
-            if (f['ext']?.toString().toLowerCase() == 'mp4' && acodec != 'none') {
+        // المحاولة الأولى: سيرفرات Cobalt العامة والمفتوحة المصدر (لا تتطلب مفاتيح أو اشتراك)
+        try {
+          var response = await dio.post(
+            'https://co.wuk.sh/api/json',
+            data: {
+              'url': url,
+              'vQuality': '720', // نطلب الجودة المدمجة لتجنب الفيديوهات الصامتة
+            },
+            options: Options(
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+              }
+            )
+          );
+          
+          if (response.statusCode == 200 && response.data['url'] != null) {
+            videoList.add({
+              'quality_name': 'تنزيل مباشر (مضمون)',
+              'desc': 'جودة ممتازة (صوت وصورة)',
+              'size': 'تلقائي',
+              'url': response.data['url'],
+              'ext': 'mp4'
+            });
+          }
+        } catch (e) {
+          // المحاولة الثانية (خطة طوارئ): استخراج رابط الفيسبوك من الكود المصدري محلياً!
+          if (url.contains('facebook.com') || url.contains('fb.watch')) {
+            var fbResponse = await dio.get(
+              url,
+              options: Options(headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+              })
+            );
+            String html = fbResponse.data.toString();
+            
+            // تهكير الواجهة البرمجية للفيسبوك للوصول إلى الرابط المخفي
+            RegExp hdRegex = RegExp(r'"playable_url_quality_hd":"([^"]+)"');
+            RegExp sdRegex = RegExp(r'"playable_url":"([^"]+)"');
+            
+            var hdMatch = hdRegex.firstMatch(html);
+            var sdMatch = sdRegex.firstMatch(html);
+            
+            if (hdMatch != null) {
               videoList.add({
-                'quality_name': 'فيديو (استخراج بديل)',
-                'desc': 'جودة متوفرة',
+                'quality_name': 'فيسبوك (HD)',
+                'desc': 'استخراج محلي مباشر',
                 'size': 'تلقائي',
-                'url': f['url'],
+                'url': hdMatch.group(1)!.replaceAll('\\/', '/'),
                 'ext': 'mp4'
               });
-              break; 
+            }
+            if (sdMatch != null) {
+              videoList.add({
+                'quality_name': 'فيسبوك (SD)',
+                'desc': 'استخراج محلي مباشر',
+                'size': 'تلقائي',
+                'url': sdMatch.group(1)!.replaceAll('\\/', '/'),
+                'ext': 'mp4'
+              });
             }
           }
         }
       }
+    } catch (e) {
+      // صمت
     }
 
     return {
@@ -198,7 +199,7 @@ class BackendService {
 
   Future<void> startDownloadProcess({
     required String downloadUrl,
-    String? audioUrl, // سيتم تجاهله الآن لأن السيرفر يرسل ملف مدمج
+    String? audioUrl, // لم نعد بحاجة إليه
     required String title,
     required String extension,
     required Function(double progress, String downloaded, String total) onProgress,
@@ -236,7 +237,6 @@ class BackendService {
       
       final dio = Dio();
       
-      // التنزيل العادي لأن السيرفر الخاص بك يرسل الملف المدمج الجاهز
       await dio.download(
         downloadUrl,
         savePath,
