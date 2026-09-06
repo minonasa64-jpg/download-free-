@@ -72,7 +72,6 @@ class BackendService {
     List<Map<String, dynamic>> videoList = [];
     String videoTitle = 'فيديو بدون عنوان';
 
-    // 1. معالجة روابط يوتيوب
     if (url.contains('youtube.com') || url.contains('youtu.be')) {
       final ytEngine = yt.YoutubeExplode();
       try {
@@ -93,9 +92,7 @@ class BackendService {
       } finally {
         ytEngine.close();
       }
-    } 
-    // 2. معالجة باقي المواقع (فيسبوك، انستغرام، تيك توك...)
-    else {
+    } else {
       final dio = Dio();
       final response = await dio.post(
         'https://web-production-69773.up.railway.app/api/extract',
@@ -105,11 +102,11 @@ class BackendService {
       if (response.statusCode == 200 && response.data['status'] == 'success') {
         videoTitle = response.data['title'] ?? 'فيديو بدون عنوان';
         
-        // الخيار الذهبي: الرابط الرئيسي المستخرج دائماً يكون مدمجاً (صوت وصورة)
+        // 1. إضافة الرابط الرئيسي (غالباً يكون مدمجاً وأفضل جودة)
         String? mainUrl = response.data['url'];
         if (mainUrl != null && mainUrl.isNotEmpty) {
           videoList.add({
-            'quality_name': 'تنزيل رئيسي (مضمون)',
+            'quality_name': 'تنزيل رئيسي (مستحسن)',
             'desc': 'أفضل جودة متوفرة (صوت وصورة)',
             'size': 'تلقائي',
             'url': mainUrl,
@@ -121,6 +118,9 @@ class BackendService {
         if (formats != null) {
           for (var f in formats) {
             String ext = f['ext']?.toString().toLowerCase() ?? '';
+            // نأخذ فقط الفيديوهات mp4 و webm
+            if (ext != 'mp4' && ext != 'webm') continue;
+
             String formatNote = f['format_note']?.toString() ?? '';
             String formatId = f['format_id']?.toString().toLowerCase() ?? '';
             String resolution = f['resolution']?.toString() ?? f['quality']?.toString() ?? '';
@@ -128,29 +128,40 @@ class BackendService {
             String quality = formatNote.isNotEmpty ? formatNote : (resolution.isNotEmpty ? resolution : formatId);
             if (quality.isEmpty) quality = 'متوسطة';
 
-            // قراءة الكوديكات لمعرفة إذا كان الفيديو صامتاً
             String acodec = f['acodec']?.toString().toLowerCase() ?? '';
             String vcodec = f['vcodec']?.toString().toLowerCase() ?? '';
             
-            bool hasAudioCodec = acodec != 'none' && acodec.isNotEmpty;
-            bool hasVideoCodec = vcodec != 'none' && vcodec.isNotEmpty;
-            
-            // الفلتر الذكي: نقبل فقط الفيديوهات المدمجة الصريحة، أو صيغ الفيسبوك الأصلية (SD/HD)
-            bool isExplicitMuxed = hasAudioCodec && hasVideoCodec;
-            bool isNativeFacebookMuxed = formatId == 'sd' || formatId == 'hd' || formatNote.toLowerCase() == 'sd' || formatNote.toLowerCase() == 'hd';
+            // الفلتر العكسي الذكي: نطرد الفيديو فقط إذا صرّح السيرفر أنه "بدون صوت" أو "بدون صورة"
+            bool isExplicitlyMuted = acodec == 'none';
+            bool isExplicitlyAudioOnly = vcodec == 'none';
 
-            if ((isExplicitMuxed || isNativeFacebookMuxed) && (ext == 'mp4' || ext == 'webm')) {
-              // تجنب تكرار الرابط إذا كان هو نفسه الرابط الرئيسي
-              if (f['url'] != mainUrl) {
+            if (!isExplicitlyMuted && !isExplicitlyAudioOnly) {
+              if (f['url'] != mainUrl) { // تجنب تكرار الخيار الرئيسي
                 String size = f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
                 videoList.add({
                   'quality_name': 'فيديو ($quality)',
-                  'desc': 'مدمج (صوت وصورة)',
+                  'desc': 'جودة مدمجة',
                   'size': size,
                   'url': f['url'],
                   'ext': ext
                 });
               }
+            }
+          }
+        }
+        
+        // خطة الإنقاذ القصوى: إذا بقيت القائمة فارغة بسبب خلل في الرد، نأخذ أي فيديو متاح لمنع الانهيار
+        if (videoList.isEmpty && formats != null) {
+          for (var f in formats) {
+            if (f['ext']?.toString().toLowerCase() == 'mp4') {
+              videoList.add({
+                'quality_name': 'فيديو (استخراج إجباري)',
+                'desc': 'تم السحب للحماية من الخطأ',
+                'size': 'تلقائي',
+                'url': f['url'],
+                'ext': 'mp4'
+              });
+              break; 
             }
           }
         }
@@ -206,7 +217,6 @@ class BackendService {
         directory.createSync(recursive: true);
       }
 
-      // تنظيف عنوان الفيسبوك من الأسطر الجديدة والرموز الممنوعة لضمان حفظ الملف
       String safeTitle = title.replaceAll(RegExp(r'[\\/:*?"<>|\n\r]'), '_').trim();
       if (safeTitle.length > 50) {
         safeTitle = safeTitle.substring(0, 50);
