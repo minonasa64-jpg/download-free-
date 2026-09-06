@@ -170,8 +170,17 @@ class BackendService {
         directory.createSync(recursive: true);
       }
 
-      String safeTitle = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-      String savePath = '${directory.path}/$safeTitle.$extension';
+      // فلتر تنظيف الأسماء الطويلة جداً (مثل منشورات الفيسبوك) وإزالة الرموز
+      String safeTitle = title.replaceAll(RegExp(r'[\\/:*?"<>|\n\r]'), '_').trim();
+      if (safeTitle.length > 50) {
+        safeTitle = safeTitle.substring(0, 50);
+      }
+      if (safeTitle.isEmpty) {
+        safeTitle = 'Video_${DateTime.now().millisecondsSinceEpoch}';
+      }
+      
+      String validExt = extension.isNotEmpty ? extension : 'mp4';
+      String savePath = '${directory.path}/$safeTitle.$validExt';
       
       final dio = Dio();
       await dio.download(
