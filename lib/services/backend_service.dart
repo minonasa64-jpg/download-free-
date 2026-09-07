@@ -68,27 +68,27 @@ class BackendService {
     langNotifier.value = value;
   }
 
-  // محرك الاستخراج الخارق (بدون سيرفرك الخاص، مجاني 100%)
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     List<Map<String, dynamic>> videoList = [];
     String videoTitle = 'فيديو جديد';
-
     final dio = Dio();
 
-    // 1. استخدام سيرفر Cobalt العالمي والمجاني لجلب أعلى جودة ممكنة (1080p فما فوق) من أي موقع!
+    // 1. الخطة أ: الاستخراج الخارق عبر سيرفرات Cobalt (مع تزوير الهوية لفك الحماية)
     try {
       var cobaltResponse = await dio.post(
-        'https://co.wuk.sh/api/json',
+        'https://api.cobalt.tools/api/json',
         data: {
           'url': url,
           'vQuality': '1080', // نطلب الجودة الفائقة دائماً
           'isAudioOnly': false,
-          'isNoAudio': false,
         },
         options: Options(
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Origin': 'https://cobalt.tools',
+            'Referer': 'https://cobalt.tools/'
           },
           receiveTimeout: const Duration(seconds: 15),
         )
@@ -99,7 +99,7 @@ class BackendService {
         if (data['url'] != null) {
           videoList.add({
             'quality_name': 'تنزيل فائق (أفضل جودة)',
-            'desc': 'جودة مدمجة خارقة (صوت وصورة)',
+            'desc': '1080p HD (صوت وصورة)',
             'size': 'تلقائي',
             'url': data['url'],
             'ext': 'mp4'
@@ -107,10 +107,10 @@ class BackendService {
         }
       }
     } catch (e) {
-      // إذا فشل Cobalt لأي سبب، سنكمل بالخطط البديلة
+      // صمت: سننتقل للخطط البديلة إذا فشل السيرفر الخارجي
     }
 
-    // 2. خطة دعم يوتيوب (محلياً بدون سيرفر) عبر YoutubeExplode
+    // 2. الخطة ب: دعم يوتيوب (محلياً بالكامل عبر مكتبة التطبيق)
     if (url.contains('youtube.com') || url.contains('youtu.be')) {
       final ytEngine = yt.YoutubeExplode();
       try {
@@ -123,13 +123,18 @@ class BackendService {
 
         for (var stream in muxedStreams) {
           String quality = '${stream.videoResolution.height}p';
-          videoList.add({
-            'quality_name': 'يوتيوب ($quality)',
-            'desc': 'جودة قياسية (صوت وصورة)',
-            'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
-            'url': stream.url.toString(),
-            'ext': stream.container.name,
-          });
+          String desc = quality == '720p' ? 'جودة عالية HD (صوت وصورة)' : 'جودة قياسية (صوت وصورة)';
+          
+          // نمنع إضافة الجودة إذا كان الرابط نفسه موجوداً مسبقاً
+          if (!videoList.any((v) => v['url'] == stream.url.toString())) {
+            videoList.add({
+              'quality_name': 'يوتيوب ($quality)',
+              'desc': desc,
+              'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
+              'url': stream.url.toString(),
+              'ext': stream.container.name,
+            });
+          }
         }
       } catch(e) {
         // صمت
@@ -137,17 +142,19 @@ class BackendService {
         ytEngine.close();
       }
     } 
-    // 3. خطة دعم فيسبوك القصوى (اختراق الواجهة لسحب الروابط مباشرة)
-    else if (url.contains('facebook.com') || url.contains('fb.watch')) {
+    // 3. الخطة ج: الدعم الفولاذي لفيسبوك (اختراق الكود المصدري لسحب الروابط مباشرة إذا فشل Cobalt)
+    else if (url.contains('facebook.com') || url.contains('fb.watch') || url.contains('fb.gg')) {
       try {
         var fbResponse = await dio.get(
           url,
           options: Options(headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
           })
         );
         String html = fbResponse.data.toString();
         
+        // خوارزمية استخراج الروابط المخفية داخل كود صفحة الفيسبوك
         RegExp hdRegex = RegExp(r'"playable_url_quality_hd":"([^"]+)"');
         RegExp sdRegex = RegExp(r'"playable_url":"([^"]+)"');
         
@@ -156,23 +163,23 @@ class BackendService {
         
         if (hdMatch != null) {
           String fbHdUrl = hdMatch.group(1)!.replaceAll('\\/', '/');
-          // التأكد من عدم تكرار الرابط إذا كان Cobalt قد جلبه
           if (!videoList.any((v) => v['url'] == fbHdUrl)) {
              videoList.add({
               'quality_name': 'فيسبوك (HD)',
-              'desc': 'جودة عالية (صوت وصورة)',
+              'desc': 'جودة عالية مباشرة (صوت وصورة)',
               'size': 'تلقائي',
               'url': fbHdUrl,
               'ext': 'mp4'
             });
           }
         }
+        
         if (sdMatch != null) {
           String fbSdUrl = sdMatch.group(1)!.replaceAll('\\/', '/');
           if (!videoList.any((v) => v['url'] == fbSdUrl)) {
             videoList.add({
               'quality_name': 'فيسبوك (SD)',
-              'desc': 'جودة عادية (صوت وصورة)',
+              'desc': 'جودة عادية مباشرة (صوت وصورة)',
               'size': 'تلقائي',
               'url': fbSdUrl,
               'ext': 'mp4'
