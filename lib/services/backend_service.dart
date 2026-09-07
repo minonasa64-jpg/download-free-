@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -13,6 +14,9 @@ class BackendService {
 
   final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
   final ValueNotifier<String> langNotifier = ValueNotifier('ar');
+
+  // استبدل هذا برابط مساحتك في Hugging Face (بدون / في النهاية)
+  final String serverUrl = 'YOUR_HUGGINGFACE_URL_HERE'; 
 
   final Map<String, Map<String, String>> langMap = {
     'ar': {
@@ -70,47 +74,8 @@ class BackendService {
 
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     List<Map<String, dynamic>> videoList = [];
-    String videoTitle = 'فيديو جديد';
-    final dio = Dio();
+    String videoTitle = 'فيديو بدون عنوان';
 
-    // 1. الخطة أ: الاستخراج الخارق عبر سيرفرات Cobalt (مع تزوير الهوية لفك الحماية)
-    try {
-      var cobaltResponse = await dio.post(
-        'https://api.cobalt.tools/api/json',
-        data: {
-          'url': url,
-          'vQuality': '1080', // نطلب الجودة الفائقة دائماً
-          'isAudioOnly': false,
-        },
-        options: Options(
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Origin': 'https://cobalt.tools',
-            'Referer': 'https://cobalt.tools/'
-          },
-          receiveTimeout: const Duration(seconds: 15),
-        )
-      );
-
-      if (cobaltResponse.statusCode == 200) {
-        var data = cobaltResponse.data;
-        if (data['url'] != null) {
-          videoList.add({
-            'quality_name': 'تنزيل فائق (أفضل جودة)',
-            'desc': '1080p HD (صوت وصورة)',
-            'size': 'تلقائي',
-            'url': data['url'],
-            'ext': 'mp4'
-          });
-        }
-      }
-    } catch (e) {
-      // صمت: سننتقل للخطط البديلة إذا فشل السيرفر الخارجي
-    }
-
-    // 2. الخطة ب: دعم يوتيوب (محلياً بالكامل عبر مكتبة التطبيق)
     if (url.contains('youtube.com') || url.contains('youtu.be')) {
       final ytEngine = yt.YoutubeExplode();
       try {
@@ -118,77 +83,76 @@ class BackendService {
         videoTitle = video.title;
         var manifest = await ytEngine.videos.streamsClient.getManifest(video.id);
         
-        var muxedStreams = manifest.muxed.toList();
-        muxedStreams.sort((a, b) => b.videoResolution.height.compareTo(a.videoResolution.height));
-
-        for (var stream in muxedStreams) {
+        for (var stream in manifest.muxed) {
           String quality = '${stream.videoResolution.height}p';
-          String desc = quality == '720p' ? 'جودة عالية HD (صوت وصورة)' : 'جودة قياسية (صوت وصورة)';
-          
-          // نمنع إضافة الجودة إذا كان الرابط نفسه موجوداً مسبقاً
-          if (!videoList.any((v) => v['url'] == stream.url.toString())) {
-            videoList.add({
-              'quality_name': 'يوتيوب ($quality)',
-              'desc': desc,
-              'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
-              'url': stream.url.toString(),
-              'ext': stream.container.name,
-            });
-          }
+          videoList.add({
+            'quality_name': 'يوتيوب داخلي ($quality)',
+            'desc': 'جودة قياسية مدمجة',
+            'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
+            'url': stream.url.toString(),
+            'ext': stream.container.name,
+          });
         }
       } catch(e) {
         // صمت
       } finally {
         ytEngine.close();
       }
-    } 
-    // 3. الخطة ج: الدعم الفولاذي لفيسبوك (اختراق الكود المصدري لسحب الروابط مباشرة إذا فشل Cobalt)
-    else if (url.contains('facebook.com') || url.contains('fb.watch') || url.contains('fb.gg')) {
-      try {
-        var fbResponse = await dio.get(
-          url,
-          options: Options(headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-            'Accept-Language': 'en-US,en;q=0.9',
-          })
-        );
-        String html = fbResponse.data.toString();
+    }
+
+    try {
+      final dio = Dio();
+      // التحدث مع Gradio مباشرة عبر مسار /run/extract
+      final response = await dio.post(
+        '$serverUrl/run/extract',
+        data: {'data': [url]}
+      );
+      
+      if (response.statusCode == 200) {
+        // استخراج النص الـ JSON من الرد الخاص بـ Gradio
+        String jsonString = response.data['data'][0];
+        Map<String, dynamic> responseData = jsonDecode(jsonString);
         
-        // خوارزمية استخراج الروابط المخفية داخل كود صفحة الفيسبوك
-        RegExp hdRegex = RegExp(r'"playable_url_quality_hd":"([^"]+)"');
-        RegExp sdRegex = RegExp(r'"playable_url":"([^"]+)"');
-        
-        var hdMatch = hdRegex.firstMatch(html);
-        var sdMatch = sdRegex.firstMatch(html);
-        
-        if (hdMatch != null) {
-          String fbHdUrl = hdMatch.group(1)!.replaceAll('\\/', '/');
-          if (!videoList.any((v) => v['url'] == fbHdUrl)) {
-             videoList.add({
-              'quality_name': 'فيسبوك (HD)',
-              'desc': 'جودة عالية مباشرة (صوت وصورة)',
-              'size': 'تلقائي',
-              'url': fbHdUrl,
-              'ext': 'mp4'
-            });
+        if (responseData['status'] == 'success') {
+          videoTitle = responseData['title'] ?? videoTitle;
+          
+          final formats = responseData['formats'] as List?;
+          if (formats != null) {
+            for (var f in formats) {
+              String ext = f['ext']?.toString().toLowerCase() ?? '';
+              if (ext != 'mp4' && ext != 'webm') continue;
+
+              String formatNote = f['format_note']?.toString().toLowerCase() ?? '';
+              String formatId = f['format_id']?.toString().toLowerCase() ?? '';
+              String resolution = f['resolution']?.toString() ?? f['quality']?.toString() ?? '';
+              
+              String quality = formatNote.isNotEmpty ? formatNote.toUpperCase() : (resolution.isNotEmpty ? resolution : formatId.toUpperCase());
+              if (quality.isEmpty) quality = 'متوسطة';
+
+              String acodec = f['acodec']?.toString().toLowerCase() ?? '';
+              String vcodec = f['vcodec']?.toString().toLowerCase() ?? '';
+              
+              bool hasAudio = acodec != 'none' && acodec.isNotEmpty;
+              bool hasVideo = vcodec != 'none' && vcodec.isNotEmpty;
+              bool isNativeFb = formatId == 'hd' || formatId == 'sd' || formatNote == 'hd' || formatNote == 'sd';
+              bool isServerMerged = formatId == '1080p_server_merged';
+
+              if ((hasAudio && hasVideo) || isNativeFb || isServerMerged) {
+                String size = f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
+                videoList.add({
+                  'quality_name': 'فيديو ($quality)',
+                  'desc': 'مضمون بصوت وصورة',
+                  'size': size,
+                  'url': f['url'],
+                  'ext': ext
+                });
+              }
+            }
           }
         }
-        
-        if (sdMatch != null) {
-          String fbSdUrl = sdMatch.group(1)!.replaceAll('\\/', '/');
-          if (!videoList.any((v) => v['url'] == fbSdUrl)) {
-            videoList.add({
-              'quality_name': 'فيسبوك (SD)',
-              'desc': 'جودة عادية مباشرة (صوت وصورة)',
-              'size': 'تلقائي',
-              'url': fbSdUrl,
-              'ext': 'mp4'
-            });
-          }
-        }
-      } catch (e) {
-        // صمت
       }
+    } catch (e) {
+      // صمت
     }
 
     return {
@@ -229,6 +193,31 @@ class BackendService {
     }
 
     try {
+      final dio = Dio();
+      
+      // خدعة جلب الفيديو المدمج من السيرفر قبل التحميل الفعلي
+      if (downloadUrl.startsWith('MERGE|||')) {
+        String originalUrl = downloadUrl.split('MERGE|||')[1];
+        
+        onProgress(0.1, "جاري", "الدمج في السيرفر..."); // إشعار للمستخدم
+        
+        final mergeRes = await dio.post(
+          '$serverUrl/run/download',
+          data: {'data': [originalUrl]}
+        );
+        
+        if (mergeRes.statusCode == 200 && mergeRes.data['data'] != null) {
+          String fileUrl = mergeRes.data['data'][0]['url'];
+          if (fileUrl.startsWith('/')) {
+            fileUrl = serverUrl + fileUrl;
+          }
+          downloadUrl = fileUrl;
+        } else {
+          onError();
+          return;
+        }
+      }
+
       Directory? directory;
       if (Platform.isAndroid) {
         directory = Directory('/storage/emulated/0/Download');
@@ -250,8 +239,6 @@ class BackendService {
       
       String validExt = extension.isNotEmpty ? extension : 'mp4';
       String savePath = '${directory.path}/$safeTitle.$validExt';
-      
-      final dio = Dio();
       
       await dio.download(
         downloadUrl,
