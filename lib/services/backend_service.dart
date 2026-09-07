@@ -68,110 +68,120 @@ class BackendService {
     langNotifier.value = value;
   }
 
-  // المحرك المستقل والمجاني تماماً (بدون سيرفر)
+  // محرك الاستخراج الخارق (بدون سيرفرك الخاص، مجاني 100%)
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     List<Map<String, dynamic>> videoList = [];
-    String videoTitle = 'فيديو مستخرج';
+    String videoTitle = 'فيديو جديد';
 
+    final dio = Dio();
+
+    // 1. استخدام سيرفر Cobalt العالمي والمجاني لجلب أعلى جودة ممكنة (1080p فما فوق) من أي موقع!
     try {
-      // 1. استخراج يوتيوب (محلياً بالكامل عبر مكتبة التطبيق)
-      if (url.contains('youtube.com') || url.contains('youtu.be')) {
-        final ytEngine = yt.YoutubeExplode();
-        try {
-          var video = await ytEngine.videos.get(url);
-          videoTitle = video.title;
-          var manifest = await ytEngine.videos.streamsClient.getManifest(video.id);
-          
-          // الاعتماد فقط على الفيديوهات المدمجة (Muxed) لضمان وجود الصوت والصورة معاً
-          // وأقصى جودة مدمجة مجانية يتيحها يوتيوب هي 720p HD
-          var muxedStreams = manifest.muxed.toList();
-          muxedStreams.sort((a, b) => b.videoResolution.height.compareTo(a.videoResolution.height));
+      var cobaltResponse = await dio.post(
+        'https://co.wuk.sh/api/json',
+        data: {
+          'url': url,
+          'vQuality': '1080', // نطلب الجودة الفائقة دائماً
+          'isAudioOnly': false,
+          'isNoAudio': false,
+        },
+        options: Options(
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          receiveTimeout: const Duration(seconds: 15),
+        )
+      );
 
-          for (var stream in muxedStreams) {
-            String quality = '${stream.videoResolution.height}p';
-            String desc = quality == '720p' ? 'جودة عالية HD (صوت وصورة)' : 'جودة قياسية (صوت وصورة)';
-            videoList.add({
-              'quality_name': 'يوتيوب ($quality)',
-              'desc': desc,
-              'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
-              'url': stream.url.toString(),
-              'ext': stream.container.name,
-            });
-          }
-        } finally {
-          ytEngine.close();
-        }
-      } 
-      // 2. استخراج فيسبوك وتيك توك (عبر APIs عامة مجانية أو اختراق الواجهة محلياً)
-      else {
-        final dio = Dio();
-        
-        // المحاولة الأولى: سيرفرات Cobalt العامة والمفتوحة المصدر (لا تتطلب مفاتيح أو اشتراك)
-        try {
-          var response = await dio.post(
-            'https://co.wuk.sh/api/json',
-            data: {
-              'url': url,
-              'vQuality': '720', // نطلب الجودة المدمجة لتجنب الفيديوهات الصامتة
-            },
-            options: Options(
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              }
-            )
-          );
-          
-          if (response.statusCode == 200 && response.data['url'] != null) {
-            videoList.add({
-              'quality_name': 'تنزيل مباشر (مضمون)',
-              'desc': 'جودة ممتازة (صوت وصورة)',
-              'size': 'تلقائي',
-              'url': response.data['url'],
-              'ext': 'mp4'
-            });
-          }
-        } catch (e) {
-          // المحاولة الثانية (خطة طوارئ): استخراج رابط الفيسبوك من الكود المصدري محلياً!
-          if (url.contains('facebook.com') || url.contains('fb.watch')) {
-            var fbResponse = await dio.get(
-              url,
-              options: Options(headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-              })
-            );
-            String html = fbResponse.data.toString();
-            
-            // تهكير الواجهة البرمجية للفيسبوك للوصول إلى الرابط المخفي
-            RegExp hdRegex = RegExp(r'"playable_url_quality_hd":"([^"]+)"');
-            RegExp sdRegex = RegExp(r'"playable_url":"([^"]+)"');
-            
-            var hdMatch = hdRegex.firstMatch(html);
-            var sdMatch = sdRegex.firstMatch(html);
-            
-            if (hdMatch != null) {
-              videoList.add({
-                'quality_name': 'فيسبوك (HD)',
-                'desc': 'استخراج محلي مباشر',
-                'size': 'تلقائي',
-                'url': hdMatch.group(1)!.replaceAll('\\/', '/'),
-                'ext': 'mp4'
-              });
-            }
-            if (sdMatch != null) {
-              videoList.add({
-                'quality_name': 'فيسبوك (SD)',
-                'desc': 'استخراج محلي مباشر',
-                'size': 'تلقائي',
-                'url': sdMatch.group(1)!.replaceAll('\\/', '/'),
-                'ext': 'mp4'
-              });
-            }
-          }
+      if (cobaltResponse.statusCode == 200) {
+        var data = cobaltResponse.data;
+        if (data['url'] != null) {
+          videoList.add({
+            'quality_name': 'تنزيل فائق (أفضل جودة)',
+            'desc': 'جودة مدمجة خارقة (صوت وصورة)',
+            'size': 'تلقائي',
+            'url': data['url'],
+            'ext': 'mp4'
+          });
         }
       }
     } catch (e) {
-      // صمت
+      // إذا فشل Cobalt لأي سبب، سنكمل بالخطط البديلة
+    }
+
+    // 2. خطة دعم يوتيوب (محلياً بدون سيرفر) عبر YoutubeExplode
+    if (url.contains('youtube.com') || url.contains('youtu.be')) {
+      final ytEngine = yt.YoutubeExplode();
+      try {
+        var video = await ytEngine.videos.get(url);
+        videoTitle = video.title;
+        var manifest = await ytEngine.videos.streamsClient.getManifest(video.id);
+        
+        var muxedStreams = manifest.muxed.toList();
+        muxedStreams.sort((a, b) => b.videoResolution.height.compareTo(a.videoResolution.height));
+
+        for (var stream in muxedStreams) {
+          String quality = '${stream.videoResolution.height}p';
+          videoList.add({
+            'quality_name': 'يوتيوب ($quality)',
+            'desc': 'جودة قياسية (صوت وصورة)',
+            'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
+            'url': stream.url.toString(),
+            'ext': stream.container.name,
+          });
+        }
+      } catch(e) {
+        // صمت
+      } finally {
+        ytEngine.close();
+      }
+    } 
+    // 3. خطة دعم فيسبوك القصوى (اختراق الواجهة لسحب الروابط مباشرة)
+    else if (url.contains('facebook.com') || url.contains('fb.watch')) {
+      try {
+        var fbResponse = await dio.get(
+          url,
+          options: Options(headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+          })
+        );
+        String html = fbResponse.data.toString();
+        
+        RegExp hdRegex = RegExp(r'"playable_url_quality_hd":"([^"]+)"');
+        RegExp sdRegex = RegExp(r'"playable_url":"([^"]+)"');
+        
+        var hdMatch = hdRegex.firstMatch(html);
+        var sdMatch = sdRegex.firstMatch(html);
+        
+        if (hdMatch != null) {
+          String fbHdUrl = hdMatch.group(1)!.replaceAll('\\/', '/');
+          // التأكد من عدم تكرار الرابط إذا كان Cobalt قد جلبه
+          if (!videoList.any((v) => v['url'] == fbHdUrl)) {
+             videoList.add({
+              'quality_name': 'فيسبوك (HD)',
+              'desc': 'جودة عالية (صوت وصورة)',
+              'size': 'تلقائي',
+              'url': fbHdUrl,
+              'ext': 'mp4'
+            });
+          }
+        }
+        if (sdMatch != null) {
+          String fbSdUrl = sdMatch.group(1)!.replaceAll('\\/', '/');
+          if (!videoList.any((v) => v['url'] == fbSdUrl)) {
+            videoList.add({
+              'quality_name': 'فيسبوك (SD)',
+              'desc': 'جودة عادية (صوت وصورة)',
+              'size': 'تلقائي',
+              'url': fbSdUrl,
+              'ext': 'mp4'
+            });
+          }
+        }
+      } catch (e) {
+        // صمت
+      }
     }
 
     return {
@@ -199,7 +209,6 @@ class BackendService {
 
   Future<void> startDownloadProcess({
     required String downloadUrl,
-    String? audioUrl, // لم نعد بحاجة إليه
     required String title,
     required String extension,
     required Function(double progress, String downloaded, String total) onProgress,
