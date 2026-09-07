@@ -299,7 +299,6 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                     barrierDismissible: false,
                     builder: (context) => DownloadProgressDialog(
                       downloadUrl: _selectedFormat!['url'],
-                      audioUrl: _selectedFormat!['audio_url'],
                       title: widget.title,
                       extension: _selectedFormat!['ext'],
                     )
@@ -373,14 +372,12 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
 
 class DownloadProgressDialog extends StatefulWidget {
   final String downloadUrl;
-  final String? audioUrl;
   final String title;
   final String extension;
 
   const DownloadProgressDialog({
     super.key,
     required this.downloadUrl,
-    this.audioUrl,
     required this.title,
     required this.extension,
   });
@@ -406,7 +403,6 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
   Future<void> _initiateDownload() async {
     await _backend.startDownloadProcess(
       downloadUrl: widget.downloadUrl,
-      audioUrl: widget.audioUrl,
       title: widget.title,
       extension: widget.extension,
       onProgress: (progress, downloaded, total) {
