@@ -16,8 +16,7 @@ class BackendService {
   final ValueNotifier<String> langNotifier = ValueNotifier('ar');
 
   // استبدل هذا برابط مساحتك في Hugging Face (بدون / في النهاية)
-  final String serverUrl = 'YOUR_HUGGINGFACE_URL_HERE'; 
-
+  final String serverUrl = 'https://nafeaouadah2009-pro-downloader-api.hf.space';
   final Map<String, Map<String, String>> langMap = {
     'ar': {
       'search': 'بحث', 'link': 'رابط', 'downloads': 'تنزيلاتي', 'settings': 'الإعدادات',
