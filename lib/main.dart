@@ -194,8 +194,9 @@ Future<void> handleExtraction(BuildContext context, String url, Function(bool) s
     
     final String videoTitle = result['title'] as String;
     final List<Map<String, dynamic>> videoList = List<Map<String, dynamic>>.from(result['video']);
+    final List<Map<String, dynamic>> audioList = List<Map<String, dynamic>>.from(result['audio']);
 
-    if (context.mounted && videoList.isNotEmpty) {
+    if (context.mounted && (videoList.isNotEmpty || audioList.isNotEmpty)) {
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -207,6 +208,7 @@ Future<void> handleExtraction(BuildContext context, String url, Function(bool) s
           return FormatSelectionSheet(
             title: videoTitle,
             videoFormats: videoList,
+            audioFormats: audioList,
           );
         },
       );
@@ -229,11 +231,13 @@ Future<void> handleExtraction(BuildContext context, String url, Function(bool) s
 class FormatSelectionSheet extends StatefulWidget {
   final String title;
   final List<Map<String, dynamic>> videoFormats;
+  final List<Map<String, dynamic>> audioFormats;
 
   const FormatSelectionSheet({
     super.key,
     required this.title,
     required this.videoFormats,
+    required this.audioFormats,
   });
 
   @override
@@ -249,73 +253,98 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                icon: Icon(Icons.arrow_forward, color: textColor),
-                onPressed: () => Navigator.pop(context),
-              ),
-              Text(
-                _backend.t('formats_title'),
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+    return DefaultTabController(
+      length: 2,
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.75,
+        padding: const EdgeInsets.only(top: 20, left: 10, right: 10, bottom: 20),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.arrow_forward, color: textColor),
+                  onPressed: () => Navigator.pop(context),
                 ),
-              ),
-              const SizedBox(width: 48), 
-            ],
-          ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: ListView(
-              children: widget.videoFormats.map((fmt) {
-                return _buildFormatRow(fmt, textColor);
-              }).toList(),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(15.0),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFD600),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                ),
-                onPressed: _selectedFormat == null ? null : () {
-                  Navigator.pop(context);
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => DownloadProgressDialog(
-                      downloadUrl: _selectedFormat!['url'],
-                      title: widget.title,
-                      extension: _selectedFormat!['ext'],
-                    )
-                  );
-                },
-                child: Text(
-                  _backend.t('download_btn'),
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
+                Text(
+                  _backend.t('formats_title'),
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                const SizedBox(width: 48), 
+              ],
+            ),
+            const SizedBox(height: 10),
+            TabBar(
+              labelColor: const Color(0xFFFFD600),
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: const Color(0xFFFFD600),
+              tabs: [
+                Tab(text: _backend.t('video')),
+                Tab(text: _backend.t('audio')),
+              ],
+            ),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  widget.videoFormats.isEmpty 
+                    ? const Center(child: Text('لا تتوفر جودات فيديو', style: TextStyle(color: Colors.grey)))
+                    : ListView(
+                        children: widget.videoFormats.map((fmt) {
+                          return _buildFormatRow(fmt, textColor);
+                        }).toList(),
+                      ),
+                  widget.audioFormats.isEmpty 
+                    ? const Center(child: Text('لا تتوفر جودات صوتية', style: TextStyle(color: Colors.grey)))
+                    : ListView(
+                        children: widget.audioFormats.map((fmt) {
+                          return _buildFormatRow(fmt, textColor);
+                        }).toList(),
+                      ),
+                ],
               ),
             ),
-          )
-        ],
+            Padding(
+              padding: const EdgeInsets.all(15.0),
+              child: SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFD600),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                  ),
+                  onPressed: _selectedFormat == null ? null : () {
+                    Navigator.pop(context);
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => DownloadProgressDialog(
+                        downloadUrl: _selectedFormat!['url'],
+                        title: widget.title,
+                        extension: _selectedFormat!['ext'],
+                      )
+                    );
+                  },
+                  child: Text(
+                    _backend.t('download_btn'),
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            )
+          ],
+        ),
       ),
     );
   }
@@ -362,7 +391,11 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
               ],
             ),
             const SizedBox(width: 15),
-            const Icon(Icons.play_arrow, color: Colors.grey, size: 22),
+            Icon(
+              format['desc'].contains('صوت') ? Icons.music_note : Icons.play_arrow, 
+              color: Colors.grey, 
+              size: 22
+            ),
           ],
         ),
       ),
@@ -1130,7 +1163,11 @@ class _DownloadsTabState extends State<DownloadsTab> {
                 final file = _downloadedFiles[index];
                 final fileName = file.path.split('/').last;
                 return ListTile(
-                  leading: const Icon(Icons.play_circle_fill, color: Colors.redAccent, size: 30),
+                  leading: Icon(
+                    fileName.endsWith('.mp3') || fileName.endsWith('.m4a') ? Icons.music_note : Icons.play_circle_fill, 
+                    color: Colors.redAccent, 
+                    size: 30
+                  ),
                   title: Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
                   onTap: () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => LocalVideoPlayerScreen(file: file)));
