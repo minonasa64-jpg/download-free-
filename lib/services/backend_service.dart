@@ -15,7 +15,6 @@ class BackendService {
   final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
   final ValueNotifier<String> langNotifier = ValueNotifier('ar');
 
-  // تم تحديث الرابط بالنطاق الجديد مع بروتوكول الأمان HTTPS
   final String serverUrl = 'https://download-free-online-production.up.railway.app';
   
   final Map<String, Map<String, String>> langMap = {
@@ -25,7 +24,7 @@ class BackendService {
       'have_link': 'لديك رابط مباشر؟', 'paste_here': 'ألصق الرابط هنا للتحميل', 'downloaded': 'تم التنزيل',
       'general': 'عام', 'dl_settings': 'إعدادات التنزيل', 'notif': 'الإشعارات', 'theme': 'السمة', 'language': 'اللغة',
       'more_tools': 'أدوات إضافية', 'share_app': 'مشاركة التطبيق', 'clean_cache': 'تنظيف الملفات المؤقتة', 'about': 'حول التطبيق',
-      'formats_title': 'تنسيقات الفيديو المتاحة', 'video': 'فيديو', 'download_btn': 'تنزيل',
+      'formats_title': 'اختر الجودة المطلوبة', 'video': 'فيديو', 'audio': 'صوت', 'download_btn': 'تنزيل',
       'related': 'فيديوهات ذات صلة', 'downloading': 'جاري التنزيل...', 'completed': 'اكتمل التنزيل بنجاح',
     },
     'en': {
@@ -34,7 +33,7 @@ class BackendService {
       'have_link': 'Have a direct link?', 'paste_here': 'Paste link here to download', 'downloaded': 'Downloaded',
       'general': 'General', 'dl_settings': 'Download Settings', 'notif': 'Notifications', 'theme': 'Theme', 'language': 'Language',
       'more_tools': 'More Tools', 'share_app': 'Share App', 'clean_cache': 'Clear Cache', 'about': 'About App',
-      'formats_title': 'Available Video Formats', 'video': 'Video', 'download_btn': 'Download',
+      'formats_title': 'Select Quality', 'video': 'Video', 'audio': 'Audio', 'download_btn': 'Download',
       'related': 'Related Videos', 'downloading': 'Downloading...', 'completed': 'Download Completed',
     },
     'fr': {
@@ -43,7 +42,7 @@ class BackendService {
       'have_link': 'Lien direct ?', 'paste_here': 'Collez le lien ici', 'downloaded': 'Téléchargé',
       'general': 'Général', 'dl_settings': 'Téléchargement', 'notif': 'Notifications', 'theme': 'Thème', 'language': 'Langue',
       'more_tools': 'Outils', 'share_app': 'Partager', 'clean_cache': 'Vider le cache', 'about': 'À propos',
-      'formats_title': 'Formats disponibles', 'video': 'Vidéo', 'download_btn': 'Télécharger',
+      'formats_title': 'Sélectionner la qualité', 'video': 'Vidéo', 'audio': 'Audio', 'download_btn': 'Télécharger',
       'related': 'Vidéos similaires', 'downloading': 'Téléchargement...', 'completed': 'Terminé',
     }
   };
@@ -74,6 +73,7 @@ class BackendService {
 
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     List<Map<String, dynamic>> videoList = [];
+    List<Map<String, dynamic>> audioList = [];
     String videoTitle = 'فيديو بدون عنوان';
 
     if (url.contains('youtube.com') || url.contains('youtu.be')) {
@@ -86,11 +86,23 @@ class BackendService {
         for (var stream in manifest.muxed) {
           String quality = '${stream.videoResolution.height}p';
           videoList.add({
-            'quality_name': 'يوتيوب داخلي ($quality)',
+            'quality_name': 'فيديو ($quality)',
             'desc': 'جودة قياسية مدمجة',
             'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
             'url': stream.url.toString(),
             'ext': stream.container.name,
+            'sort_size': stream.size.totalBytes,
+          });
+        }
+        for (var stream in manifest.audioOnly) {
+          String quality = '${stream.audioCodec}';
+          audioList.add({
+            'quality_name': 'صوت ($quality)',
+            'desc': 'مقطع صوتي',
+            'size': (stream.size.totalBytes / (1024 * 1024)).toStringAsFixed(1),
+            'url': stream.url.toString(),
+            'ext': stream.container.name,
+            'sort_size': stream.size.totalBytes,
           });
         }
       } catch(e) {
@@ -102,14 +114,12 @@ class BackendService {
 
     try {
       final dio = Dio();
-      // إرسال الطلب إلى خادم Flask عبر مسار /api/extract
       final response = await dio.post(
         '$serverUrl/api/extract',
         data: {'url': url}
       );
       
       if (response.statusCode == 200) {
-        // استخراج البيانات مباشرة لأن Flask يرسلها بصيغة JSON نظيفة
         Map<String, dynamic> responseData = response.data is String 
             ? jsonDecode(response.data) 
             : response.data;
@@ -121,31 +131,52 @@ class BackendService {
           if (formats != null) {
             for (var f in formats) {
               String ext = f['ext']?.toString().toLowerCase() ?? '';
-              if (ext != 'mp4' && ext != 'webm') continue;
-
               String formatNote = f['format_note']?.toString().toLowerCase() ?? '';
               String formatId = f['format_id']?.toString().toLowerCase() ?? '';
               String resolution = f['resolution']?.toString() ?? f['quality']?.toString() ?? '';
               
-              String quality = formatNote.isNotEmpty ? formatNote.toUpperCase() : (resolution.isNotEmpty ? resolution : formatId.toUpperCase());
-              if (quality.isEmpty) quality = 'متوسطة';
-
               String acodec = f['acodec']?.toString().toLowerCase() ?? '';
               String vcodec = f['vcodec']?.toString().toLowerCase() ?? '';
               
               bool hasAudio = acodec != 'none' && acodec.isNotEmpty;
               bool hasVideo = vcodec != 'none' && vcodec.isNotEmpty;
-              bool isNativeFb = formatId == 'hd' || formatId == 'sd' || formatNote == 'hd' || formatNote == 'sd';
               bool isServerMerged = formatId == '1080p_server_merged';
 
-              if ((hasAudio && hasVideo) || isNativeFb || isServerMerged) {
-                String size = f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
+              // استخراج الحجم التقريبي أو الحقيقي
+              double sizeBytes = 0;
+              if (f['filesize'] != null) {
+                sizeBytes = (f['filesize'] as num).toDouble();
+              } else if (f['filesize_approx'] != null) {
+                sizeBytes = (f['filesize_approx'] as num).toDouble();
+              }
+              String sizeStr = sizeBytes > 0 ? (sizeBytes / (1024 * 1024)).toStringAsFixed(1) : 'غير محدد';
+
+              // فرز الصوتيات
+              if (!hasVideo && hasAudio) {
+                if (ext != 'm4a' && ext != 'mp3' && ext != 'webm') continue;
+                String quality = formatNote.isNotEmpty ? formatNote : (f['abr'] != null ? '${f['abr']}kbps' : 'صوت');
+                audioList.add({
+                  'quality_name': 'صوت ($quality)',
+                  'desc': 'جودة صوتية - $ext',
+                  'size': sizeStr,
+                  'url': f['url'],
+                  'ext': ext,
+                  'sort_size': sizeBytes
+                });
+              }
+              // فرز الفيديوهات
+              else if ((hasAudio && hasVideo) || isServerMerged) {
+                if (ext != 'mp4' && ext != 'webm') continue;
+                String quality = formatNote.isNotEmpty ? formatNote.toUpperCase() : (resolution.isNotEmpty ? resolution : formatId.toUpperCase());
+                if (quality.isEmpty) quality = 'متوسطة';
+
                 videoList.add({
                   'quality_name': 'فيديو ($quality)',
                   'desc': 'مضمون بصوت وصورة',
-                  'size': size,
+                  'size': sizeStr,
                   'url': f['url'],
-                  'ext': ext
+                  'ext': ext,
+                  'sort_size': isServerMerged ? double.infinity : sizeBytes
                 });
               }
             }
@@ -156,9 +187,24 @@ class BackendService {
       // صمت
     }
 
+    // ترتيب الفيديوهات والصوتيات من الحجم الأصغر إلى الأكبر
+    videoList.sort((a, b) => (a['sort_size'] as num).compareTo(b['sort_size'] as num));
+    audioList.sort((a, b) => (a['sort_size'] as num).compareTo(b['sort_size'] as num));
+
+    // إزالة النسخ المكررة ذات الأحجام المتطابقة لتنظيف القائمة
+    final Map<String, Map<String, dynamic>> uniqueVideos = {};
+    for (var v in videoList) {
+      uniqueVideos[v['size']] = v; 
+    }
+    final Map<String, Map<String, dynamic>> uniqueAudios = {};
+    for (var a in audioList) {
+      uniqueAudios[a['size']] = a;
+    }
+
     return {
       'title': videoTitle, 
-      'video': videoList,
+      'video': uniqueVideos.values.toList(),
+      'audio': uniqueAudios.values.toList(),
     };
   }
 
@@ -212,14 +258,12 @@ class BackendService {
         safeTitle = safeTitle.substring(0, 50);
       }
       if (safeTitle.isEmpty) {
-        safeTitle = 'Video_${DateTime.now().millisecondsSinceEpoch}';
+        safeTitle = 'Media_${DateTime.now().millisecondsSinceEpoch}';
       }
       
       String validExt = extension.isNotEmpty ? extension : 'mp4';
       String savePath = '${directory.path}/$safeTitle.$validExt';
       
-      // التنزيل المباشر من رابط الخادم الخاص بك 
-      // تم إضافة مهلة زمنية إضافية لأن السيرفر يحتاج وقتا لدمج الفيديوهات عالية الجودة
       await dio.download(
         downloadUrl,
         savePath,
@@ -249,7 +293,7 @@ class BackendService {
       Directory directory = Directory('/storage/emulated/0/Download');
       if (await directory.exists()) {
         files = directory.listSync().where((file) {
-          return file.path.endsWith('.mp4') || file.path.endsWith('.webm');
+          return file.path.endsWith('.mp4') || file.path.endsWith('.webm') || file.path.endsWith('.m4a') || file.path.endsWith('.mp3');
         }).toList();
       }
     } catch (e) {
