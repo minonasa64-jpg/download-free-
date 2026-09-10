@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
+import '../widgets/download_dialogs.dart'; // تم التفعيل
 
 class LinksTab extends StatefulWidget {
   const LinksTab({super.key});
@@ -20,18 +21,15 @@ class _LinksTabState extends State<LinksTab> {
   Map<String, dynamic>? _mediaData;
   Map<String, dynamic>? _selectedFormat;
   
-  // دالة للصق النص من الحافظة
   Future<void> _pasteFromClipboard() async {
     final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
     if (clipboardData != null && clipboardData.text != null) {
       setState(() {
         _urlController.text = clipboardData.text!;
       });
-      // يمكننا تفعيل التحليل التلقائي هنا إذا أردت
     }
   }
 
-  // دالة تحليل الرابط
   Future<void> _analyzeLink() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
@@ -41,7 +39,7 @@ class _LinksTabState extends State<LinksTab> {
       return;
     }
 
-    FocusScope.of(context).unfocus(); // إخفاء لوحة المفاتيح
+    FocusScope.of(context).unfocus(); 
     
     setState(() {
       _isAnalyzing = true;
@@ -83,7 +81,6 @@ class _LinksTabState extends State<LinksTab> {
     }
   }
 
-  // محاولة استخراج صورة مصغرة إذا كان الرابط من يوتيوب
   String _getThumbnailUrl(String url) {
     if (url.contains('youtube.com') || url.contains('youtu.be')) {
       final RegExp regExp = RegExp(
@@ -94,7 +91,6 @@ class _LinksTabState extends State<LinksTab> {
         return 'https://img.youtube.com/vi/$videoId/hqdefault.jpg';
       }
     }
-    // صورة افتراضية للروابط الأخرى
     return 'https://via.placeholder.com/400x225/12121A/00D9FF?text=Video+Thumbnail';
   }
 
@@ -109,11 +105,10 @@ class _LinksTabState extends State<LinksTab> {
     return SafeArea(
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 120), // لترك مساحة لشريط التنقل السفلي
+        padding: const EdgeInsets.only(bottom: 120), 
         child: Column(
           children: [
             const SizedBox(height: 30),
-            // أيقونة وعنوان القسم
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -132,20 +127,15 @@ class _LinksTabState extends State<LinksTab> {
               ),
             ),
             const SizedBox(height: 30),
-            
-            // قسم إدخال الرابط
             _buildInputSection(),
-            
             const SizedBox(height: 30),
-            
-            // منطقة التحميل أو النتائج
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 400),
               child: _isAnalyzing
                   ? _buildLoadingState()
                   : _hasResult
                       ? _buildResultCard()
-                      : const SizedBox.shrink(), // فارغ قبل التحليل
+                      : const SizedBox.shrink(),
             ),
           ],
         ),
@@ -169,7 +159,6 @@ class _LinksTabState extends State<LinksTab> {
             ),
             child: Column(
               children: [
-                // حقل النص
                 Container(
                   decoration: BoxDecoration(
                     color: AppColors.background.withOpacity(0.5),
@@ -187,7 +176,6 @@ class _LinksTabState extends State<LinksTab> {
                   ),
                 ),
                 const SizedBox(height: 15),
-                // أزرار اللصق والتحليل
                 Row(
                   children: [
                     Expanded(
@@ -263,7 +251,7 @@ class _LinksTabState extends State<LinksTab> {
           strokeWidth: 3,
         ),
         const SizedBox(height: 15),
-        Text(
+        const Text(
           'جاري جلب جودات الفيديو...',
           style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
         )
@@ -294,7 +282,6 @@ class _LinksTabState extends State<LinksTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // الصورة المصغرة
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             child: Image.network(
@@ -304,8 +291,6 @@ class _LinksTabState extends State<LinksTab> {
               fit: BoxFit.cover,
             ),
           ),
-          
-          // العنوان
           Padding(
             padding: const EdgeInsets.all(15),
             child: Text(
@@ -319,10 +304,7 @@ class _LinksTabState extends State<LinksTab> {
               ),
             ),
           ),
-          
           const Divider(color: AppColors.surfaceLight, height: 1),
-          
-          // تبويبات الفيديو والصوت (اختيار الجودة)
           DefaultTabController(
             length: 2,
             child: Column(
@@ -337,7 +319,7 @@ class _LinksTabState extends State<LinksTab> {
                   ],
                 ),
                 SizedBox(
-                  height: 220, // ارتفاع ثابت لقائمة الجودات
+                  height: 220, 
                   child: TabBarView(
                     children: [
                       _buildFormatList(videoList, Icons.play_circle_outline),
@@ -348,8 +330,6 @@ class _LinksTabState extends State<LinksTab> {
               ],
             ),
           ),
-          
-          // زر التحميل النهائي
           if (_selectedFormat != null)
             Padding(
               padding: const EdgeInsets.all(15),
@@ -376,8 +356,16 @@ class _LinksTabState extends State<LinksTab> {
                     ),
                   ),
                   onPressed: () {
-                    // سيتم استدعاء دالة التحميل وعرض النافذة المنبثقة للتحميل
-                    // كما برمجناها مسبقاً في DownloadProgressDialog
+                    // فتح نافذة التقدم للتحميل الفعلي
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => DownloadProgressDialog(
+                        downloadUrl: _selectedFormat!['url'],
+                        title: title,
+                        extension: _selectedFormat!['ext'],
+                      )
+                    );
                   },
                   icon: const Icon(Icons.download, color: Colors.white),
                   label: const Text(
