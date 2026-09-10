@@ -15,9 +15,8 @@ class BackendService {
   final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
   final ValueNotifier<String> langNotifier = ValueNotifier('ar');
 
-  // استبدل هذا برابط مساحتك الجديدة في Railway (بدون / في النهاية)
-  // مثال: 'https://your-app-name.up.railway.app'
-  final String serverUrl = 'ضع_رابط_استضافة_railway_هنا';
+  // تم تحديث الرابط بالنطاق الجديد مع بروتوكول الأمان HTTPS
+  final String serverUrl = 'https://download-free-online-production.up.railway.app';
   
   final Map<String, Map<String, String>> langMap = {
     'ar': {
