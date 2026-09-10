@@ -7,6 +7,7 @@ import 'package:chewie/chewie.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'services/backend_service.dart';
+import 'splash_screen.dart'; // تم إضافة الاستدعاء هنا
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,48 +65,12 @@ class ProDownloaderApp extends StatelessWidget {
                 ),
                 fontFamily: 'Cairo',
               ),
+              // سيقوم التطبيق بفتح شاشة SplashScreen من الملف المستقل
               home: const SplashScreen(),
             );
           },
         );
       }
-    );
-  }
-}
-
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
-
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pushReplacement(
-        context, 
-        MaterialPageRoute(builder: (context) => const MainNavigation())
-      );
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: const Center(
-        child: Text(
-          'Pro Downloader',
-          style: TextStyle(
-            fontSize: 36,
-            fontWeight: FontWeight.w900,
-            color: Colors.redAccent,
-          ),
-        ),
-      ),
     );
   }
 }
