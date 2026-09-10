@@ -15,8 +15,10 @@ class BackendService {
   final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
   final ValueNotifier<String> langNotifier = ValueNotifier('ar');
 
-  // استبدل هذا برابط مساحتك في Hugging Face (بدون / في النهاية)
-  final String serverUrl = 'https://nafeaouadah2009-pro-downloader-api.hf.space';
+  // استبدل هذا برابط مساحتك الجديدة في Railway (بدون / في النهاية)
+  // مثال: 'https://your-app-name.up.railway.app'
+  final String serverUrl = 'ضع_رابط_استضافة_railway_هنا';
+  
   final Map<String, Map<String, String>> langMap = {
     'ar': {
       'search': 'بحث', 'link': 'رابط', 'downloads': 'تنزيلاتي', 'settings': 'الإعدادات',
@@ -101,16 +103,17 @@ class BackendService {
 
     try {
       final dio = Dio();
-      // التحدث مع Gradio مباشرة عبر مسار /run/extract
+      // إرسال الطلب إلى خادم Flask عبر مسار /api/extract
       final response = await dio.post(
-        '$serverUrl/run/extract',
-        data: {'data': [url]}
+        '$serverUrl/api/extract',
+        data: {'url': url}
       );
       
       if (response.statusCode == 200) {
-        // استخراج النص الـ JSON من الرد الخاص بـ Gradio
-        String jsonString = response.data['data'][0];
-        Map<String, dynamic> responseData = jsonDecode(jsonString);
+        // استخراج البيانات مباشرة لأن Flask يرسلها بصيغة JSON نظيفة
+        Map<String, dynamic> responseData = response.data is String 
+            ? jsonDecode(response.data) 
+            : response.data;
         
         if (responseData['status'] == 'success') {
           videoTitle = responseData['title'] ?? videoTitle;
@@ -194,29 +197,6 @@ class BackendService {
     try {
       final dio = Dio();
       
-      // خدعة جلب الفيديو المدمج من السيرفر قبل التحميل الفعلي
-      if (downloadUrl.startsWith('MERGE|||')) {
-        String originalUrl = downloadUrl.split('MERGE|||')[1];
-        
-        onProgress(0.1, "جاري", "الدمج في السيرفر..."); // إشعار للمستخدم
-        
-        final mergeRes = await dio.post(
-          '$serverUrl/run/download',
-          data: {'data': [originalUrl]}
-        );
-        
-        if (mergeRes.statusCode == 200 && mergeRes.data['data'] != null) {
-          String fileUrl = mergeRes.data['data'][0]['url'];
-          if (fileUrl.startsWith('/')) {
-            fileUrl = serverUrl + fileUrl;
-          }
-          downloadUrl = fileUrl;
-        } else {
-          onError();
-          return;
-        }
-      }
-
       Directory? directory;
       if (Platform.isAndroid) {
         directory = Directory('/storage/emulated/0/Download');
@@ -239,10 +219,15 @@ class BackendService {
       String validExt = extension.isNotEmpty ? extension : 'mp4';
       String savePath = '${directory.path}/$safeTitle.$validExt';
       
+      // التنزيل المباشر من رابط الخادم الخاص بك 
+      // تم إضافة مهلة زمنية إضافية لأن السيرفر يحتاج وقتا لدمج الفيديوهات عالية الجودة
       await dio.download(
         downloadUrl,
         savePath,
-        options: Options(headers: {'User-Agent': 'Mozilla/5.0'}),
+        options: Options(
+          headers: {'User-Agent': 'Mozilla/5.0'},
+          receiveTimeout: const Duration(minutes: 15), 
+        ),
         onReceiveProgress: (received, total) {
           if (total != -1) {
             double progress = received / total;
