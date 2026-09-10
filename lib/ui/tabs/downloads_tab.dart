@@ -3,7 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
-// import '../local_video_player_screen.dart'; // لتشغيل الفيديو محلياً (سننشئه لاحقاً)
+import '../local_video_player_screen.dart'; // تم التفعيل للتشغيل المباشر
 
 class DownloadsTab extends StatefulWidget {
   const DownloadsTab({super.key});
@@ -23,7 +23,6 @@ class _DownloadsTabState extends State<DownloadsTab> {
     _loadFiles();
   }
 
-  // تحميل الملفات من التخزين المحلي
   Future<void> _loadFiles() async {
     setState(() {
       _isLoading = true;
@@ -39,9 +38,7 @@ class _DownloadsTabState extends State<DownloadsTab> {
     }
   }
 
-  // حذف ملف مع التحديث
   Future<void> _deleteFile(String path, int index) async {
-    // إزالة العنصر من الواجهة أولاً لسرعة الاستجابة (Optimistic UI update)
     final removedFile = _downloadedFiles[index];
     setState(() {
       _downloadedFiles.removeAt(index);
@@ -59,7 +56,6 @@ class _DownloadsTabState extends State<DownloadsTab> {
         );
       }
     } catch (e) {
-      // استرجاع العنصر إذا فشل الحذف
       if (mounted) {
         setState(() {
           _downloadedFiles.insert(index, removedFile);
@@ -71,7 +67,6 @@ class _DownloadsTabState extends State<DownloadsTab> {
     }
   }
 
-  // الحصول على حجم الملف ليعرض في البطاقة
   String _getFileSize(File file) {
     try {
       final bytes = file.lengthSync();
@@ -87,7 +82,6 @@ class _DownloadsTabState extends State<DownloadsTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // العنوان العلوي
           const Padding(
             padding: EdgeInsets.fromLTRB(25, 30, 25, 20),
             child: Text(
@@ -100,7 +94,6 @@ class _DownloadsTabState extends State<DownloadsTab> {
             ),
           ),
           
-          // عرض حالة التحميل أو الملفات أو حالة الفراغ
           Expanded(
             child: _isLoading 
                 ? const Center(child: CircularProgressIndicator(color: AppColors.cyan))
@@ -113,13 +106,11 @@ class _DownloadsTabState extends State<DownloadsTab> {
     );
   }
 
-  // حالة الفراغ الإبداعية (Empty State)
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // أيقونة صندوق فارغ مع Glow
           Container(
             width: 120,
             height: 120,
@@ -136,18 +127,16 @@ class _DownloadsTabState extends State<DownloadsTab> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Icon(Icons.folder_open_rounded, size: 80, color: AppColors.surfaceLight),
+                const Icon(Icons.folder_open_rounded, size: 80, color: AppColors.surfaceLight),
                 Positioned(
                   bottom: 20,
                   right: 20,
-                  child: Icon(Icons.search_off_rounded, size: 30, color: AppColors.textMuted),
+                  child: const Icon(Icons.search_off_rounded, size: 30, color: AppColors.textMuted),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 30),
-          
-          // النص المخصص
           const Text(
             'مازال ما هبطت والو 😎',
             style: TextStyle(
@@ -157,7 +146,6 @@ class _DownloadsTabState extends State<DownloadsTab> {
             ),
           ),
           const SizedBox(height: 10),
-          
           const Text(
             'استخدم تبويب البحث أو الروابط\nللبدء في تحميل مقاطعك المفضلة',
             textAlign: TextAlign.center,
@@ -172,7 +160,6 @@ class _DownloadsTabState extends State<DownloadsTab> {
     );
   }
 
-  // قائمة الملفات
   Widget _buildFilesList() {
     return RefreshIndicator(
       color: AppColors.cyan,
@@ -180,7 +167,7 @@ class _DownloadsTabState extends State<DownloadsTab> {
       onRefresh: _loadFiles,
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-        padding: const EdgeInsets.only(bottom: 120, top: 10), // مسافة لشريط التنقل
+        padding: const EdgeInsets.only(bottom: 120, top: 10), 
         itemCount: _downloadedFiles.length,
         itemBuilder: (context, index) {
           final file = _downloadedFiles[index] as File;
@@ -193,7 +180,6 @@ class _DownloadsTabState extends State<DownloadsTab> {
     );
   }
 
-  // بطاقة الملف الزجاجية
   Widget _buildDownloadCard(File file, String fileName, bool isAudio, int index) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -210,7 +196,6 @@ class _DownloadsTabState extends State<DownloadsTab> {
             ),
             child: Row(
               children: [
-                // أيقونة نوع الملف مع خلفية متدرجة
                 Container(
                   width: 55,
                   height: 55,
@@ -231,8 +216,6 @@ class _DownloadsTabState extends State<DownloadsTab> {
                   ),
                 ),
                 const SizedBox(width: 15),
-                
-                // تفاصيل الملف
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,20 +254,16 @@ class _DownloadsTabState extends State<DownloadsTab> {
                     ],
                   ),
                 ),
-                
-                // أزرار التحكم (تشغيل / حذف)
                 Row(
                   children: [
                     IconButton(
                       icon: const Icon(Icons.play_circle_fill, color: AppColors.cyan, size: 28),
                       onPressed: () {
-                        // فتح صفحة المشاهدة المحلية
-                        /*
+                        // التشغيل المباشر للملف
                         Navigator.push(
                           context, 
                           MaterialPageRoute(builder: (_) => LocalVideoPlayerScreen(file: file))
                         );
-                        */
                       },
                     ),
                     IconButton(
@@ -301,7 +280,6 @@ class _DownloadsTabState extends State<DownloadsTab> {
     );
   }
 
-  // نافذة تأكيد الحذف
   void _showDeleteConfirmDialog(String path, int index, String fileName) {
     showDialog(
       context: context,
