@@ -2,8 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import '../../core/app_colors.dart';
-// تذكر: ستحتاج لإنشاء ملف صفحة المشاهدة (WatchVideoScreen) لاحقاً
-// import '../watch_video_screen.dart';
+import '../watch_video_screen.dart'; // تم التفعيل
 
 class YoutubeTab extends StatefulWidget {
   const YoutubeTab({super.key});
@@ -18,13 +17,13 @@ class _YoutubeTabState extends State<YoutubeTab> {
   
   List<yt.Video> _searchResults = [];
   bool _isSearching = false;
-  bool _hasSearchedOnce = false; // لتحديد ما إذا كان المستخدم قد بحث أم لا
+  bool _hasSearchedOnce = false; 
 
   Future<void> _performSearch() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
 
-    FocusScope.of(context).unfocus(); // إخفاء لوحة المفاتيح
+    FocusScope.of(context).unfocus(); 
     
     setState(() {
       _isSearching = true;
@@ -68,10 +67,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
     return SafeArea(
       child: Column(
         children: [
-          // 1. شريط البحث العلوي (Glassmorphism)
           _buildSearchBar(),
-          
-          // 2. منطقة عرض النتائج
           Expanded(
             child: _buildBodyContent(),
           ),
@@ -143,16 +139,14 @@ class _YoutubeTabState extends State<YoutubeTab> {
   }
 
   Widget _buildBodyContent() {
-    // حالة: جاري البحث (شكل بطاقات تحميل وهمية Skeleton)
     if (_isSearching) {
       return ListView.builder(
-        padding: const EdgeInsets.only(bottom: 100, top: 10), // مسافة لشريط التنقل السفلي
+        padding: const EdgeInsets.only(bottom: 100, top: 10), 
         itemCount: 4,
         itemBuilder: (context, index) => _buildSkeletonCard(),
       );
     }
     
-    // حالة: لم يقم بالبحث بعد (شاشة ترحيبية / فارغة)
     if (!_hasSearchedOnce && _searchResults.isEmpty) {
       return Center(
         child: Column(
@@ -189,7 +183,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
       );
     }
 
-    // حالة: لا توجد نتائج للبحث
     if (_hasSearchedOnce && _searchResults.isEmpty) {
       return const Center(
         child: Text(
@@ -199,9 +192,8 @@ class _YoutubeTabState extends State<YoutubeTab> {
       );
     }
 
-    // حالة: عرض النتائج
     return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 100, top: 10), // مسافة أسفل القائمة حتى لا يغطيها شريط التنقل
+      padding: const EdgeInsets.only(bottom: 100, top: 10), 
       itemCount: _searchResults.length,
       itemBuilder: (context, index) {
         final video = _searchResults[index];
@@ -229,24 +221,20 @@ class _YoutubeTabState extends State<YoutubeTab> {
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          splashColor: AppColors.cyan.withOpacity(0.2), // لون تأثير الضغط
+          splashColor: AppColors.cyan.withOpacity(0.2), 
           highlightColor: AppColors.cyan.withOpacity(0.1),
           onTap: () {
-            // هنا سننتقل لصفحة مشاهدة/تحميل الفيديو
-            // سننشئ هذا الملف في الخطوات القادمة
-            /*
+            // الانتقال الفعلي لشاشة المشاهدة
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => WatchVideoScreen(video: video),
               ),
             );
-            */
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // قسم الصورة المصغرة (Thumbnail)
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 child: Stack(
@@ -262,7 +250,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
                         child: const Icon(Icons.broken_image, color: AppColors.textMuted),
                       ),
                     ),
-                    // مؤشر مدة الفيديو
                     Positioned(
                       bottom: 10,
                       right: 10,
@@ -279,7 +266,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
                                 color: Colors.white,
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                fontFamily: 'Courier', // خط واضح للأرقام
+                                fontFamily: 'Courier', 
                               ),
                             ),
                           ),
@@ -289,8 +276,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
                   ],
                 ),
               ),
-              
-              // قسم التفاصيل (العنوان والقناة)
               Padding(
                 padding: const EdgeInsets.all(15),
                 child: Column(
@@ -335,7 +320,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
     );
   }
 
-  // بطاقة وهمية تظهر أثناء التحميل (Shimmer/Skeleton effect)
   Widget _buildSkeletonCard() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -384,7 +368,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
     );
   }
 
-  // أداة مساعدة لتنسيق الوقت
   String _formatDuration(Duration? duration) {
     if (duration == null) return "0:00";
     String twoDigits(int n) => n.toString().padLeft(2, "0");
