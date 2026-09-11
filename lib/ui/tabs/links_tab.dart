@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
+import '../../services/ad_service.dart';
 
 class LinksTab extends StatefulWidget {
   const LinksTab({super.key});
@@ -355,16 +356,19 @@ class _LinksTabState extends State<LinksTab> {
                     ),
                   ),
                   onPressed: () {
-                    // إغلاق النافذة للمتابعة
+                    // 1. إظهار الإعلان البيني لزيادة الأرباح
+                    AdService().showInterstitialAd();
+                    
+                    // 2. إغلاق النافذة للمتابعة
                     setState(() {
                       _hasResult = false;
                       _urlController.clear();
                     });
                     
-                    // تحديد ما إذا كان الملف صوتاً أم لا
+                    // 3. تحديد ما إذا كان الملف صوتاً أم لا
                     bool isAudio = _selectedFormat!['ext'] == 'mp3' || _selectedFormat!['ext'] == 'm4a';
                     
-                    // بدء التنزيل في الخلفية مع الإشعارات
+                    // 4. بدء التنزيل في الخلفية مع الإشعارات
                     BackendService().startDownloadProcess(
                       downloadUrl: _selectedFormat!['url'],
                       title: title,
@@ -372,7 +376,7 @@ class _LinksTabState extends State<LinksTab> {
                       isAudio: isAudio,
                     );
 
-                    // رسالة تأكيد لبدء العملية
+                    // 5. رسالة تأكيد لبدء العملية
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('بدأ التنزيل في الخلفية... يمكنك متابعة التصفح 🚀'),
