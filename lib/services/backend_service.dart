@@ -110,7 +110,6 @@ class BackendService {
              };
 
              if (isAudioOnly) {
-               // 🔴 تم المنع بصرامة: الهاتف لن يرى سوى صيغ mp3 و m4a الصوتية الحقيقية
                if (formatData['ext'] == 'mp3' || formatData['ext'] == 'm4a') {
                  audioList.add(formatData);
                }
@@ -150,6 +149,7 @@ class BackendService {
     }
   }
 
+  // الدالة التي تم تحديث مسار الحفظ والصلاحيات فيها
   Future<void> startDownloadProcess({
     required String downloadUrl,
     required String title,
@@ -159,25 +159,36 @@ class BackendService {
     required VoidCallback onError,
   }) async {
     try {
-      var status = await Permission.storage.request();
-      if (!status.isGranted) {
-        if (int.parse(Platform.version.split('.')[0]) >= 13) {
+      // 1. طلب الصلاحيات بشكل سليم
+      if (Platform.isAndroid) {
+        final sdkInt = int.tryParse(Platform.version.split('.')[0]) ?? 0;
+        if (sdkInt >= 13) {
           await Permission.photos.request();
           await Permission.videos.request();
           await Permission.audio.request();
+        } else {
+          await Permission.storage.request();
         }
       }
 
+      // 2. تحديد مسار الحفظ الآمن (في الأندرويد نستخدم مجلد التطبيق الخارجي لضمان الصلاحيات)
       Directory? dir;
       if (Platform.isAndroid) {
-        dir = Directory('/storage/emulated/0/Download/Boykta');
-        if (!await dir.exists()) await dir.create(recursive: true);
+        dir = await getExternalStorageDirectory();
       } else {
         dir = await getApplicationDocumentsDirectory();
       }
+      
+      if (dir == null) throw Exception("Could not find storage directory");
+
+      // إنشاء مجلد Boykta داخل المسار الآمن
+      final boyktaDir = Directory('${dir.path}/Boykta');
+      if (!await boyktaDir.exists()) {
+        await boyktaDir.create(recursive: true);
+      }
 
       final cleanTitle = title.replaceAll(RegExp(r'[^\w\s]+'), '').trim();
-      final savePath = '${dir.path}/$cleanTitle.$extension';
+      final savePath = '${boyktaDir.path}/$cleanTitle.$extension';
 
       await _dio.download(
         downloadUrl,
@@ -191,21 +202,37 @@ class BackendService {
           }
         },
       );
+      
+      // تحديث مسار التنزيل في الإعدادات ليعرف التطبيق أين يجد الملفات
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('download_path', boyktaDir.path);
+      
       onComplete();
     } catch (e) {
       onError();
     }
   }
 
+  // تحديث دالة جلب الملفات لتقرأ من المسار الجديد الآمن
   Future<List<FileSystemEntity>> getDownloadedFiles() async {
     try {
-      Directory dir;
-      if (Platform.isAndroid) {
-        dir = Directory('/storage/emulated/0/Download/Boykta');
+      final prefs = await SharedPreferences.getInstance();
+      String? savedPath = prefs.getString('download_path');
+      
+      Directory? dir;
+      if (savedPath != null) {
+        dir = Directory(savedPath);
       } else {
-        dir = await getApplicationDocumentsDirectory();
+        if (Platform.isAndroid) {
+          dir = await getExternalStorageDirectory();
+          if (dir != null) dir = Directory('${dir.path}/Boykta');
+        } else {
+          dir = await getApplicationDocumentsDirectory();
+          dir = Directory('${dir.path}/Boykta');
+        }
       }
-      if (await dir.exists()) {
+
+      if (dir != null && await dir.exists()) {
         final List<FileSystemEntity> files = dir.listSync();
         files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
         return files.where((f) => f is File).toList();
@@ -227,7 +254,7 @@ class BackendService {
     final prefs = await SharedPreferences.getInstance();
     return {
       'downloadMobile': prefs.getBool('downloadMobile') ?? true,
-      'download_path': prefs.getString('download_path') ?? '/storage/emulated/0/Download/Boykta',
+      'download_path': prefs.getString('download_path') ?? 'المسار الآمن (Boykta)',
       'max_tasks': prefs.getInt('max_tasks') ?? 4,
       'speed_limit': prefs.getString('speed_limit') ?? 'غير محدود',
     };
