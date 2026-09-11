@@ -1,24 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
-import 'core/app_theme.dart';
+import 'core/app_colors.dart';
 import 'services/backend_service.dart';
-import 'ui/splash_screen.dart';
+import 'services/ad_service.dart';
+import 'ui/main_navigation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // تهيئة الخدمات
   await BackendService().initBackend();
-
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-    ),
-  );
-
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-  ]);
+  await AdService.init(); // تهيئة إعلانات AdMob
+  AdService().loadInterstitialAd(); // تحميل أول إعلان بيني في الذاكرة
 
   runApp(const BoyktaApp());
 }
@@ -28,31 +20,24 @@ class BoyktaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backend = BackendService();
-
-    return ValueListenableBuilder<String>(
-      valueListenable: backend.langNotifier,
-      builder: (context, currentLang, child) {
-        return ValueListenableBuilder<ThemeMode>(
-          valueListenable: backend.themeNotifier,
-          builder: (context, currentTheme, child) {
-            return MaterialApp(
-              title: 'Boykta',
-              debugShowCheckedModeBanner: false,
-              themeMode: currentTheme, 
-              theme: AppTheme.lightTheme, // تم تفعيل السمة الفاتحة هنا
-              darkTheme: AppTheme.darkTheme,
-              builder: (context, childWidget) {
-                return Directionality(
-                  textDirection: currentLang == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-                  child: childWidget!,
-                );
-              },
-              home: const SplashScreen(),
-            );
-          },
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: BackendService().themeNotifier,
+      builder: (context, currentMode, child) {
+        return MaterialApp(
+          title: 'Boykta',
+          debugShowCheckedModeBanner: false,
+          themeMode: currentMode,
+          theme: ThemeData.light().copyWith(
+            scaffoldBackgroundColor: const Color(0xFFF5F5FA),
+            primaryColor: AppColors.cyan,
+          ),
+          darkTheme: ThemeData.dark().copyWith(
+            scaffoldBackgroundColor: AppColors.background,
+            primaryColor: AppColors.cyan,
+          ),
+          home: const MainNavigation(),
         );
-      }
+      },
     );
   }
 }
