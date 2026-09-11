@@ -28,8 +28,9 @@ jobs:
           flutter-version: '3.19.6'
           channel: 'stable' 
 
-      - name: 🏗️ بناء هياكل فلاتر الأساسية مع تحديد الاسم
-        run: flutter create --project-name pro_downloader --platforms=android .
+      - name: 🏗️ بناء هياكل فلاتر الأساسية
+        # تم إضافة --no-pub هنا لمنع خطأ التصريح (Exit code 69)
+        run: flutter create --no-pub --project-name pro_downloader --platforms=android .
 
       - name: 🌐 حقن جميع الصلاحيات إجبارياً
         run: |
