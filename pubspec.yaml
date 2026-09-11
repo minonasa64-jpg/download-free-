@@ -19,6 +19,9 @@ dependencies:
   chewie: 1.7.5
   shared_preferences: ^2.2.2
   video_thumbnail: ^0.5.3
+  audioplayers: ^5.2.1
+  flutter_local_notifications: ^17.1.2
+
 
 dev_dependencies:
   flutter_test:
