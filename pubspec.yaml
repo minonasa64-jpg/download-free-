@@ -16,11 +16,13 @@ dependencies:
   share_plus: ^8.0.3
   youtube_explode_dart: ^2.5.3
   video_player: ^2.8.2
-  chewie: 1.7.5
+  chewie: ^1.7.5
   shared_preferences: ^2.2.2
   video_thumbnail: ^0.5.3
   audioplayers: ^5.2.1
   flutter_local_notifications: ^17.1.2
+  google_mobile_ads: ^5.2.0 # مكتبة إعلانات جوجل الرسمية
+
 
 
 dev_dependencies:
