@@ -150,13 +150,18 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
         );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر استخراج الجودات، الرابط قد يكون محمياً'))
+          const SnackBar(content: Text('الرابط محمي أو لا توجد جودات متاحة.'))
         );
       }
     } catch (e) {
       if (mounted) {
+        // تم تغيير هذه الرسالة لتعرض الخطأ الفعلي القادم من Railway
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('حدث خطأ أثناء الاستخراج. تأكد من اتصالك بالإنترنت.'))
+          SnackBar(
+            content: Text('الخطأ: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: AppColors.orange,
+            duration: const Duration(seconds: 5),
+          )
         );
       }
     } finally {
