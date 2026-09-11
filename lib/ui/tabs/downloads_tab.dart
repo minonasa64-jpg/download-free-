@@ -22,7 +22,6 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
   List<FileSystemEntity> _audioFiles = [];
   bool _isLoading = true;
 
-  // مشغل الموسيقى المدمج
   late AudioPlayer _audioPlayer;
   File? _currentAudio;
   bool _isPlaying = false;
@@ -36,7 +35,6 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
     _initAudioPlayer();
     _loadFiles();
     
-    // الاستماع للتنزيلات الجارية لتحديث القائمة عند الانتهاء
     _backend.activeDownloads.addListener(_onActiveDownloadsChanged);
   }
 
@@ -119,15 +117,15 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(25, 30, 25, 10),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(25, 30, 25, 10),
+                // دمج دالة الترجمة هنا
                 child: Text(
-                  'تنزيلاتي 📥', 
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary)
+                  _backend.t('downloads'), 
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary)
                 ),
               ),
               
-              // واجهة التنزيلات النشطة العلوية (مراقبة التحميل)
               ValueListenableBuilder<List<DownloadTask>>(
                 valueListenable: _backend.activeDownloads,
                 builder: (context, tasks, child) {
@@ -145,7 +143,7 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'جاري تنزيل: ${t.title}', 
+                            '${_backend.t('downloading_now')} ${t.title}', 
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13), 
                             maxLines: 1, 
                             overflow: TextOverflow.ellipsis
@@ -186,9 +184,9 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                 indicatorColor: AppColors.cyan,
                 labelColor: AppColors.cyan,
                 unselectedLabelColor: AppColors.textMuted,
-                tabs: const [
-                  Tab(icon: Icon(Icons.video_library), text: 'الفيديوهات'),
-                  Tab(icon: Icon(Icons.library_music), text: 'الموسيقى'),
+                tabs: [
+                  Tab(icon: const Icon(Icons.video_library), text: _backend.t('video')),
+                  Tab(icon: const Icon(Icons.library_music), text: _backend.t('audio')),
                 ],
               ),
               Expanded(
@@ -205,7 +203,6 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
             ],
           ),
           
-          // مشغل الموسيقى الزجاجي المصغر أسفل الشاشة
           if (_currentAudio != null)
             Positioned(
               left: 0, right: 0, bottom: 0,
@@ -370,7 +367,7 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                             Navigator.push(context, MaterialPageRoute(builder: (_) => LocalVideoPlayerScreen(file: file)));
                           }
                         } else {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الملف غير موجود أو تم حذفه')));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_backend.t('file_not_found'))));
                           _loadFiles();
                         }
                       },
@@ -442,7 +439,7 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
         children: [
           Icon(isAudio ? Icons.library_music_outlined : Icons.video_library_outlined, size: 80, color: AppColors.textMuted.withOpacity(0.5)),
           const SizedBox(height: 20),
-          Text(isAudio ? 'لا توجد موسيقى محملة' : 'لا توجد فيديوهات محملة', style: const TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+          Text(isAudio ? _backend.t('no_audio') : _backend.t('no_video'), style: const TextStyle(color: AppColors.textSecondary, fontSize: 16)),
         ],
       ),
     );
