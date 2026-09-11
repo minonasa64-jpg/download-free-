@@ -30,7 +30,6 @@ class BoyktaApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final backend = BackendService();
 
-    // الاستماع لتغييرات اللغة والسمة من الإعدادات لحظياً
     return ValueListenableBuilder<String>(
       valueListenable: backend.langNotifier,
       builder: (context, currentLang, child) {
@@ -41,7 +40,7 @@ class BoyktaApp extends StatelessWidget {
               title: 'Boykta',
               debugShowCheckedModeBanner: false,
               themeMode: currentTheme, 
-              theme: AppTheme.darkTheme, 
+              theme: AppTheme.lightTheme, // تم تفعيل السمة الفاتحة هنا
               darkTheme: AppTheme.darkTheme,
               builder: (context, childWidget) {
                 return Directionality(
