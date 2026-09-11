@@ -6,23 +6,19 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class BackendService {
-  // 1. تحويل الكلاس إلى Singleton لضمان التحديث اللحظي
   static final BackendService _instance = BackendService._internal();
   factory BackendService() => _instance;
   BackendService._internal();
 
-  // 2. المتغيرات التي يستمع لها التطبيق
   final ValueNotifier<String> langNotifier = ValueNotifier<String>('ar');
   final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
 
-  // تم وضع رابط سيرفر Railway الحقيقي هنا
   final Dio _dio = Dio(BaseOptions(
     baseUrl: 'https://Download-free-online-production.up.railway.app', 
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(minutes: 5),
   ));
 
-  // تهيئة الإعدادات عند فتح التطبيق
   Future<void> initBackend() async {
     final prefs = await SharedPreferences.getInstance();
     final savedLang = prefs.getString('app_lang') ?? 'ar';
@@ -32,21 +28,18 @@ class BackendService {
     themeNotifier.value = savedTheme == 'dark' ? ThemeMode.dark : ThemeMode.light;
   }
 
-  // تغيير اللغة لحظياً وحفظها
   Future<void> changeLanguage(String lang) async {
     langNotifier.value = lang;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('app_lang', lang);
   }
 
-  // تغيير السمة لحظياً وحفظها
   Future<void> changeTheme(String theme) async {
     themeNotifier.value = theme == 'dark' ? ThemeMode.dark : ThemeMode.light;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('app_theme', theme);
   }
 
-  // قاموس الترجمة البسيط
   String t(String key) {
     final ar = {
       'search': 'بحث', 'link': 'الروابط', 'downloads': 'تنزيلاتي', 'settings': 'إعدادات',
@@ -89,14 +82,23 @@ class BackendService {
 
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     try {
-      final response = await _dio.post('/extract', data: {'url': url});
+      // استخدام FormData لضمان التوافق مع سيرفرات بايثون
+      final formData = FormData.fromMap({'url': url});
+      final response = await _dio.post('/extract', data: formData);
+      
       if (response.statusCode == 200) {
         return response.data as Map<String, dynamic>;
       } else {
-        throw Exception('Failed to extract links');
+        throw Exception('Server Error: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      if (e.response != null) {
+        throw Exception('Server Rejected: ${e.response?.statusCode} - ${e.response?.data}');
+      } else {
+        throw Exception('Connection Timeout or Server Offline');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      throw Exception(e.toString());
     }
   }
 
