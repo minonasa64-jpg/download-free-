@@ -5,7 +5,7 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import '../core/app_colors.dart';
 import '../services/backend_service.dart';
-import 'tabs/links_tab.dart' as links_tab; // نستخدم هذا لاستدعاء نافذة الجودات التي بنيناها
+import 'widgets/download_dialogs.dart'; // هذا هو الاستيراد الصحيح
 
 class WatchVideoScreen extends StatefulWidget {
   final yt.Video video;
@@ -47,14 +47,12 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     });
   }
 
-  // محاولة تشغيل الفيديو مباشرة للعرض المسبق
   Future<void> _initializeDirectPlayer() async {
     try {
       var manifest = await _yt.videos.streamsClient.getManifest(widget.video.id);
       var muxedStreams = manifest.muxed.toList();
       
       if (muxedStreams.isNotEmpty) {
-        // نختار جودة متوسطة للعرض السريع توفيراً للبيانات
         muxedStreams.sort((a, b) => a.videoResolution.height.compareTo(b.videoResolution.height));
         var streamUrl = muxedStreams.last.url.toString();
 
@@ -86,7 +84,6 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     }
   }
 
-  // جلب الفيديوهات المقترحة
   Future<void> _fetchRelatedVideos() async {
     try {
       var results = await _yt.search.search(widget.video.title);
@@ -125,7 +122,6 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     }
   }
 
-  // استخراج الجودات لغرض التحميل
   Future<void> _handleExtraction() async {
     setState(() => _isLoadingExtraction = true);
     try {
@@ -139,9 +135,8 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
         showModalBottomSheet(
           context: context,
           isScrollControlled: true,
-          backgroundColor: Colors.transparent, // شفاف لكي يظهر التأثير الزجاجي
+          backgroundColor: Colors.transparent,
           builder: (context) {
-            // نستخدم مكون الجودات الذي سنضيفه لاحقاً في ملف منفصل أو نستعيره من links_tab
             return FormatSelectionSheet(
               title: videoTitle,
               videoFormats: videoList,
@@ -177,7 +172,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black, // خلفية سينمائية
+      backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
@@ -189,7 +184,6 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // منطقة مشغل الفيديو
           Container(
             height: 230,
             width: double.infinity,
@@ -214,7 +208,6 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                 : Chewie(controller: _chewieController!),
           ),
               
-          // التفاصيل والمقترحات
           Expanded(
             child: Container(
               color: AppColors.background,
@@ -223,7 +216,6 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                 physics: const BouncingScrollPhysics(),
                 itemCount: _relatedVideos.length + 2, 
                 itemBuilder: (context, index) {
-                  // العنصر الأول: تفاصيل الفيديو الحالي وزر التحميل
                   if (index == 0) {
                     return Padding(
                       padding: const EdgeInsets.all(20.0), 
@@ -244,7 +236,6 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                           ),
                           const SizedBox(height: 25), 
                           
-                          // زر التحميل السحري ⬇️
                           Container(
                             width: double.infinity,
                             decoration: BoxDecoration(
@@ -294,14 +285,12 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                     );
                   }
                   
-                  // عنصر الانتظار في نهاية القائمة
                   if (index == _relatedVideos.length + 1) {
                     return _isLoadingMoreRelated 
                         ? const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: AppColors.cyan))) 
                         : const SizedBox.shrink();
                   }
                   
-                  // قائمة الفيديوهات المقترحة
                   final v = _relatedVideos[index - 1];
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -322,7 +311,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                         style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold)
                       ),
                       subtitle: Padding(
-                        padding: const EdgeInsets.top(5),
+                        padding: const EdgeInsets.only(top: 5), // هنا تم التصحيح: EdgeInsets.only(top: 5) بدلاً من EdgeInsets.top(5)
                         child: Text(v.author, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
                       ),
                       onTap: () {
