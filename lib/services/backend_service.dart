@@ -4,6 +4,26 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+// كلاس جديد لتتبع التنزيلات النشطة
+class DownloadTask {
+  final int id;
+  final String title;
+  final bool isAudio;
+  double progress;
+  String downloaded;
+  String total;
+
+  DownloadTask({
+    required this.id,
+    required this.title,
+    required this.isAudio,
+    this.progress = 0.0,
+    this.downloaded = "0.0",
+    this.total = "0.0",
+  });
+}
 
 class BackendService {
   static final BackendService _instance = BackendService._internal();
@@ -12,6 +32,11 @@ class BackendService {
 
   final ValueNotifier<String> langNotifier = ValueNotifier<String>('ar');
   final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
+  
+  // قائمة التنزيلات النشطة لمراقبتها في واجهة المستخدم
+  final ValueNotifier<List<DownloadTask>> activeDownloads = ValueNotifier([]);
+
+  final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
 
   final Dio _dio = Dio(BaseOptions(
     baseUrl: 'https://Download-free-online-production.up.railway.app', 
@@ -26,6 +51,11 @@ class BackendService {
     
     langNotifier.value = savedLang;
     themeNotifier.value = savedTheme == 'dark' ? ThemeMode.dark : ThemeMode.light;
+
+    // تهيئة الإشعارات
+    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+    await _notificationsPlugin.initialize(initializationSettings);
   }
 
   Future<void> changeLanguage(String lang) async {
@@ -149,29 +179,25 @@ class BackendService {
     }
   }
 
-  // الدالة التي تم تحديث مسار الحفظ والصلاحيات فيها
   Future<void> startDownloadProcess({
     required String downloadUrl,
     required String title,
     required String extension,
-    required Function(double progress, String downloaded, String total) onProgress,
-    required VoidCallback onComplete,
-    required VoidCallback onError,
+    required bool isAudio,
   }) async {
     try {
-      // 1. طلب الصلاحيات بشكل سليم
       if (Platform.isAndroid) {
         final sdkInt = int.tryParse(Platform.version.split('.')[0]) ?? 0;
         if (sdkInt >= 13) {
           await Permission.photos.request();
           await Permission.videos.request();
           await Permission.audio.request();
+          await Permission.notification.request(); // طلب صلاحية الإشعارات
         } else {
           await Permission.storage.request();
         }
       }
 
-      // 2. تحديد مسار الحفظ الآمن (في الأندرويد نستخدم مجلد التطبيق الخارجي لضمان الصلاحيات)
       Directory? dir;
       if (Platform.isAndroid) {
         dir = await getExternalStorageDirectory();
@@ -181,7 +207,6 @@ class BackendService {
       
       if (dir == null) throw Exception("Could not find storage directory");
 
-      // إنشاء مجلد Boykta داخل المسار الآمن
       final boyktaDir = Directory('${dir.path}/Boykta');
       if (!await boyktaDir.exists()) {
         await boyktaDir.create(recursive: true);
@@ -189,6 +214,17 @@ class BackendService {
 
       final cleanTitle = title.replaceAll(RegExp(r'[^\w\s]+'), '').trim();
       final savePath = '${boyktaDir.path}/$cleanTitle.$extension';
+
+      // إعداد التنزيل في الخلفية
+      int notifId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+      DownloadTask task = DownloadTask(id: notifId, title: cleanTitle, isAudio: isAudio);
+      
+      // إضافة التنزيل لقائمة الانتظار في واجهة المستخدم
+      List<DownloadTask> currentList = List.from(activeDownloads.value);
+      currentList.add(task);
+      activeDownloads.value = currentList;
+
+      int lastUpdate = 0; // لعدم إرهاق الهاتف بكثرة الإشعارات
 
       await _dio.download(
         downloadUrl,
@@ -198,22 +234,69 @@ class BackendService {
             final progress = received / total;
             final downloadedStr = (received / (1024 * 1024)).toStringAsFixed(1);
             final totalStr = (total / (1024 * 1024)).toStringAsFixed(1);
-            onProgress(progress, downloadedStr, totalStr);
+            
+            task.progress = progress;
+            task.downloaded = downloadedStr;
+            task.total = totalStr;
+
+            int now = DateTime.now().millisecondsSinceEpoch;
+            // تحديث الإشعار كل ثانية واحدة فقط لضمان السلاسة
+            if (now - lastUpdate > 1000) {
+              lastUpdate = now;
+              activeDownloads.value = List.from(activeDownloads.value); // تحديث الشاشة
+              
+              _notificationsPlugin.show(
+                notifId,
+                'جاري التنزيل: $cleanTitle',
+                '$downloadedStr MB / $totalStr MB',
+                NotificationDetails(
+                  android: AndroidNotificationDetails(
+                    'download_channel',
+                    'تنزيلات Boykta',
+                    channelDescription: 'يظهر تقدم التنزيل',
+                    importance: Importance.low,
+                    priority: Priority.low,
+                    showProgress: true,
+                    maxProgress: 100,
+                    progress: (progress * 100).toInt(),
+                    ongoing: true,
+                    onlyAlertOnce: true,
+                  ),
+                ),
+              );
+            }
           }
         },
       );
       
-      // تحديث مسار التنزيل في الإعدادات ليعرف التطبيق أين يجد الملفات
+      // تحديث الإعدادات
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('download_path', boyktaDir.path);
       
-      onComplete();
+      // عند الانتهاء: مسح الإشعار القديم وعرض إشعار النجاح وحذف من القائمة
+      activeDownloads.value = activeDownloads.value.where((t) => t.id != notifId).toList();
+      _notificationsPlugin.cancel(notifId);
+      
+      _notificationsPlugin.show(
+        notifId + 1,
+        'اكتمل التنزيل بنجاح 🎉',
+        cleanTitle,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'download_channel',
+            'تنزيلات Boykta',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+        ),
+      );
+
     } catch (e) {
-      onError();
+      // في حالة الخطأ، إزالة من القائمة
+      activeDownloads.value = activeDownloads.value.where((t) => t.title != title).toList();
     }
   }
 
-  // تحديث دالة جلب الملفات لتقرأ من المسار الجديد الآمن
   Future<List<FileSystemEntity>> getDownloadedFiles() async {
     try {
       final prefs = await SharedPreferences.getInstance();
