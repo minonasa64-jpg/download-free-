@@ -82,18 +82,48 @@ class BackendService {
 
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     try {
-      // استخدام FormData لضمان التوافق مع سيرفرات بايثون
-      final formData = FormData.fromMap({'url': url});
-      final response = await _dio.post('/extract', data: formData);
+      // إرسال البيانات كـ JSON كما يتوقع السيرفر، وإلى المسار الصحيح /api/extract
+      final response = await _dio.post('/api/extract', data: {'url': url});
       
       if (response.statusCode == 200) {
-        return response.data as Map<String, dynamic>;
+        final data = response.data as Map<String, dynamic>;
+        if (data['status'] == 'success') {
+           // تحويل شكل البيانات من السيرفر لتناسب الواجهة الخاصة بنا
+           List<Map<String, dynamic>> videoList = [];
+           List<Map<String, dynamic>> audioList = [];
+
+           for (var f in data['formats'] ?? []) {
+             // تحديد نوع الملف بناءً على الترميز (vcodec/acodec)
+             bool isAudioOnly = (f['vcodec'] == 'none' || f['vcodec'] == null) && f['acodec'] != 'none';
+             
+             Map<String, dynamic> formatData = {
+               'quality_name': f['format_note'] ?? f['resolution'] ?? f['format_id'] ?? 'Unknown',
+               'url': f['url'],
+               'ext': f['ext'] ?? 'mp4',
+               'size': f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'Unknown'
+             };
+
+             if (isAudioOnly) {
+               audioList.append(formatData);
+             } else {
+               videoList.add(formatData);
+             }
+           }
+           
+           return {
+             'title': data['title'],
+             'video': videoList,
+             'audio': audioList,
+           };
+        } else {
+          throw Exception(data['message'] ?? 'Unknown error from server');
+        }
       } else {
         throw Exception('Server Error: ${response.statusCode}');
       }
     } on DioException catch (e) {
       if (e.response != null) {
-        throw Exception('Server Rejected: ${e.response?.statusCode} - ${e.response?.data}');
+        throw Exception('Server Rejected: ${e.response?.statusCode}');
       } else {
         throw Exception('Connection Timeout or Server Offline');
       }
