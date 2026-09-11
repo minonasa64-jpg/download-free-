@@ -17,6 +17,10 @@ class BackendService {
     baseUrl: 'https://Download-free-online-production.up.railway.app', 
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(minutes: 5),
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
   ));
 
   Future<void> initBackend() async {
@@ -93,15 +97,24 @@ class BackendService {
            for (var f in data['formats'] ?? []) {
              bool isAudioOnly = (f['vcodec'] == 'none' || f['vcodec'] == null) && f['acodec'] != 'none';
              
+             // معالجة ذكية لحجم الملف لتجنب أي أخطاء
+             String sizeStr = 'Unknown';
+             if (f['filesize'] != null) {
+               try {
+                 double sizeMb = (double.parse(f['filesize'].toString()) / (1024 * 1024));
+                 sizeStr = sizeMb.toStringAsFixed(1);
+               } catch (_) {}
+             }
+
              Map<String, dynamic> formatData = {
                'quality_name': f['format_note'] ?? f['resolution'] ?? f['format_id'] ?? 'Unknown',
                'url': f['url'],
                'ext': f['ext'] ?? 'mp4',
-               'size': f['filesize'] != null ? (f['filesize'] / (1024 * 1024)).toStringAsFixed(1) : 'Unknown'
+               'size': sizeStr
              };
 
              if (isAudioOnly) {
-               audioList.add(formatData); // تم تصحيح append إلى add
+               audioList.add(formatData);
              } else {
                videoList.add(formatData);
              }
@@ -119,8 +132,18 @@ class BackendService {
         throw Exception('Server Error: ${response.statusCode}');
       }
     } on DioException catch (e) {
+      // 🔴 التعديل الذهبي: هنا سنقرأ رسالة الخطأ الحقيقية التي أرسلها السيرفر
       if (e.response != null) {
-        throw Exception('Server Rejected: ${e.response?.statusCode}');
+        String serverErrorMsg = 'Server Rejected: ${e.response?.statusCode}';
+        try {
+          if (e.response?.data != null && e.response?.data is Map) {
+            final data = e.response?.data as Map;
+            if (data.containsKey('message')) {
+              serverErrorMsg = data['message'].toString(); // سحب رسالة Python
+            }
+          }
+        } catch (_) {}
+        throw Exception(serverErrorMsg);
       } else {
         throw Exception('Connection Timeout or Server Offline');
       }
