@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
+import '../../services/ad_service.dart';
 
 // ==========================================
 // 1. شريط عرض الجودات الزجاجي أسفل الشاشة
@@ -34,11 +35,9 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
     _filteredAudio = _processFormats(widget.audioFormats);
   }
 
-  // دالة الفرز لاختيار 4 جودات فقط (من الأضعف للأقوى)
   List<Map<String, dynamic>> _processFormats(List<Map<String, dynamic>> formats) {
     if (formats.isEmpty) return [];
     
-    // إزالة المكرر وفرز القائمة تصاعدياً حسب الحجم
     var uniqueFormats = <String, Map<String, dynamic>>{};
     for (var f in formats) {
       uniqueFormats[f['quality_name']] = f; 
@@ -126,13 +125,16 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                         padding: const EdgeInsets.symmetric(vertical: 15),
                       ),
                       onPressed: _selectedFormat == null ? null : () {
-                        // إغلاق النافذة للمتابعة
+                        // 1. إغلاق النافذة للمتابعة
                         Navigator.pop(context); 
                         
-                        // تحديد ما إذا كان الملف صوتاً أم لا
+                        // 2. إظهار الإعلان البيني (الخطوة الجديدة للأرباح)
+                        AdService().showInterstitialAd();
+                        
+                        // 3. تحديد ما إذا كان الملف صوتاً أم لا
                         bool isAudio = _selectedFormat!['ext'] == 'mp3' || _selectedFormat!['ext'] == 'm4a';
                         
-                        // بدء التنزيل في الخلفية مع الإشعارات
+                        // 4. بدء التنزيل في الخلفية
                         BackendService().startDownloadProcess(
                           downloadUrl: _selectedFormat!['url'],
                           title: widget.title,
@@ -140,7 +142,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                           isAudio: isAudio,
                         );
 
-                        // رسالة تأكيد لبدء العملية
+                        // 5. رسالة تأكيد لبدء العملية
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('بدأ التنزيل في الخلفية... يمكنك متابعة التصفح 🚀'),
@@ -225,7 +227,6 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
 
 // ==========================================
 // 2. نافذة تقدم التنزيل (Download Progress)
-// (تم الإبقاء عليها بالكامل كما اتفقنا لعدم حذف أي كود صحيح)
 // ==========================================
 class DownloadProgressDialog extends StatefulWidget {
   final String downloadUrl;
@@ -253,8 +254,6 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
   @override
   void initState() {
     super.initState();
-    // حالياً التنزيل يتم عبر الخلفية في FormatSelectionSheet
-    // هذا الكلاس متاح إذا أردت استخدامه مستقبلاً للتحميل الإجباري في الواجهة
   }
 
   @override
