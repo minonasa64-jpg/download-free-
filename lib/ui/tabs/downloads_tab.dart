@@ -28,14 +28,27 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
     _loadFiles();
   }
 
+  // دالة ذكية للتعرف على جميع صيغ الصوت المحتملة
+  bool _isAudioFile(String path) {
+    final p = path.toLowerCase();
+    return p.endsWith('.mp3') || 
+           p.endsWith('.m4a') || 
+           p.endsWith('.opus') || 
+           p.endsWith('.wav') || 
+           p.endsWith('.weba') || 
+           p.endsWith('.aac') || 
+           p.endsWith('.ogg') ||
+           p.endsWith('.flac');
+  }
+
   Future<void> _loadFiles() async {
     setState(() => _isLoading = true);
     final files = await _backend.getDownloadedFiles();
     
     if (mounted) {
       setState(() {
-        _videoFiles = files.where((f) => !f.path.endsWith('.mp3') && !f.path.endsWith('.m4a')).toList();
-        _audioFiles = files.where((f) => f.path.endsWith('.mp3') || f.path.endsWith('.m4a')).toList();
+        _videoFiles = files.where((f) => !_isAudioFile(f.path)).toList();
+        _audioFiles = files.where((f) => _isAudioFile(f.path)).toList();
         _isLoading = false;
       });
     }
@@ -90,13 +103,13 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
         itemCount: files.length,
         itemBuilder: (context, index) {
           final file = files[index] as File;
-          return _buildDownloadCard(file, isAudio, index, files);
+          return _buildDownloadCard(file, isAudio, index);
         },
       ),
     );
   }
 
-  Widget _buildDownloadCard(File file, bool isAudio, int index, List<FileSystemEntity> listRef) {
+  Widget _buildDownloadCard(File file, bool isAudio, int index) {
     final fileName = file.path.split('/').last;
 
     return Container(
@@ -119,22 +132,7 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                   height: 60,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: isAudio 
-                      ? Container(color: AppColors.magenta.withOpacity(0.2), child: const Icon(Icons.music_note, color: AppColors.magenta, size: 30))
-                      : FutureBuilder<Uint8List?>(
-                          future: VideoThumbnail.thumbnailData(
-                            video: file.path,
-                            imageFormat: ImageFormat.JPEG,
-                            maxWidth: 128,
-                            quality: 25,
-                          ),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
-                              return Image.memory(snapshot.data!, fit: BoxFit.cover);
-                            }
-                            return Container(color: Colors.black26, child: const Center(child: CircularProgressIndicator(strokeWidth: 2)));
-                          },
-                        ),
+                    child: _buildThumbnail(file, isAudio),
                   ),
                 ),
                 const SizedBox(width: 15),
@@ -150,7 +148,14 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                   children: [
                     IconButton(
                       icon: const Icon(Icons.play_circle_fill, color: AppColors.cyan, size: 35),
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LocalVideoPlayerScreen(file: file))),
+                      onPressed: () {
+                        if (file.existsSync()) {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => LocalVideoPlayerScreen(file: file)));
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الملف غير موجود أو تم حذفه')));
+                          _loadFiles();
+                        }
+                      },
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline_rounded, color: AppColors.orange, size: 22),
@@ -164,6 +169,41 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
         ),
       ),
     );
+  }
+
+  // دالة بناء الصورة المصغرة مع حماية الأخطاء (Error Handling)
+  Widget _buildThumbnail(File file, bool isAudio) {
+    if (isAudio) {
+      return Container(
+        color: AppColors.magenta.withOpacity(0.2), 
+        child: const Icon(Icons.music_note, color: AppColors.magenta, size: 30)
+      );
+    } else {
+      return FutureBuilder<Uint8List?>(
+        future: VideoThumbnail.thumbnailData(
+          video: file.path,
+          imageFormat: ImageFormat.JPEG,
+          maxWidth: 128,
+          quality: 25,
+        ).catchError((e) {
+          // منع الانهيار إذا فشل استخراج الصورة
+          return null; 
+        }),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Container(color: Colors.black26, child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.cyan)));
+          }
+          if (snapshot.hasData && snapshot.data != null) {
+            return Image.memory(snapshot.data!, fit: BoxFit.cover);
+          }
+          // الصورة البديلة في حال فشل الاستخراج
+          return Container(
+            color: AppColors.surfaceLight, 
+            child: const Icon(Icons.videocam, color: AppColors.textMuted, size: 30)
+          );
+        },
+      );
+    }
   }
 
   Future<void> _deleteFile(String path, File file, bool isAudio) async {
