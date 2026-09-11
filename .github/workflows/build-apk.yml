@@ -29,12 +29,13 @@ jobs:
           channel: 'stable' 
 
       - name: 🏗️ بناء هياكل فلاتر الأساسية
-        # تم إضافة --no-pub هنا لمنع خطأ التصريح (Exit code 69)
         run: flutter create --no-pub --project-name pro_downloader --platforms=android .
 
-      - name: 🌐 حقن جميع الصلاحيات إجبارياً
+      - name: 🌐 حقن جميع الصلاحيات ومعرف AdMob إجبارياً
+        # قمنا هنا بدمج صلاحية AD_ID وحقن معرف AdMob الرسمي للاختبار داخل وسم application
         run: |
-          sed -i '/<manifest xmlns:android=/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<manifest xmlns:android=/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<application/a \        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>' android/app/src/main/AndroidManifest.xml
 
       - name: 📦 تحميل الحزم والمكتبات
         run: flutter pub get
