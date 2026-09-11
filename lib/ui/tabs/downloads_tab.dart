@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
 import '../local_video_player_screen.dart'; 
@@ -21,24 +22,59 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
   List<FileSystemEntity> _audioFiles = [];
   bool _isLoading = true;
 
+  // مشغل الموسيقى المدمج
+  late AudioPlayer _audioPlayer;
+  File? _currentAudio;
+  bool _isPlaying = false;
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _initAudioPlayer();
     _loadFiles();
+    
+    // الاستماع للتنزيلات الجارية لتحديث القائمة عند الانتهاء
+    _backend.activeDownloads.addListener(_onActiveDownloadsChanged);
   }
 
-  // دالة ذكية للتعرف على جميع صيغ الصوت المحتملة
+  void _initAudioPlayer() {
+    _audioPlayer = AudioPlayer();
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (mounted) setState(() => _isPlaying = state == PlayerState.playing);
+    });
+    _audioPlayer.onDurationChanged.listen((d) {
+      if (mounted) setState(() => _duration = d);
+    });
+    _audioPlayer.onPositionChanged.listen((p) {
+      if (mounted) setState(() => _position = p);
+    });
+    _audioPlayer.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = false;
+          _position = Duration.zero;
+        });
+      }
+    });
+  }
+
+  void _onActiveDownloadsChanged() {
+    if (_backend.activeDownloads.value.isEmpty) {
+      _loadFiles(); 
+    }
+  }
+
   bool _isAudioFile(String path) {
     final p = path.toLowerCase();
     return p.endsWith('.mp3') || 
            p.endsWith('.m4a') || 
            p.endsWith('.opus') || 
            p.endsWith('.wav') || 
-           p.endsWith('.weba') || 
            p.endsWith('.aac') || 
-           p.endsWith('.ogg') ||
-           p.endsWith('.flac');
+           p.endsWith('.ogg');
   }
 
   Future<void> _loadFiles() async {
@@ -54,37 +90,197 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
     }
   }
 
+  void _playAudio(File file) async {
+    if (_currentAudio?.path == file.path) {
+      if (_isPlaying) {
+        await _audioPlayer.pause();
+      } else {
+        await _audioPlayer.resume();
+      }
+    } else {
+      await _audioPlayer.play(DeviceFileSource(file.path));
+      setState(() => _currentAudio = file);
+    }
+  }
+
+  @override
+  void dispose() {
+    _backend.activeDownloads.removeListener(_onActiveDownloadsChanged);
+    _audioPlayer.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(25, 30, 25, 10),
-            child: Text('تنزيلاتي 📥', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-          ),
-          TabBar(
-            controller: _tabController,
-            indicatorColor: AppColors.cyan,
-            labelColor: AppColors.cyan,
-            unselectedLabelColor: AppColors.textMuted,
-            tabs: const [
-              Tab(icon: Icon(Icons.video_library), text: 'الفيديوهات'),
-              Tab(icon: Icon(Icons.library_music), text: 'الموسيقى'),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(25, 30, 25, 10),
+                child: Text(
+                  'تنزيلاتي 📥', 
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary)
+                ),
+              ),
+              
+              // واجهة التنزيلات النشطة العلوية (مراقبة التحميل)
+              ValueListenableBuilder<List<DownloadTask>>(
+                valueListenable: _backend.activeDownloads,
+                builder: (context, tasks, child) {
+                  if (tasks.isEmpty) return const SizedBox.shrink();
+                  return Column(
+                    children: tasks.map((t) => Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+                      padding: const EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLight.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: AppColors.cyan.withOpacity(0.3))
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'جاري تنزيل: ${t.title}', 
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13), 
+                            maxLines: 1, 
+                            overflow: TextOverflow.ellipsis
+                          ),
+                          const SizedBox(height: 10),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: LinearProgressIndicator(
+                              value: t.progress, 
+                              backgroundColor: Colors.white12, 
+                              color: AppColors.cyan, 
+                              minHeight: 8
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${(t.progress * 100).toInt()}%', 
+                                style: const TextStyle(color: AppColors.cyan, fontSize: 12, fontWeight: FontWeight.bold)
+                              ),
+                              Text(
+                                '${t.downloaded} MB / ${t.total} MB', 
+                                style: const TextStyle(color: AppColors.textMuted, fontSize: 11)
+                              ),
+                            ]
+                          )
+                        ]
+                      )
+                    )).toList(),
+                  );
+                }
+              ),
+
+              TabBar(
+                controller: _tabController,
+                indicatorColor: AppColors.cyan,
+                labelColor: AppColors.cyan,
+                unselectedLabelColor: AppColors.textMuted,
+                tabs: const [
+                  Tab(icon: Icon(Icons.video_library), text: 'الفيديوهات'),
+                  Tab(icon: Icon(Icons.library_music), text: 'الموسيقى'),
+                ],
+              ),
+              Expanded(
+                child: _isLoading 
+                    ? const Center(child: CircularProgressIndicator(color: AppColors.cyan))
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildFilesList(_videoFiles, isAudio: false),
+                          _buildFilesList(_audioFiles, isAudio: true),
+                        ],
+                      ),
+              ),
             ],
           ),
-          Expanded(
-            child: _isLoading 
-                ? const Center(child: CircularProgressIndicator(color: AppColors.cyan))
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildFilesList(_videoFiles, isAudio: false),
-                      _buildFilesList(_audioFiles, isAudio: true),
-                    ],
+          
+          // مشغل الموسيقى الزجاجي المصغر أسفل الشاشة
+          if (_currentAudio != null)
+            Positioned(
+              left: 0, right: 0, bottom: 0,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight.withOpacity(0.85),
+                      border: Border(top: BorderSide(color: AppColors.magenta.withOpacity(0.5))),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.magenta.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.music_note, color: AppColors.magenta, size: 25),
+                            ),
+                            const SizedBox(width: 15),
+                            Expanded(
+                              child: Text(
+                                _currentAudio!.path.split('/').last, 
+                                maxLines: 1, 
+                                overflow: TextOverflow.ellipsis, 
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)
+                              )
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, 
+                                color: AppColors.cyan, 
+                                size: 40
+                              ),
+                              onPressed: () => _playAudio(_currentAudio!),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 28),
+                              onPressed: () {
+                                _audioPlayer.stop();
+                                setState(() => _currentAudio = null);
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        SizedBox(
+                          height: 20,
+                          child: SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                              trackHeight: 3,
+                            ),
+                            child: Slider(
+                              activeColor: AppColors.magenta,
+                              inactiveColor: Colors.white24,
+                              value: _position.inSeconds.toDouble().clamp(0.0, _duration.inSeconds.toDouble()),
+                              max: _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0,
+                              onChanged: (val) => _audioPlayer.seek(Duration(seconds: val.toInt())),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-          ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -99,7 +295,7 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
       onRefresh: _loadFiles,
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-        padding: const EdgeInsets.only(bottom: 120, top: 10), 
+        padding: EdgeInsets.only(bottom: _currentAudio != null ? 120 : 20, top: 10), 
         itemCount: files.length,
         itemBuilder: (context, index) {
           final file = files[index] as File;
@@ -111,6 +307,7 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
 
   Widget _buildDownloadCard(File file, bool isAudio, int index) {
     final fileName = file.path.split('/').last;
+    final isCurrentlyPlaying = _currentAudio?.path == file.path;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -119,20 +316,22 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.surfaceLight.withOpacity(0.5),
+              color: isCurrentlyPlaying ? AppColors.magenta.withOpacity(0.15) : AppColors.surfaceLight.withOpacity(0.5),
               borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: Colors.white.withOpacity(0.05)),
+              border: Border.all(
+                color: isCurrentlyPlaying ? AppColors.magenta.withOpacity(0.6) : Colors.white.withOpacity(0.05)
+              ),
             ),
             child: Row(
               children: [
                 SizedBox(
-                  width: 80,
-                  height: 60,
+                  width: 85,
+                  height: 65,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: _buildThumbnail(file, isAudio),
+                    child: _buildThumbnail(file, isAudio, isCurrentlyPlaying),
                   ),
                 ),
                 const SizedBox(width: 15),
@@ -140,17 +339,36 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(fileName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text(
+                        fileName, 
+                        maxLines: 2, 
+                        overflow: TextOverflow.ellipsis, 
+                        style: TextStyle(
+                          color: isCurrentlyPlaying ? AppColors.magenta : AppColors.textPrimary, 
+                          fontWeight: FontWeight.bold, 
+                          fontSize: 13
+                        )
+                      ),
                     ],
                   ),
                 ),
                 Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.play_circle_fill, color: AppColors.cyan, size: 35),
+                      icon: Icon(
+                        isAudio 
+                          ? (isCurrentlyPlaying && _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill) 
+                          : Icons.play_circle_fill, 
+                        color: isAudio && isCurrentlyPlaying ? AppColors.magenta : AppColors.cyan, 
+                        size: 38
+                      ),
                       onPressed: () {
                         if (file.existsSync()) {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => LocalVideoPlayerScreen(file: file)));
+                          if (isAudio) {
+                            _playAudio(file);
+                          } else {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => LocalVideoPlayerScreen(file: file)));
+                          }
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الملف غير موجود أو تم حذفه')));
                           _loadFiles();
@@ -158,7 +376,7 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                       },
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded, color: AppColors.orange, size: 22),
+                      icon: const Icon(Icons.delete_outline_rounded, color: AppColors.orange, size: 24),
                       onPressed: () => _deleteFile(file.path, file, isAudio),
                     ),
                   ],
@@ -171,12 +389,15 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
     );
   }
 
-  // دالة بناء الصورة المصغرة مع حماية الأخطاء (Error Handling)
-  Widget _buildThumbnail(File file, bool isAudio) {
+  Widget _buildThumbnail(File file, bool isAudio, bool isPlaying) {
     if (isAudio) {
       return Container(
         color: AppColors.magenta.withOpacity(0.2), 
-        child: const Icon(Icons.music_note, color: AppColors.magenta, size: 30)
+        child: Icon(
+          isPlaying ? Icons.equalizer_rounded : Icons.music_note, 
+          color: AppColors.magenta, 
+          size: 35
+        )
       );
     } else {
       return FutureBuilder<Uint8List?>(
@@ -185,10 +406,7 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
           imageFormat: ImageFormat.JPEG,
           maxWidth: 128,
           quality: 25,
-        ).catchError((e) {
-          // منع الانهيار إذا فشل استخراج الصورة
-          return null; 
-        }),
+        ).catchError((e) { return null; }),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Container(color: Colors.black26, child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.cyan)));
@@ -196,23 +414,19 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
           if (snapshot.hasData && snapshot.data != null) {
             return Image.memory(snapshot.data!, fit: BoxFit.cover);
           }
-          // الصورة البديلة في حال فشل الاستخراج
-          return Container(
-            color: AppColors.surfaceLight, 
-            child: const Icon(Icons.videocam, color: AppColors.textMuted, size: 30)
-          );
+          return Container(color: AppColors.surfaceLight, child: const Icon(Icons.videocam, color: AppColors.textMuted, size: 30));
         },
       );
     }
   }
 
   Future<void> _deleteFile(String path, File file, bool isAudio) async {
+    if (_currentAudio?.path == path) {
+      _audioPlayer.stop();
+      setState(() => _currentAudio = null);
+    }
     setState(() {
-      if (isAudio) {
-        _audioFiles.remove(file);
-      } else {
-        _videoFiles.remove(file);
-      }
+      if (isAudio) _audioFiles.remove(file); else _videoFiles.remove(file);
     });
     try {
       await _backend.deleteFile(path);
