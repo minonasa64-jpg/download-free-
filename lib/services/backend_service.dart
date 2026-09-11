@@ -17,10 +17,6 @@ class BackendService {
     baseUrl: 'https://Download-free-online-production.up.railway.app', 
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(minutes: 5),
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
   ));
 
   Future<void> initBackend() async {
@@ -86,7 +82,8 @@ class BackendService {
 
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     try {
-      final response = await _dio.post('/api/extract', data: {'url': url});
+      final formData = FormData.fromMap({'url': url});
+      final response = await _dio.post('/api/extract', data: formData);
       
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
@@ -97,7 +94,6 @@ class BackendService {
            for (var f in data['formats'] ?? []) {
              bool isAudioOnly = (f['vcodec'] == 'none' || f['vcodec'] == null) && f['acodec'] != 'none';
              
-             // معالجة ذكية لحجم الملف لتجنب أي أخطاء
              String sizeStr = 'Unknown';
              if (f['filesize'] != null) {
                try {
@@ -114,7 +110,10 @@ class BackendService {
              };
 
              if (isAudioOnly) {
-               audioList.add(formatData);
+               // 🔴 تم المنع بصرامة: الهاتف لن يرى سوى صيغ mp3 و m4a الصوتية الحقيقية
+               if (formatData['ext'] == 'mp3' || formatData['ext'] == 'm4a') {
+                 audioList.add(formatData);
+               }
              } else {
                videoList.add(formatData);
              }
@@ -132,14 +131,13 @@ class BackendService {
         throw Exception('Server Error: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      // 🔴 التعديل الذهبي: هنا سنقرأ رسالة الخطأ الحقيقية التي أرسلها السيرفر
       if (e.response != null) {
         String serverErrorMsg = 'Server Rejected: ${e.response?.statusCode}';
         try {
           if (e.response?.data != null && e.response?.data is Map) {
             final data = e.response?.data as Map;
             if (data.containsKey('message')) {
-              serverErrorMsg = data['message'].toString(); // سحب رسالة Python
+              serverErrorMsg = data['message'].toString();
             }
           }
         } catch (_) {}
