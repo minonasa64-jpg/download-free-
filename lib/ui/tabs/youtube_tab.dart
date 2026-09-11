@@ -2,7 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import '../../core/app_colors.dart';
-import '../watch_video_screen.dart'; // تم التفعيل
+import '../watch_video_screen.dart';
 
 class YoutubeTab extends StatefulWidget {
   const YoutubeTab({super.key});
@@ -13,11 +13,25 @@ class YoutubeTab extends StatefulWidget {
 
 class _YoutubeTabState extends State<YoutubeTab> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final yt.YoutubeExplode _yt = yt.YoutubeExplode();
   
   List<yt.Video> _searchResults = [];
+  yt.VideoSearchList? _currentSearchPage;
+  
   bool _isSearching = false;
+  bool _isLoadingMore = false;
   bool _hasSearchedOnce = false; 
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+        _loadMore();
+      }
+    });
+  }
 
   Future<void> _performSearch() async {
     final query = _searchController.text.trim();
@@ -29,21 +43,21 @@ class _YoutubeTabState extends State<YoutubeTab> {
       _isSearching = true;
       _hasSearchedOnce = true;
       _searchResults.clear();
+      _currentSearchPage = null;
     });
 
     try {
       final results = await _yt.search.search(query);
       if (mounted) {
         setState(() {
+          _currentSearchPage = results;
           _searchResults = results.whereType<yt.Video>().toList();
           _isSearching = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isSearching = false;
-        });
+        setState(() => _isSearching = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('حدث خطأ أثناء البحث. تحقق من الاتصال.'),
@@ -55,9 +69,30 @@ class _YoutubeTabState extends State<YoutubeTab> {
     }
   }
 
+  Future<void> _loadMore() async {
+    if (_isLoadingMore) return; 
+    if (_currentSearchPage?.nextPage != null) {
+      setState(() => _isLoadingMore = true);
+      try {
+        final next = await _currentSearchPage!.nextPage();
+        if (next != null) {
+          setState(() {
+            _currentSearchPage = next;
+            _searchResults.addAll(next.whereType<yt.Video>());
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading more: $e');
+      } finally {
+        if (mounted) setState(() => _isLoadingMore = false);
+      }
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     _yt.close();
     super.dispose();
   }
@@ -68,9 +103,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
       child: Column(
         children: [
           _buildSearchBar(),
-          Expanded(
-            child: _buildBodyContent(),
-          ),
+          Expanded(child: _buildBodyContent()),
         ],
       ),
     );
@@ -98,11 +131,11 @@ class _YoutubeTabState extends State<YoutubeTab> {
                     style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
                     textInputAction: TextInputAction.search,
                     onSubmitted: (_) => _performSearch(),
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       hintText: 'ابحث في يوتيوب...',
-                      hintStyle: const TextStyle(color: AppColors.textMuted),
+                      hintStyle: TextStyle(color: AppColors.textMuted),
                       border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 20),
                     ),
                   ),
                 ),
@@ -123,11 +156,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
                         )
                       ],
                     ),
-                    child: const Icon(
-                      Icons.search,
-                      color: Colors.white,
-                      size: 22,
-                    ),
+                    child: const Icon(Icons.search, color: Colors.white, size: 22),
                   ),
                 ),
               ],
@@ -161,23 +190,9 @@ class _YoutubeTabState extends State<YoutubeTab> {
               child: const Icon(Icons.play_circle_outline, size: 80, color: AppColors.cyan),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'اكتشف وحمّل',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
+            const Text('اكتشف وحمّل', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
             const SizedBox(height: 10),
-            const Text(
-              'ابحث عن أي فيديو أو مقطع صوتي\nبجودة عالية وبكل سهولة',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                height: 1.5,
-              ),
-            ),
+            const Text('ابحث عن أي فيديو أو مقطع صوتي\nبجودة عالية وبكل سهولة', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary, height: 1.5)),
           ],
         ),
       );
@@ -185,17 +200,21 @@ class _YoutubeTabState extends State<YoutubeTab> {
 
     if (_hasSearchedOnce && _searchResults.isEmpty) {
       return const Center(
-        child: Text(
-          'لم نتمكن من العثور على أي نتائج 😔',
-          style: TextStyle(color: AppColors.textMuted, fontSize: 16),
-        ),
+        child: Text('لم نتمكن من العثور على أي نتائج 😔', style: TextStyle(color: AppColors.textMuted, fontSize: 16)),
       );
     }
 
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.only(bottom: 100, top: 10), 
-      itemCount: _searchResults.length,
+      itemCount: _searchResults.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index == _searchResults.length) {
+          return const Padding(
+            padding: EdgeInsets.all(20.0),
+            child: Center(child: CircularProgressIndicator(color: AppColors.cyan)),
+          );
+        }
         final video = _searchResults[index];
         return _buildVideoCard(video);
       },
@@ -209,11 +228,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.5),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          )
+          BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 5))
         ],
       ),
       child: Material(
@@ -224,13 +239,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
           splashColor: AppColors.cyan.withOpacity(0.2), 
           highlightColor: AppColors.cyan.withOpacity(0.1),
           onTap: () {
-            // الانتقال الفعلي لشاشة المشاهدة
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => WatchVideoScreen(video: video),
-              ),
-            );
+            Navigator.push(context, MaterialPageRoute(builder: (context) => WatchVideoScreen(video: video)));
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,12 +271,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
                             color: Colors.black.withOpacity(0.6),
                             child: Text(
                               _formatDuration(video.duration),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Courier', 
-                              ),
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
                             ),
                           ),
                         ),
@@ -285,12 +289,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
                       video.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        height: 1.3,
-                      ),
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.bold, height: 1.3),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -302,10 +301,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
                             video.author,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
-                            ),
+                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                           ),
                         ),
                       ],
@@ -323,43 +319,23 @@ class _YoutubeTabState extends State<YoutubeTab> {
   Widget _buildSkeletonCard() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: double.infinity,
             height: 200,
-            decoration: const BoxDecoration(
-              color: AppColors.surfaceLight,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
+            decoration: const BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
           ),
           Padding(
             padding: const EdgeInsets.all(15),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: double.infinity,
-                  height: 15,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                ),
+                Container(width: double.infinity, height: 15, decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(5))),
                 const SizedBox(height: 10),
-                Container(
-                  width: 150,
-                  height: 15,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                ),
+                Container(width: 150, height: 15, decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(5))),
               ],
             ),
           ),
