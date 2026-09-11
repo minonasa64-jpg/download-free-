@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import '../../core/app_colors.dart';
 import '../watch_video_screen.dart';
+import '../../services/backend_service.dart';
 
 class YoutubeTab extends StatefulWidget {
   const YoutubeTab({super.key});
@@ -12,6 +13,7 @@ class YoutubeTab extends StatefulWidget {
 }
 
 class _YoutubeTabState extends State<YoutubeTab> {
+  final BackendService _backend = BackendService();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final yt.YoutubeExplode _yt = yt.YoutubeExplode();
@@ -60,7 +62,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
         setState(() => _isSearching = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('حدث خطأ أثناء البحث. تحقق من الاتصال.'),
+            content: Text(_backend.t('search_error')),
             backgroundColor: Colors.redAccent.withOpacity(0.8),
             behavior: SnackBarBehavior.floating,
           )
@@ -131,11 +133,11 @@ class _YoutubeTabState extends State<YoutubeTab> {
                     style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
                     textInputAction: TextInputAction.search,
                     onSubmitted: (_) => _performSearch(),
-                    decoration: const InputDecoration(
-                      hintText: 'ابحث في يوتيوب...',
-                      hintStyle: TextStyle(color: AppColors.textMuted),
+                    decoration: InputDecoration(
+                      hintText: _backend.t('search_hint'),
+                      hintStyle: const TextStyle(color: AppColors.textMuted),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 20),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                     ),
                   ),
                 ),
@@ -190,17 +192,17 @@ class _YoutubeTabState extends State<YoutubeTab> {
               child: const Icon(Icons.play_circle_outline, size: 80, color: AppColors.cyan),
             ),
             const SizedBox(height: 20),
-            const Text('اكتشف وحمّل', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+            Text(_backend.t('discover'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
             const SizedBox(height: 10),
-            const Text('ابحث عن أي فيديو أو مقطع صوتي\nبجودة عالية وبكل سهولة', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary, height: 1.5)),
+            Text(_backend.t('start_search'), textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary, height: 1.5)),
           ],
         ),
       );
     }
 
     if (_hasSearchedOnce && _searchResults.isEmpty) {
-      return const Center(
-        child: Text('لم نتمكن من العثور على أي نتائج 😔', style: TextStyle(color: AppColors.textMuted, fontSize: 16)),
+      return Center(
+        child: Text(_backend.t('no_results'), style: const TextStyle(color: AppColors.textMuted, fontSize: 16)),
       );
     }
 
