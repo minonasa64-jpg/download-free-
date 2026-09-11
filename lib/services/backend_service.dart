@@ -67,52 +67,55 @@ class BackendService {
     await prefs.setString('app_theme', theme);
   }
 
-  // قاموس الترجمة الشامل
+  // تم دمج كلمات شريط التنقل وقسم الروابط في القاموس
   String t(String key) {
     final ar = {
-      'search': 'بحث', 'link': 'الروابط', 'downloads': 'تنزيلاتي 📥', 'settings': 'إعدادات',
-      'discover': 'اكتشف وحمّل', 'search_hint': 'ابحث في يوتيوب...', 
+      'youtube': 'يوتيوب', 'link': 'الروابط', 'downloads': 'تنزيلاتي', 'settings': 'إعدادات',
+      'search': 'بحث', 'discover': 'اكتشف وحمّل', 'search_hint': 'ابحث في يوتيوب...', 
       'start_search': 'ابحث عن أي فيديو أو مقطع صوتي\nبجودة عالية وبكل سهولة',
-      'download_btn': 'تحميل', 'related': 'فيديوهات ذات صلة', 'have_link': 'لديك رابط؟',
-      'paste_here': 'الصقه هنا لتحميله مباشرة', 'downloading': 'جاري التنزيل...',
-      'completed': 'اكتمل التنزيل', 'formats_title': 'اختر الجودة المطلوبة',
-      'video': 'فيديوهات', 'audio': 'موسيقى', 'downloaded': 'الملفات المحملة',
-      'general': 'عام', 'dl_settings': 'إعدادات التنزيل', 'notif': 'الإشعارات',
-      'theme': 'السمة', 'language': 'اللغة', 'more_tools': 'أدوات إضافية',
+      'download_btn': 'تحميل', 'related': 'فيديوهات ذات صلة', 
+      'have_link': 'لديك رابط؟', 'paste_here': 'الصق رابط الفيديو هنا لتحميله مباشرة',
+      'downloading': 'جاري التنزيل...', 'completed': 'اكتمل التنزيل', 
+      'formats_title': 'اختر الجودة المطلوبة', 'video': 'فيديوهات', 'audio': 'موسيقى', 
+      'downloaded': 'الملفات المحملة', 'general': 'عام', 'dl_settings': 'إعدادات التنزيل', 
+      'notif': 'الإشعارات', 'theme': 'السمة', 'language': 'اللغة', 'more_tools': 'أدوات إضافية',
       'share_app': 'شارك التطبيق', 'clean_cache': 'تنظيف الملفات المؤقتة', 'about': 'حول التطبيق',
       'no_audio': 'لا توجد موسيقى محملة', 'no_video': 'لا توجد فيديوهات محملة',
       'downloading_now': 'جاري تنزيل:', 'file_not_found': 'الملف غير موجود أو تم حذفه',
       'no_results': 'لم نتمكن من العثور على أي نتائج 😔', 'search_error': 'حدث خطأ أثناء البحث. تحقق من الاتصال.',
+      'invalid_link': 'الرابط غير صالح', 'extracting': 'جاري استخراج الجودات...',
     };
     final en = {
-      'search': 'Search', 'link': 'Links', 'downloads': 'Downloads 📥', 'settings': 'Settings',
-      'discover': 'Discover & Download', 'search_hint': 'Search YouTube...', 
+      'youtube': 'YouTube', 'link': 'Links', 'downloads': 'Downloads', 'settings': 'Settings',
+      'search': 'Search', 'discover': 'Discover & Download', 'search_hint': 'Search YouTube...', 
       'start_search': 'Search for any video or audio\nin high quality easily',
-      'download_btn': 'Download', 'related': 'Related Videos', 'have_link': 'Have a link?',
-      'paste_here': 'Paste it here to download', 'downloading': 'Downloading...',
-      'completed': 'Download Completed', 'formats_title': 'Select Quality',
-      'video': 'Videos', 'audio': 'Music', 'downloaded': 'Downloaded Files',
-      'general': 'General', 'dl_settings': 'Download Settings', 'notif': 'Notifications',
-      'theme': 'Theme', 'language': 'Language', 'more_tools': 'More Tools',
+      'download_btn': 'Download', 'related': 'Related Videos', 
+      'have_link': 'Have a link?', 'paste_here': 'Paste the video link here to download',
+      'downloading': 'Downloading...', 'completed': 'Download Completed', 
+      'formats_title': 'Select Quality', 'video': 'Videos', 'audio': 'Music', 
+      'downloaded': 'Downloaded Files', 'general': 'General', 'dl_settings': 'Download Settings', 
+      'notif': 'Notifications', 'theme': 'Theme', 'language': 'Language', 'more_tools': 'More Tools',
       'share_app': 'Share App', 'clean_cache': 'Clean Cache', 'about': 'About',
       'no_audio': 'No music downloaded', 'no_video': 'No videos downloaded',
       'downloading_now': 'Downloading:', 'file_not_found': 'File not found or deleted',
-      'no_results': 'No results found 😔', 'search_error': 'Search error. Check your connection.',
+      'no_results': 'No results found 😔', 'search_error': 'Search error. Check connection.',
+      'invalid_link': 'Invalid link', 'extracting': 'Extracting formats...',
     };
     final fr = {
-      'search': 'Recherche', 'link': 'Liens', 'downloads': 'Téléchargements 📥', 'settings': 'Paramètres',
-      'discover': 'Découvrez et Téléchargez', 'search_hint': 'Rechercher sur YouTube...', 
+      'youtube': 'YouTube', 'link': 'Liens', 'downloads': 'Téléchargements', 'settings': 'Paramètres',
+      'search': 'Recherche', 'discover': 'Découvrez et Téléchargez', 'search_hint': 'Rechercher sur YouTube...', 
       'start_search': 'Recherchez des vidéos ou des audios\nen haute qualité facilement',
-      'download_btn': 'Télécharger', 'related': 'Vidéos similaires', 'have_link': 'Vous avez un lien ?',
-      'paste_here': 'Collez-le ici', 'downloading': 'Téléchargement...',
-      'completed': 'Téléchargement terminé', 'formats_title': 'Sélectionnez la qualité',
-      'video': 'Vidéos', 'audio': 'Musique', 'downloaded': 'Fichiers téléchargés',
-      'general': 'Général', 'dl_settings': 'Paramètres de téléchargement', 'notif': 'Notifications',
-      'theme': 'Thème', 'language': 'Langue', 'more_tools': 'Plus d\'outils',
+      'download_btn': 'Télécharger', 'related': 'Vidéos similaires', 
+      'have_link': 'Vous avez un lien ?', 'paste_here': 'Collez le lien ici pour télécharger',
+      'downloading': 'Téléchargement...', 'completed': 'Téléchargement terminé', 
+      'formats_title': 'Sélectionnez la qualité', 'video': 'Vidéos', 'audio': 'Musique', 
+      'downloaded': 'Fichiers téléchargés', 'general': 'Général', 'dl_settings': 'Paramètres de téléchargement', 
+      'notif': 'Notifications', 'theme': 'Thème', 'language': 'Langue', 'more_tools': 'Plus d\'outils',
       'share_app': 'Partager l\'appli', 'clean_cache': 'Vider le cache', 'about': 'À propos',
       'no_audio': 'Aucune musique téléchargée', 'no_video': 'Aucune vidéo téléchargée',
-      'downloading_now': 'Téléchargement:', 'file_not_found': 'Fichier introuvable ou supprimé',
-      'no_results': 'Aucun résultat trouvé 😔', 'search_error': 'Erreur de recherche. Vérifiez votre connexion.',
+      'downloading_now': 'Téléchargement:', 'file_not_found': 'Fichier introuvable',
+      'no_results': 'Aucun résultat 😔', 'search_error': 'Erreur de recherche.',
+      'invalid_link': 'Lien invalide', 'extracting': 'Extraction des formats...',
     };
     
     if (langNotifier.value == 'en') return en[key] ?? key;
@@ -210,8 +213,8 @@ class BackendService {
 
       Directory? dir;
       if (Platform.isAndroid) {
-        // التعديل الجوهري: إجبار الحفظ في المسار العام لضمان ظهوره في المعرض وعدم حذفه
-        dir = Directory('/storage/emulated/0/Download/Boykta');
+        // الحل الجذري لمشكلة الـ 0%: مسار Movies متاح دائماً للكتابة بدون قيود الأندرويد المعقدة
+        dir = Directory('/storage/emulated/0/Movies/Boykta');
       } else {
         final docDir = await getApplicationDocumentsDirectory();
         dir = Directory('${docDir.path}/Boykta');
@@ -297,12 +300,11 @@ class BackendService {
     }
   }
 
-  // التعديل الجوهري للبحث عن الملفات: قراءة المسار العام دائماً
   Future<List<FileSystemEntity>> getDownloadedFiles() async {
     try {
       Directory? dir;
       if (Platform.isAndroid) {
-        dir = Directory('/storage/emulated/0/Download/Boykta');
+        dir = Directory('/storage/emulated/0/Movies/Boykta');
       } else {
         final docDir = await getApplicationDocumentsDirectory();
         dir = Directory('${docDir.path}/Boykta');
@@ -330,7 +332,7 @@ class BackendService {
     final prefs = await SharedPreferences.getInstance();
     return {
       'downloadMobile': prefs.getBool('downloadMobile') ?? true,
-      'download_path': prefs.getString('download_path') ?? '/storage/emulated/0/Download/Boykta',
+      'download_path': prefs.getString('download_path') ?? 'مسار Boykta العام',
       'max_tasks': prefs.getInt('max_tasks') ?? 4,
       'speed_limit': prefs.getString('speed_limit') ?? 'غير محدود',
     };
