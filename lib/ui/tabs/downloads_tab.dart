@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'dart:ui';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
-import '../local_video_player_screen.dart'; // تم التفعيل للتشغيل المباشر
+import '../local_video_player_screen.dart'; 
 
 class DownloadsTab extends StatefulWidget {
   const DownloadsTab({super.key});
@@ -12,67 +14,30 @@ class DownloadsTab extends StatefulWidget {
   State<DownloadsTab> createState() => _DownloadsTabState();
 }
 
-class _DownloadsTabState extends State<DownloadsTab> {
+class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderStateMixin {
   final BackendService _backend = BackendService();
-  List<FileSystemEntity> _downloadedFiles = [];
+  late TabController _tabController;
+  List<FileSystemEntity> _videoFiles = [];
+  List<FileSystemEntity> _audioFiles = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadFiles();
   }
 
   Future<void> _loadFiles() async {
-    setState(() {
-      _isLoading = true;
-    });
-    
+    setState(() => _isLoading = true);
     final files = await _backend.getDownloadedFiles();
     
     if (mounted) {
       setState(() {
-        _downloadedFiles = files;
+        _videoFiles = files.where((f) => !f.path.endsWith('.mp3') && !f.path.endsWith('.m4a')).toList();
+        _audioFiles = files.where((f) => f.path.endsWith('.mp3') || f.path.endsWith('.m4a')).toList();
         _isLoading = false;
       });
-    }
-  }
-
-  Future<void> _deleteFile(String path, int index) async {
-    final removedFile = _downloadedFiles[index];
-    setState(() {
-      _downloadedFiles.removeAt(index);
-    });
-
-    try {
-      await _backend.deleteFile(path);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم حذف الملف بنجاح'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _downloadedFiles.insert(index, removedFile);
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فشل في حذف الملف')),
-        );
-      }
-    }
-  }
-
-  String _getFileSize(File file) {
-    try {
-      final bytes = file.lengthSync();
-      return (bytes / (1024 * 1024)).toStringAsFixed(1);
-    } catch (e) {
-      return 'N/A';
     }
   }
 
@@ -83,84 +48,38 @@ class _DownloadsTabState extends State<DownloadsTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Padding(
-            padding: EdgeInsets.fromLTRB(25, 30, 25, 20),
-            child: Text(
-              'تنزيلاتي 📥',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
+            padding: EdgeInsets.fromLTRB(25, 30, 25, 10),
+            child: Text('تنزيلاتي 📥', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
           ),
-          
+          TabBar(
+            controller: _tabController,
+            indicatorColor: AppColors.cyan,
+            labelColor: AppColors.cyan,
+            unselectedLabelColor: AppColors.textMuted,
+            tabs: const [
+              Tab(icon: Icon(Icons.video_library), text: 'الفيديوهات'),
+              Tab(icon: Icon(Icons.library_music), text: 'الموسيقى'),
+            ],
+          ),
           Expanded(
             child: _isLoading 
                 ? const Center(child: CircularProgressIndicator(color: AppColors.cyan))
-                : _downloadedFiles.isEmpty
-                    ? _buildEmptyState()
-                    : _buildFilesList(),
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildFilesList(_videoFiles, isAudio: false),
+                      _buildFilesList(_audioFiles, isAudio: true),
+                    ],
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.purple.withOpacity(0.2),
-                  blurRadius: 30,
-                  spreadRadius: 10,
-                ),
-              ],
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                const Icon(Icons.folder_open_rounded, size: 80, color: AppColors.surfaceLight),
-                Positioned(
-                  bottom: 20,
-                  right: 20,
-                  child: const Icon(Icons.search_off_rounded, size: 30, color: AppColors.textMuted),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 30),
-          const Text(
-            'مازال ما هبطت والو 😎',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'استخدم تبويب البحث أو الروابط\nللبدء في تحميل مقاطعك المفضلة',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildFilesList(List<FileSystemEntity> files, {required bool isAudio}) {
+    if (files.isEmpty) return _buildEmptyState(isAudio);
 
-  Widget _buildFilesList() {
     return RefreshIndicator(
       color: AppColors.cyan,
       backgroundColor: AppColors.surface,
@@ -168,51 +87,54 @@ class _DownloadsTabState extends State<DownloadsTab> {
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         padding: const EdgeInsets.only(bottom: 120, top: 10), 
-        itemCount: _downloadedFiles.length,
+        itemCount: files.length,
         itemBuilder: (context, index) {
-          final file = _downloadedFiles[index] as File;
-          final fileName = file.path.split('/').last;
-          final isAudio = fileName.endsWith('.mp3') || fileName.endsWith('.m4a');
-          
-          return _buildDownloadCard(file, fileName, isAudio, index);
+          final file = files[index] as File;
+          return _buildDownloadCard(file, isAudio, index, files);
         },
       ),
     );
   }
 
-  Widget _buildDownloadCard(File file, String fileName, bool isAudio, int index) {
+  Widget _buildDownloadCard(File file, bool isAudio, int index, List<FileSystemEntity> listRef) {
+    final fileName = file.path.split('/').last;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(15),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
-            padding: const EdgeInsets.all(15),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: AppColors.surfaceLight.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(15),
               border: Border.all(color: Colors.white.withOpacity(0.05)),
             ),
             child: Row(
               children: [
-                Container(
-                  width: 55,
-                  height: 55,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.blue.withOpacity(0.3),
-                        blurRadius: 10,
-                      )
-                    ],
-                  ),
-                  child: Icon(
-                    isAudio ? Icons.music_note_rounded : Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 30,
+                SizedBox(
+                  width: 80,
+                  height: 60,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: isAudio 
+                      ? Container(color: AppColors.magenta.withOpacity(0.2), child: const Icon(Icons.music_note, color: AppColors.magenta, size: 30))
+                      : FutureBuilder<Uint8List?>(
+                          future: VideoThumbnail.thumbnailData(
+                            video: file.path,
+                            imageFormat: ImageFormat.JPEG,
+                            maxWidth: 128,
+                            quality: 25,
+                          ),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
+                              return Image.memory(snapshot.data!, fit: BoxFit.cover);
+                            }
+                            return Container(color: Colors.black26, child: const Center(child: CircularProgressIndicator(strokeWidth: 2)));
+                          },
+                        ),
                   ),
                 ),
                 const SizedBox(width: 15),
@@ -220,55 +142,19 @@ class _DownloadsTabState extends State<DownloadsTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        fileName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            child: Text(
-                              isAudio ? 'صوت' : 'فيديو',
-                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${_getFileSize(file)} MB',
-                            style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-                          ),
-                        ],
-                      ),
+                      Text(fileName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
                     ],
                   ),
                 ),
                 Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.play_circle_fill, color: AppColors.cyan, size: 28),
-                      onPressed: () {
-                        // التشغيل المباشر للملف
-                        Navigator.push(
-                          context, 
-                          MaterialPageRoute(builder: (_) => LocalVideoPlayerScreen(file: file))
-                        );
-                      },
+                      icon: const Icon(Icons.play_circle_fill, color: AppColors.cyan, size: 35),
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LocalVideoPlayerScreen(file: file))),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded, color: AppColors.orange, size: 24),
-                      onPressed: () => _showDeleteConfirmDialog(file.path, index, fileName),
+                      icon: const Icon(Icons.delete_outline_rounded, color: AppColors.orange, size: 22),
+                      onPressed: () => _deleteFile(file.path, file, isAudio),
                     ),
                   ],
                 ),
@@ -280,33 +166,29 @@ class _DownloadsTabState extends State<DownloadsTab> {
     );
   }
 
-  void _showDeleteConfirmDialog(String path, int index, String fileName) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('حذف الملف؟', style: TextStyle(color: Colors.white)),
-        content: Text(
-          'هل أنت متأكد من حذف "$fileName" نهائياً؟',
-          style: const TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء', style: TextStyle(color: AppColors.textMuted)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.orange,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteFile(path, index);
-            },
-            child: const Text('نعم، احذف', style: TextStyle(color: Colors.white)),
-          ),
+  Future<void> _deleteFile(String path, File file, bool isAudio) async {
+    setState(() {
+      if (isAudio) {
+        _audioFiles.remove(file);
+      } else {
+        _videoFiles.remove(file);
+      }
+    });
+    try {
+      await _backend.deleteFile(path);
+    } catch (e) {
+      _loadFiles(); 
+    }
+  }
+
+  Widget _buildEmptyState(bool isAudio) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(isAudio ? Icons.library_music_outlined : Icons.video_library_outlined, size: 80, color: AppColors.textMuted.withOpacity(0.5)),
+          const SizedBox(height: 20),
+          Text(isAudio ? 'لا توجد موسيقى محملة' : 'لا توجد فيديوهات محملة', style: const TextStyle(color: AppColors.textSecondary, fontSize: 16)),
         ],
       ),
     );
