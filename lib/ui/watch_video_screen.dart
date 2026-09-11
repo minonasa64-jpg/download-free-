@@ -5,7 +5,7 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import '../core/app_colors.dart';
 import '../services/backend_service.dart';
-import 'widgets/download_dialogs.dart'; // هذا هو الاستيراد الصحيح
+import 'widgets/download_dialogs.dart';
 
 class WatchVideoScreen extends StatefulWidget {
   final yt.Video video;
@@ -41,7 +41,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     _fetchRelatedVideos();
 
     _relatedScrollController.addListener(() {
-      if (_relatedScrollController.position.pixels >= _relatedScrollController.position.maxScrollExtent - 200 && !_isLoadingMoreRelated) {
+      if (_relatedScrollController.position.pixels >= _relatedScrollController.position.maxScrollExtent - 200) {
         _loadMoreRelatedVideos();
       }
     });
@@ -107,6 +107,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   }
 
   Future<void> _loadMoreRelatedVideos() async {
+    if (_isLoadingMoreRelated) return;
     if (_relatedSearchPage?.nextPage != null) {
       setState(() => _isLoadingMoreRelated = true);
       try {
@@ -117,8 +118,11 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
             _relatedVideos.addAll(next.whereType<yt.Video>());
           });
         }
-      } catch (e) {}
-      setState(() => _isLoadingMoreRelated = false);
+      } catch (e) {
+        debugPrint('Error loading more related: $e');
+      } finally {
+        if (mounted) setState(() => _isLoadingMoreRelated = false);
+      }
     }
   }
 
@@ -311,7 +315,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                         style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold)
                       ),
                       subtitle: Padding(
-                        padding: const EdgeInsets.only(top: 5), // هنا تم التصحيح: EdgeInsets.only(top: 5) بدلاً من EdgeInsets.top(5)
+                        padding: const EdgeInsets.only(top: 5), 
                         child: Text(v.author, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
                       ),
                       onTap: () {
