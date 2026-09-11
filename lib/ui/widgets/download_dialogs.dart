@@ -24,6 +24,45 @@ class FormatSelectionSheet extends StatefulWidget {
 
 class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
   Map<String, dynamic>? _selectedFormat;
+  List<Map<String, dynamic>> _filteredVideo = [];
+  List<Map<String, dynamic>> _filteredAudio = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredVideo = _processFormats(widget.videoFormats);
+    _filteredAudio = _processFormats(widget.audioFormats);
+  }
+
+  // دالة الفرز واختيار 4 جودات فقط (من الأضعف للأقوى)
+  List<Map<String, dynamic>> _processFormats(List<Map<String, dynamic>> formats) {
+    if (formats.isEmpty) return [];
+    
+    // إزالة المكرر وفرز القائمة تصاعدياً حسب الحجم (MB)
+    var uniqueFormats = <String, Map<String, dynamic>>{};
+    for (var f in formats) {
+      uniqueFormats[f['quality_name']] = f; 
+    }
+    var sortedList = uniqueFormats.values.toList();
+    
+    // ترتيب تصاعدي (من الأضعف للأقوى) بناءً على الحجم
+    sortedList.sort((a, b) {
+      double sizeA = double.tryParse(a['size'].toString().replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+      double sizeB = double.tryParse(b['size'].toString().replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+      return sizeA.compareTo(sizeB);
+    });
+
+    // إذا كانت القائمة أطول من 4، نختار (أضعف، متوسطة 1، متوسطة 2، أقوى)
+    if (sortedList.length > 4) {
+      return [
+        sortedList.first, 
+        sortedList[(sortedList.length / 3).floor()],
+        sortedList[(sortedList.length * 2 / 3).floor()],
+        sortedList.last, 
+      ];
+    }
+    return sortedList;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +80,6 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
             length: 2,
             child: Column(
               children: [
-                // مقبض السحب (Drag Handle)
                 Container(
                   margin: const EdgeInsets.only(top: 15, bottom: 5),
                   width: 50,
@@ -51,17 +89,10 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                
-                // العنوان
                 const Padding(
                   padding: EdgeInsets.all(15),
-                  child: Text(
-                    'اختر الجودة المطلوبة',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
+                  child: Text('اختر الجودة المطلوبة', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
-                
-                // التبويبات (فيديو / صوت)
                 const TabBar(
                   indicatorColor: AppColors.cyan,
                   labelColor: AppColors.cyan,
@@ -71,18 +102,14 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                     Tab(icon: Icon(Icons.library_music), text: 'صوت'),
                   ],
                 ),
-                
-                // القوائم
                 Expanded(
                   child: TabBarView(
                     children: [
-                      _buildList(widget.videoFormats),
-                      _buildList(widget.audioFormats),
+                      _buildList(_filteredVideo),
+                      _buildList(_filteredAudio),
                     ],
                   ),
                 ),
-                
-                // زر التحميل
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
                   child: Container(
@@ -98,8 +125,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                         padding: const EdgeInsets.symmetric(vertical: 15),
                       ),
                       onPressed: _selectedFormat == null ? null : () {
-                        Navigator.pop(context); // إغلاق القائمة
-                        // فتح نافذة التقدم
+                        Navigator.pop(context); 
                         showDialog(
                           context: context,
                           barrierDismissible: false,
@@ -150,6 +176,15 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                     const SizedBox(height: 2),
                     Text('MB ${format['size']}', style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
                   ],
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text('جودة ${index + 1}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
                 ),
               ],
             ),
@@ -219,7 +254,7 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: Colors.transparent, // لجعل التأثير الزجاجي يعمل
+      backgroundColor: Colors.transparent, 
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: BackdropFilter(
@@ -263,7 +298,6 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                 ] else ...[
                   const Text('جاري التنزيل...', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 25),
-                  // شريط التقدم الفخم
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: LinearProgressIndicator(
