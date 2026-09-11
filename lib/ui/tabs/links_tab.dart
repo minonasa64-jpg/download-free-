@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
-import '../widgets/download_dialogs.dart'; // تم التفعيل
 
 class LinksTab extends StatefulWidget {
   const LinksTab({super.key});
@@ -56,7 +55,7 @@ class _LinksTabState extends State<LinksTab> {
       if (mounted) {
         if (videoList.isEmpty && audioList.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تعذر استخراج البيانات. قد يكون الرابط محمياً أو غير مدعوم.')),
+            SnackBar(content: Text(_backend.t('file_not_found'))),
           );
           setState(() {
             _isAnalyzing = false;
@@ -75,7 +74,7 @@ class _LinksTabState extends State<LinksTab> {
           _isAnalyzing = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('حدث خطأ في الاتصال بالسيرفر')),
+          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
         );
       }
     }
@@ -118,9 +117,9 @@ class _LinksTabState extends State<LinksTab> {
               child: const Icon(Icons.link, size: 50, color: AppColors.magenta),
             ),
             const SizedBox(height: 15),
-            const Text(
-              'الصق رابط الفيديو هنا',
-              style: TextStyle(
+            Text(
+              _backend.t('have_link'),
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
@@ -221,9 +220,9 @@ class _LinksTabState extends State<LinksTab> {
                             ),
                           ),
                           onPressed: _analyzeLink,
-                          child: const Text(
-                            'تحليل الرابط',
-                            style: TextStyle(
+                          child: Text(
+                            _backend.t('download_btn'),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
@@ -251,9 +250,9 @@ class _LinksTabState extends State<LinksTab> {
           strokeWidth: 3,
         ),
         const SizedBox(height: 15),
-        const Text(
-          'جاري جلب جودات الفيديو...',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+        Text(
+          _backend.t('extracting'),
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
         )
       ],
     );
@@ -309,13 +308,13 @@ class _LinksTabState extends State<LinksTab> {
             length: 2,
             child: Column(
               children: [
-                const TabBar(
+                TabBar(
                   indicatorColor: AppColors.cyan,
                   labelColor: AppColors.cyan,
                   unselectedLabelColor: AppColors.textMuted,
                   tabs: [
-                    Tab(icon: Icon(Icons.video_library), text: 'فيديو'),
-                    Tab(icon: Icon(Icons.library_music), text: 'صوت'),
+                    Tab(icon: const Icon(Icons.video_library), text: _backend.t('video')),
+                    Tab(icon: const Icon(Icons.library_music), text: _backend.t('audio')),
                   ],
                 ),
                 SizedBox(
@@ -356,14 +355,29 @@ class _LinksTabState extends State<LinksTab> {
                     ),
                   ),
                   onPressed: () {
-                    // فتح نافذة التقدم للتحميل الفعلي
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (context) => DownloadProgressDialog(
-                        downloadUrl: _selectedFormat!['url'],
-                        title: title,
-                        extension: _selectedFormat!['ext'],
+                    // إغلاق النافذة للمتابعة
+                    setState(() {
+                      _hasResult = false;
+                      _urlController.clear();
+                    });
+                    
+                    // تحديد ما إذا كان الملف صوتاً أم لا
+                    bool isAudio = _selectedFormat!['ext'] == 'mp3' || _selectedFormat!['ext'] == 'm4a';
+                    
+                    // بدء التنزيل في الخلفية مع الإشعارات
+                    BackendService().startDownloadProcess(
+                      downloadUrl: _selectedFormat!['url'],
+                      title: title,
+                      extension: _selectedFormat!['ext'],
+                      isAudio: isAudio,
+                    );
+
+                    // رسالة تأكيد لبدء العملية
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('بدأ التنزيل في الخلفية... يمكنك متابعة التصفح 🚀'),
+                        backgroundColor: AppColors.cyan,
+                        duration: Duration(seconds: 3),
                       )
                     );
                   },
