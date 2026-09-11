@@ -19,11 +19,13 @@ class _YoutubeTabState extends State<YoutubeTab> {
   final yt.YoutubeExplode _yt = yt.YoutubeExplode();
   
   List<yt.Video> _searchResults = [];
+  List<String> _searchSuggestions = [];
   yt.VideoSearchList? _currentSearchPage;
   
   bool _isSearching = false;
   bool _isLoadingMore = false;
   bool _hasSearchedOnce = false; 
+  bool _showSuggestions = false;
 
   @override
   void initState() {
@@ -33,17 +35,47 @@ class _YoutubeTabState extends State<YoutubeTab> {
         _loadMore();
       }
     });
+
+    // مراقبة الكتابة لجلب الاقتراحات
+    _searchController.addListener(_onSearchChanged);
   }
 
-  Future<void> _performSearch() async {
+  void _onSearchChanged() async {
     final query = _searchController.text.trim();
+    if (query.isNotEmpty) {
+      try {
+        final suggestions = await _yt.search.getQuerySuggestions(query);
+        if (mounted) {
+          setState(() {
+            _searchSuggestions = suggestions;
+            _showSuggestions = true;
+          });
+        }
+      } catch (_) {}
+    } else {
+      if (mounted) {
+        setState(() {
+          _searchSuggestions.clear();
+          _showSuggestions = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _performSearch([String? suggestionQuery]) async {
+    final query = suggestionQuery ?? _searchController.text.trim();
     if (query.isEmpty) return;
+
+    if (suggestionQuery != null) {
+      _searchController.text = suggestionQuery;
+    }
 
     FocusScope.of(context).unfocus(); 
     
     setState(() {
       _isSearching = true;
       _hasSearchedOnce = true;
+      _showSuggestions = false;
       _searchResults.clear();
       _currentSearchPage = null;
     });
@@ -93,6 +125,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _scrollController.dispose();
     _yt.close();
@@ -105,6 +138,27 @@ class _YoutubeTabState extends State<YoutubeTab> {
       child: Column(
         children: [
           _buildSearchBar(),
+          // قسم الاقتراحات الذكية
+          if (_showSuggestions && _searchSuggestions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLight.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _searchSuggestions.length > 5 ? 5 : _searchSuggestions.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    leading: const Icon(Icons.search, color: AppColors.textMuted, size: 20),
+                    title: Text(_searchSuggestions[index], style: const TextStyle(color: AppColors.textPrimary)),
+                    onTap: () => _performSearch(_searchSuggestions[index]),
+                  );
+                },
+              ),
+            ),
           Expanded(child: _buildBodyContent()),
         ],
       ),
@@ -142,7 +196,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
                   ),
                 ),
                 GestureDetector(
-                  onTap: _isSearching ? null : _performSearch,
+                  onTap: _isSearching ? null : () => _performSearch(),
                   child: Container(
                     margin: const EdgeInsets.all(8),
                     width: 44,
