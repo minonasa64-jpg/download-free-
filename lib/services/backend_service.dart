@@ -16,7 +16,7 @@ class BackendService {
   final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
 
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'https://download-free-online-production.up.railway.app', // ضع رابط سيرفر Flask الخاص بك هنا
+    baseUrl: 'https://download-free-online-production.up.railway.app'; // ضع رابط سيرفر Flask الخاص بك هنا
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(minutes: 5),
   ));
