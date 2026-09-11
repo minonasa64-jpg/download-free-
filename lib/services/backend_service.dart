@@ -82,18 +82,15 @@ class BackendService {
 
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     try {
-      // إرسال البيانات كـ JSON كما يتوقع السيرفر، وإلى المسار الصحيح /api/extract
       final response = await _dio.post('/api/extract', data: {'url': url});
       
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
         if (data['status'] == 'success') {
-           // تحويل شكل البيانات من السيرفر لتناسب الواجهة الخاصة بنا
            List<Map<String, dynamic>> videoList = [];
            List<Map<String, dynamic>> audioList = [];
 
            for (var f in data['formats'] ?? []) {
-             // تحديد نوع الملف بناءً على الترميز (vcodec/acodec)
              bool isAudioOnly = (f['vcodec'] == 'none' || f['vcodec'] == null) && f['acodec'] != 'none';
              
              Map<String, dynamic> formatData = {
@@ -104,7 +101,7 @@ class BackendService {
              };
 
              if (isAudioOnly) {
-               audioList.append(formatData);
+               audioList.add(formatData); // تم تصحيح append إلى add
              } else {
                videoList.add(formatData);
              }
