@@ -38,7 +38,6 @@ class _SettingsTabState extends State<SettingsTab> {
         _downloadPath = dlSettings['download_path'];
         _maxTasks = dlSettings['max_tasks'];
         _speedLimit = dlSettings['speed_limit'];
-        
         _progressNotif = notifSettings['n_prog']!;
         _completeNotif = notifSettings['n_comp']!;
       });
@@ -65,78 +64,72 @@ class _SettingsTabState extends State<SettingsTab> {
 
   @override
   Widget build(BuildContext context) {
+    // تحديد الألوان بناءً على السمة الحالية
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? AppColors.textPrimary : Colors.black87;
+    final subtitleColor = isDark ? AppColors.textMuted : Colors.black54;
+    final surfaceColor = isDark ? AppColors.surfaceLight.withOpacity(0.4) : Colors.white.withOpacity(0.7);
+
     return SafeArea(
       child: ListView(
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 120, top: 10), 
         children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 25, vertical: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
             child: Text(
-              'الإعدادات ⚙️',
+              '${_backend.t('settings')} ⚙️',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: textColor,
               ),
             ),
           ),
 
-          // ==============================
-          // قسم التنزيل
-          // ==============================
-          _buildSectionHeader('التنزيل'),
-          _buildGlassTile(
-            context,
-            icon: Icons.download_rounded,
-            title: 'جودة الفيديو الافتراضية',
-            subtitle: 'تحديد الجودة المفضلة للتحميل التلقائي',
-            onTap: () => _showQualityDialog(context),
-          ),
+          _buildSectionHeader(_backend.t('dl_settings')),
           _buildGlassTile(
             context,
             icon: Icons.folder_rounded,
-            title: 'مجلّد التنزيل',
+            title: _backend.t('downloaded'),
             subtitle: _downloadPath,
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
             onTap: () => _showStoragePathDialog(context),
-          ),
-          _buildGlassTile(
-            context,
-            icon: Icons.network_cell_rounded,
-            title: 'التنزيل ببيانات الهاتف',
-            subtitle: 'السماح بالتحميل دون واي فاي',
-            trailing: Switch(
-              value: _downloadViaMobile,
-              activeColor: AppColors.cyan,
-              onChanged: (val) => _updateDownload('downloadMobile', val),
-            ),
           ),
 
           const SizedBox(height: 15),
 
-          // ==============================
-          // قسم التطبيق
-          // ==============================
-          _buildSectionHeader('التطبيق'),
+          _buildSectionHeader(_backend.t('general')),
           _buildGlassTile(
             context,
             icon: Icons.dark_mode_rounded,
-            title: 'السمة (Theme)',
-            subtitle: _backend.themeNotifier.value == ThemeMode.dark ? 'الوضع الداكن (Dark)' : 'الوضع الفاتح (Light)',
+            title: _backend.t('theme'),
+            subtitle: _backend.themeNotifier.value == ThemeMode.dark ? 'Dark Mode' : 'Light Mode',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
             onTap: () => _showThemeDialog(context),
           ),
           _buildGlassTile(
             context,
             icon: Icons.language_rounded,
-            title: 'لغة التطبيق',
+            title: _backend.t('language'),
             subtitle: _backend.langNotifier.value == 'ar' ? 'العربية' : (_backend.langNotifier.value == 'en' ? 'English' : 'Français'),
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
             onTap: () => _showLanguageDialog(context),
           ),
           _buildGlassTile(
             context,
             icon: Icons.notifications_active_rounded,
-            title: 'إشعارات الاكتمال',
-            subtitle: 'تنبيهات حالة اكتمال التنزيلات',
+            title: _backend.t('notif'),
+            subtitle: '',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
             trailing: Switch(
               value: _completeNotif,
               activeColor: AppColors.cyan,
@@ -146,39 +139,16 @@ class _SettingsTabState extends State<SettingsTab> {
 
           const SizedBox(height: 15),
 
-          // ==============================
-          // قسم معلومات عن التطبيق (About)
-          // ==============================
-          _buildSectionHeader('معلومات'),
+          _buildSectionHeader(_backend.t('more_tools')),
           _buildGlassTile(
             context,
             icon: Icons.info_outline_rounded,
-            title: 'حول التطبيق (About Boykta)',
-            subtitle: 'الإصدار 1.0.0',
+            title: _backend.t('about'),
+            subtitle: '1.0.0',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
             onTap: () => _showAboutDialog(context),
-          ),
-          _buildGlassTile(
-            context,
-            icon: Icons.share_rounded,
-            title: 'مشاركة التطبيق مع أصدقائك',
-            subtitle: 'ادعمنا بمشاركة التطبيق',
-            onTap: () {
-              Share.share('جرب تطبيق Boykta الرائع لتحميل الفيديوهات والمقاطع بكل سهولة 🚀');
-            },
-          ),
-          _buildGlassTile(
-            context,
-            icon: Icons.cleaning_services_rounded,
-            title: 'تنظيف الملفات المؤقتة (Cache)',
-            subtitle: 'تفريغ المساحة الزائدة',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('تم تنظيف الملفات المؤقتة بنجاح ✨'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
           ),
         ],
       ),
@@ -205,6 +175,9 @@ class _SettingsTabState extends State<SettingsTab> {
     required IconData icon,
     required String title,
     required String subtitle,
+    required Color textColor,
+    required Color subtitleColor,
+    required Color surfaceColor,
     Widget? trailing,
     VoidCallback? onTap,
   }) {
@@ -216,9 +189,9 @@ class _SettingsTabState extends State<SettingsTab> {
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
             decoration: BoxDecoration(
-              color: AppColors.surfaceLight.withOpacity(0.4),
+              color: surfaceColor,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.05)),
+              border: Border.all(color: Colors.grey.withOpacity(0.1)),
             ),
             child: ListTile(
               onTap: onTap,
@@ -230,22 +203,9 @@ class _SettingsTabState extends State<SettingsTab> {
                 ),
                 child: Icon(icon, color: AppColors.cyan, size: 22),
               ),
-              title: Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              subtitle: Text(
-                subtitle,
-                style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 12,
-                ),
-              ),
-              trailing: trailing ?? const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textMuted, size: 14),
+              title: Text(title, style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.bold)),
+              subtitle: subtitle.isNotEmpty ? Text(subtitle, style: TextStyle(color: subtitleColor, fontSize: 12)) : null,
+              trailing: trailing ?? Icon(Icons.arrow_forward_ios_rounded, color: subtitleColor, size: 14),
             ),
           ),
         ),
@@ -253,49 +213,23 @@ class _SettingsTabState extends State<SettingsTab> {
     );
   }
 
-  void _showQualityDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('جودة الفيديو الافتراضية', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: ['1080p (FHD)', '720p (HD)', '480p (SD)'].map((quality) {
-            return ListTile(
-              title: Text(quality, style: const TextStyle(color: AppColors.textPrimary)),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم التغيير إلى $quality')));
-              },
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
   void _showStoragePathDialog(BuildContext context) {
     final TextEditingController pathController = TextEditingController(text: _downloadPath);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: isDark ? AppColors.surface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('تغيير مسار التنزيل', style: TextStyle(color: Colors.white)),
+        title: Text('تغيير مسار التنزيل', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
         content: TextField(
           controller: pathController,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.cyan)),
-          ),
+          style: TextStyle(color: isDark ? Colors.white : Colors.black),
+          decoration: const InputDecoration(focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.cyan))),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء', style: TextStyle(color: AppColors.textMuted)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
             onPressed: () {
@@ -310,30 +244,29 @@ class _SettingsTabState extends State<SettingsTab> {
   }
 
   void _showThemeDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: isDark ? AppColors.surface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('اختر السمة', style: TextStyle(color: Colors.white)),
+        title: Text(_backend.t('theme'), style: TextStyle(color: isDark ? Colors.white : Colors.black)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              title: const Text('داكن (Dark Mode)', style: TextStyle(color: AppColors.textPrimary)),
+              title: Text('داكن (Dark Mode)', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
               trailing: _backend.themeNotifier.value == ThemeMode.dark ? const Icon(Icons.check, color: AppColors.cyan) : null,
               onTap: () async {
                 await _backend.changeTheme('dark');
-                setState(() {});
                 if (mounted) Navigator.pop(context);
               },
             ),
             ListTile(
-              title: const Text('فاتح (Light Mode)', style: TextStyle(color: AppColors.textPrimary)),
+              title: Text('فاتح (Light Mode)', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
               trailing: _backend.themeNotifier.value == ThemeMode.light ? const Icon(Icons.check, color: AppColors.cyan) : null,
               onTap: () async {
                 await _backend.changeTheme('light');
-                setState(() {});
                 if (mounted) Navigator.pop(context);
               },
             ),
@@ -344,39 +277,37 @@ class _SettingsTabState extends State<SettingsTab> {
   }
 
   void _showLanguageDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: isDark ? AppColors.surface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('اختر اللغة', style: TextStyle(color: Colors.white)),
+        title: Text(_backend.t('language'), style: TextStyle(color: isDark ? Colors.white : Colors.black)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              title: const Text('العربية', style: TextStyle(color: AppColors.textPrimary)),
+              title: Text('العربية', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
               trailing: _backend.langNotifier.value == 'ar' ? const Icon(Icons.check, color: AppColors.cyan) : null,
               onTap: () async {
                 await _backend.changeLanguage('ar');
-                setState(() {});
                 if (mounted) Navigator.pop(context);
               },
             ),
             ListTile(
-              title: const Text('English', style: TextStyle(color: AppColors.textPrimary)),
+              title: Text('English', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
               trailing: _backend.langNotifier.value == 'en' ? const Icon(Icons.check, color: AppColors.cyan) : null,
               onTap: () async {
                 await _backend.changeLanguage('en');
-                setState(() {});
                 if (mounted) Navigator.pop(context);
               },
             ),
             ListTile(
-              title: const Text('Français', style: TextStyle(color: AppColors.textPrimary)),
+              title: Text('Français', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
               trailing: _backend.langNotifier.value == 'fr' ? const Icon(Icons.check, color: AppColors.cyan) : null,
               onTap: () async {
                 await _backend.changeLanguage('fr');
-                setState(() {});
                 if (mounted) Navigator.pop(context);
               },
             ),
@@ -393,18 +324,12 @@ class _SettingsTabState extends State<SettingsTab> {
       applicationVersion: '1.0.0',
       applicationIcon: Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          gradient: AppColors.primaryGradient,
-          borderRadius: BorderRadius.circular(15),
-        ),
+        decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(15)),
         child: const Icon(Icons.download, color: Colors.white, size: 30),
       ),
       children: [
         const SizedBox(height: 10),
-        const Text(
-          'تطبيق Boykta هو أداة احترافية وفخمة لتحميل الفيديوهات والمقاطع الصوتية بسرعة وكفاءة عالية.',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
+        const Text('تطبيق Boykta هو أداة احترافية لتحميل الفيديوهات والمقاطع الصوتية بسرعة وكفاءة عالية.'),
       ],
     );
   }
