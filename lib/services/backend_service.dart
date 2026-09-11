@@ -15,9 +15,9 @@ class BackendService {
   final ValueNotifier<String> langNotifier = ValueNotifier<String>('ar');
   final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
 
-  // تم وضع رابط Railway الفعلي الخاص بك هنا
+  // تم وضع رابط سيرفر Railway الحقيقي هنا
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'https://download-free-online-production.up.railway.app',
+    baseUrl: 'https://Download-free-online-production.up.railway.app', 
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(minutes: 5),
   ));
