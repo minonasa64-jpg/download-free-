@@ -1,8 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
-
-// سيتم إنشاء هذه الملفات في الخطوة القادمة
+import '../services/backend_service.dart';
 import 'tabs/youtube_tab.dart';
 import 'tabs/links_tab.dart';
 import 'tabs/downloads_tab.dart';
@@ -16,10 +15,11 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
+  final BackendService _backend = BackendService();
   int _currentIndex = 0;
-  
-  // الصفحات الأربعة الرئيسية
-  final List<Widget> _pages = const [
+
+  // حفظ حالة الشاشات لتجنب إعادة التحميل عند التنقل
+  final List<Widget> _tabs = const [
     YoutubeTab(),
     LinksTab(),
     DownloadsTab(),
@@ -29,113 +29,83 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true, // مهم جداً لجعل المحتوى يمتد خلف شريط التنقل العائم
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        transitionBuilder: (Widget child, Animation<double> animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.0, 0.05),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            ),
+      extendBody: true,
+      body: ValueListenableBuilder<String>(
+        valueListenable: _backend.langNotifier,
+        builder: (context, lang, child) {
+          // استخدام IndexedStack بدلاً من التبديل المباشر لحفظ الصفحة وما يعرض فيها
+          return IndexedStack(
+            index: _currentIndex,
+            children: _tabs,
           );
-        },
-        child: _pages[_currentIndex],
+        }
       ),
-      bottomNavigationBar: _buildFloatingBottomNav(),
-    );
-  }
-
-  Widget _buildFloatingBottomNav() {
-    return Padding(
-      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 25),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15), // تأثير الزجاج
-          child: Container(
-            height: 70,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: AppColors.surface.withOpacity(0.6),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.1),
-                width: 1,
+      bottomNavigationBar: ValueListenableBuilder<String>(
+        valueListenable: _backend.langNotifier,
+        builder: (context, lang, child) {
+          return Container(
+            margin: const EdgeInsets.only(left: 15, right: 15, bottom: 20),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(25),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                child: Container(
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(25),
+                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildNavItem(Icons.play_circle_fill, _backend.t('youtube'), 0),
+                      _buildNavItem(Icons.link_rounded, _backend.t('link'), 1),
+                      _buildNavItem(Icons.download_rounded, _backend.t('downloads'), 2),
+                      _buildNavItem(Icons.settings_rounded, _backend.t('settings'), 3),
+                    ],
+                  ),
+                ),
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(0, Icons.play_circle_fill, Icons.play_circle_outline, 'يوتيوب'),
-                _buildNavItem(1, Icons.link, Icons.link, 'الروابط'),
-                _buildNavItem(2, Icons.download, Icons.download_outlined, 'التنزيلات'),
-                _buildNavItem(3, Icons.settings, Icons.settings_outlined, 'إعدادات'),
-              ],
-            ),
-          ),
-        ),
+          );
+        }
       ),
     );
   }
 
-  Widget _buildNavItem(int index, IconData activeIcon, IconData inactiveIcon, String label) {
-    final isSelected = _currentIndex == index;
-    
+  Widget _buildNavItem(IconData icon, String label, int index) {
+    bool isSelected = _currentIndex == index;
     return GestureDetector(
-      onTap: () {
-        if (_currentIndex != index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        }
-      },
+      onTap: () => setState(() => _currentIndex = index),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.cyan.withOpacity(0.15) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppColors.cyan.withOpacity(0.3),
-                    blurRadius: 15,
-                    spreadRadius: 1,
-                  )
-                ]
-              : [],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
-              child: Icon(
-                isSelected ? activeIcon : inactiveIcon,
-                key: ValueKey<bool>(isSelected),
-                color: isSelected ? AppColors.cyan : AppColors.textMuted,
-                size: isSelected ? 26 : 24,
-              ),
+            Icon(
+              icon,
+              color: isSelected ? AppColors.cyan : AppColors.textMuted,
+              size: isSelected ? 26 : 24,
             ),
-            const SizedBox(height: 4),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              style: TextStyle(
-                color: isSelected ? AppColors.cyan : AppColors.textMuted,
-                fontSize: isSelected ? 11 : 10,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                fontFamily: 'Cairo',
+            if (isSelected) ...[
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.cyan,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              child: Text(label),
-            ),
+            ]
           ],
         ),
       ),
