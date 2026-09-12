@@ -21,7 +21,7 @@ dependencies:
   video_thumbnail: ^0.5.3
   audioplayers: ^5.2.1
   flutter_local_notifications: ^17.1.2
-  google_mobile_ads: 5.2.0 # تم التثبيت على هذا الإصدار ليتوافق مع Dart 3.3.4
+  google_mobile_ads: 4.0.0 # تم التثبيت على هذا الإصدار ليتوافق مع Dart 3.3.4
 
 dev_dependencies:
   flutter_test:
