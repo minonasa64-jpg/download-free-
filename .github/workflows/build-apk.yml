@@ -30,6 +30,9 @@ jobs:
       - name: 🗑️ مسح مجلد أندرويد القديم بالكامل لضمان التوافق
         run: rm -rf android
 
+      - name: 🚀 ترقية مكتبة الإعلانات للإصدار الأحدث (لتجنب تعارض Gradle)
+        run: flutter pub add google_mobile_ads
+
       - name: 🏗️ بناء هياكل فلاتر الأساسية الحديثة
         run: flutter create --no-pub --project-name pro_downloader --platforms=android .
 
