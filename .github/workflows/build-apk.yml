@@ -22,18 +22,16 @@ jobs:
           distribution: 'zulu'
           java-version: '17' 
 
-      - name: 🐦 إعداد بيئة فلاتر (الإصدار الأحدث)
+      - name: 🐦 إعداد بيئة فلاتر المستقرة (3.19.6)
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.19.6'
           channel: 'stable' 
 
-      - name: 🗑️ مسح مجلد أندرويد القديم بالكامل لضمان التوافق
-        run: rm -rf android
+      - name: 🛠️ إيقاف تحديث مكتبة chewie لتجنب تدمير النظام
+        run: flutter pub add chewie:1.7.5
 
-      - name: 🚀 ترقية مكتبة الإعلانات للإصدار الأحدث (لتجنب تعارض Gradle)
-        run: flutter pub add google_mobile_ads
-
-      - name: 🏗️ بناء هياكل فلاتر الأساسية الحديثة
+      - name: 🏗️ بناء هياكل فلاتر الأساسية
         run: flutter create --no-pub --project-name pro_downloader --platforms=android .
 
       - name: 🌐 حقن جميع الصلاحيات ومعرف AdMob إجبارياً
@@ -43,6 +41,17 @@ jobs:
 
       - name: 📦 تحميل الحزم والمكتبات
         run: flutter pub get
+
+      - name: 🩹 حل مشكلة تكرار ملفات Kotlin
+        run: |
+          cat <<EOF >> android/app/build.gradle
+          dependencies {
+              constraints {
+                  implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22")
+                  implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22")
+              }
+          }
+          EOF
 
       - name: 🎨 دمج الأيقونة الجديدة
         run: dart run flutter_launcher_icons || true
