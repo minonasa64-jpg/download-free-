@@ -28,9 +28,6 @@ jobs:
           flutter-version: '3.19.6'
           channel: 'stable' 
 
-      - name: 🛠️ إيقاف تحديث مكتبة chewie لتجنب تدمير النظام
-        run: flutter pub add chewie:1.7.5
-
       - name: 🏗️ بناء هياكل فلاتر الأساسية
         run: flutter create --no-pub --project-name pro_downloader --platforms=android .
 
