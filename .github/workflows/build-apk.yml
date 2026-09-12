@@ -27,7 +27,10 @@ jobs:
         with:
           channel: 'stable' 
 
-      - name: 🏗️ بناء هياكل فلاتر الأساسية
+      - name: 🗑️ مسح مجلد أندرويد القديم بالكامل لضمان التوافق
+        run: rm -rf android
+
+      - name: 🏗️ بناء هياكل فلاتر الأساسية الحديثة
         run: flutter create --no-pub --project-name pro_downloader --platforms=android .
 
       - name: 🌐 حقن جميع الصلاحيات ومعرف AdMob إجبارياً
@@ -37,17 +40,6 @@ jobs:
 
       - name: 📦 تحميل الحزم والمكتبات
         run: flutter pub get
-
-      - name: 🩹 حل مشكلة تكرار ملفات Kotlin
-        run: |
-          cat <<EOF >> android/app/build.gradle
-          dependencies {
-              constraints {
-                  implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22")
-                  implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22")
-              }
-          }
-          EOF
 
       - name: 🎨 دمج الأيقونة الجديدة
         run: dart run flutter_launcher_icons || true
