@@ -21,7 +21,7 @@ dependencies:
   video_thumbnail: ^0.5.3
   audioplayers: ^5.2.1
   flutter_local_notifications: ^17.1.2
-  google_mobile_ads: ^5.2.0 # مكتبة إعلانات جوجل الرسمية
+  google_mobile_ads: ^9.0.0 # مكتبة إعلانات جوجل الرسمية
 
 
 
