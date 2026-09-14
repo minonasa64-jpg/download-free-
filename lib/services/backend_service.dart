@@ -2,21 +2,68 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-// تم تحديث الاستيراد ليتوافق مع مكتبة min الجديدة
-import 'package:ffmpeg_kit_flutter_min/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_min/return_code.dart';
+import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class BackendService {
   final YoutubeExplode _yt = YoutubeExplode();
   final Dio _dio = Dio();
 
-  Future<Video> getVideoInfo(String url) async {
+  // محاكاة استجابة السيرفر القديم لجلب جميع الجودات
+  Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     try {
+      var manifest = await _yt.videos.streamsClient.getManifest(url);
       var video = await _yt.videos.get(url);
-      return video;
+
+      List<Map<String, dynamic>> videoFormats = [];
+      
+      // الجودات العالية (بدون صوت مدمج - تحتاج دمج)
+      for (var stream in manifest.videoOnly) {
+        videoFormats.add({
+          'url': stream.url.toString(),
+          'quality_name': stream.qualityLabel,
+          'size': stream.size.totalMegaBytes.toStringAsFixed(1),
+          'ext': 'mp4', // نوحد المخرج ليكون mp4 دائماً
+          'needs_merge': true,
+        });
+      }
+      
+      // الجودات العادية (بصوت مدمج - لا تحتاج دمج)
+      for (var stream in manifest.muxed) {
+        videoFormats.add({
+          'url': stream.url.toString(),
+          'quality_name': stream.qualityLabel,
+          'size': stream.size.totalMegaBytes.toStringAsFixed(1),
+          'ext': 'mp4',
+          'needs_merge': false,
+        });
+      }
+
+      // الجودات الصوتية
+      List<Map<String, dynamic>> audioFormats = [];
+      for (var stream in manifest.audioOnly) {
+        audioFormats.add({
+          'url': stream.url.toString(),
+          'quality_name': '${stream.bitrate.kiloBitsPerSecond.toStringAsFixed(0)} kbps',
+          'size': stream.size.totalMegaBytes.toStringAsFixed(1),
+          'ext': 'mp3',
+          'needs_merge': false,
+        });
+      }
+
+      // أعلى جودة صوت للدمج لاحقاً
+      String highestAudioUrl = manifest.audioOnly.withHighestBitrate().url.toString();
+
+      return {
+        'title': video.title,
+        'thumbnail': video.thumbnails.highResUrl,
+        'highestAudioUrl': highestAudioUrl,
+        'video': videoFormats,
+        'audio': audioFormats,
+      };
     } catch (e) {
-      throw Exception('فشل في جلب معلومات الفيديو: $e');
+      throw Exception('فشل في جلب البيانات: $e');
     }
   }
 
@@ -31,8 +78,13 @@ class BackendService {
     return true; 
   }
 
-  Future<String> downloadAndMerge(
-    String url, {
+  // الدالة الذكية للتحميل والدمج (تعمل محلياً)
+  Future<String> downloadAndMerge({
+    required String selectedUrl,
+    required String title,
+    required String ext,
+    required bool needsMerge,
+    required String highestAudioUrl,
     required Function(String) onStatusChanged,
     required Function(int, int) onReceiveProgress,
   }) async {
@@ -41,80 +93,67 @@ class BackendService {
       throw Exception('لم يتم منح صلاحيات التخزين');
     }
 
-    onStatusChanged('جاري تحليل الرابط...');
+    String safeTitle = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    Directory tempDir = await getTemporaryDirectory();
+    
+    Directory? downloadsDir;
+    if (Platform.isAndroid) {
+      downloadsDir = Directory('/storage/emulated/0/Download');
+      if (!await downloadsDir.exists()) {
+         downloadsDir = await getExternalStorageDirectory();
+      }
+    } else {
+      downloadsDir = await getApplicationDocumentsDirectory();
+    }
+    
+    String finalOutputPath = '${downloadsDir!.path}/$safeTitle.$ext';
 
     try {
-      var manifest = await _yt.videos.streamsClient.getManifest(url);
-      var video = await _yt.videos.get(url);
-      String safeTitle = video.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      if (!needsMerge) {
+        // حالة: صوت فقط أو فيديو مدمج جاهز
+        onStatusChanged('جاري تحميل الملف...');
+        await _downloadFile(
+          selectedUrl,
+          finalOutputPath,
+          onReceiveProgress: onReceiveProgress,
+        );
+        return finalOutputPath;
+      } else {
+        // حالة: فيديو عالي الجودة مفصول عن الصوت (يحتاج FFmpeg)
+        String tempVideoPath = '${tempDir.path}/$safeTitle\_video.mp4';
+        String tempAudioPath = '${tempDir.path}/$safeTitle\_audio.m4a';
 
-      var videoStreamInfo = manifest.muxed.withHighestBitrate();
-      var videoOnlyStreamInfo = manifest.videoOnly.withHighestBitrate();
-      
-      var selectedVideoStream = videoOnlyStreamInfo.size > videoStreamInfo.size
-          ? videoOnlyStreamInfo
-          : videoStreamInfo;
+        onStatusChanged('جاري تحميل الفيديو عالي الجودة...');
+        await _downloadFile(
+          selectedUrl,
+          tempVideoPath,
+          onReceiveProgress: onReceiveProgress,
+        );
 
-      var audioStreamInfo = manifest.audioOnly.withHighestBitrate();
+        onStatusChanged('جاري تحميل الصوت الأصلي الدمج...');
+        await _downloadFile(
+          highestAudioUrl,
+          tempAudioPath,
+          onReceiveProgress: (received, total) {}, // تجاهل نسبة الصوت لعدم إرباك الواجهة
+        );
 
-      Directory tempDir = await getTemporaryDirectory();
-      String tempVideoPath = '${tempDir.path}/$safeTitle\_video.mp4';
-      String tempAudioPath = '${tempDir.path}/$safeTitle\_audio.m4a';
+        onStatusChanged('جاري المعالجة والدمج (قد يستغرق بعض الوقت)...');
+        String command = '-i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a aac "$finalOutputPath"';
+        
+        var session = await FFmpegKit.execute(command);
+        var returnCode = await session.getReturnCode();
 
-      Directory? downloadsDir;
-      if (Platform.isAndroid) {
-        downloadsDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadsDir.exists()) {
-           downloadsDir = await getExternalStorageDirectory();
+        if (ReturnCode.isSuccess(returnCode)) {
+          onStatusChanged('تم الدمج بنجاح!');
+          File(tempVideoPath).deleteSync();
+          File(tempAudioPath).deleteSync();
+          return finalOutputPath;
+        } else {
+          var failLog = await session.getFailStackTrace();
+          throw Exception('فشل الدمج: $failLog');
         }
-      } else {
-        downloadsDir = await getApplicationDocumentsDirectory();
       }
-      String finalOutputPath = '${downloadsDir!.path}/$safeTitle.mp4';
-
-      onStatusChanged('جاري تحميل الفيديو...');
-      await _downloadFile(
-        selectedVideoStream.url.toString(),
-        tempVideoPath,
-        onReceiveProgress: (received, total) {
-          onReceiveProgress(received, total); 
-        },
-      );
-
-      if (selectedVideoStream == videoStreamInfo) {
-        onStatusChanged('جاري نقل الملف النهائي...');
-        File(tempVideoPath).copySync(finalOutputPath);
-        File(tempVideoPath).deleteSync();
-        _yt.close();
-        return finalOutputPath;
-      }
-
-      onStatusChanged('جاري تحميل الصوت...');
-      await _downloadFile(
-        audioStreamInfo.url.toString(),
-        tempAudioPath,
-        onReceiveProgress: (received, total) {},
-      );
-
-      onStatusChanged('جاري دمج الفيديو والصوت (قد يستغرق بعض الوقت)...');
-      String command = '-i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a aac "$finalOutputPath"';
-      
-      var session = await FFmpegKit.execute(command);
-      var returnCode = await session.getReturnCode();
-
-      if (ReturnCode.isSuccess(returnCode)) {
-        onStatusChanged('تم الدمج بنجاح!');
-        File(tempVideoPath).deleteSync();
-        File(tempAudioPath).deleteSync();
-        _yt.close();
-        return finalOutputPath;
-      } else {
-        var failLog = await session.getFailStackTrace();
-        throw Exception('فشل الدمج: $failLog');
-      }
-
     } catch (e) {
-      _yt.close();
       throw Exception('حدث خطأ أثناء العملية: $e');
     }
   }
@@ -131,12 +170,25 @@ class BackendService {
         onReceiveProgress: onReceiveProgress,
         options: Options(
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           }
         )
       );
     } catch (e) {
       throw Exception('خطأ في تحميل الملف: $e');
     }
+  }
+
+  // ترجمة النصوص السابقة
+  String t(String key) {
+    Map<String, String> translations = {
+      'have_link': 'لديك رابط؟',
+      'download_btn': 'بحث وتحليل',
+      'extracting': 'جاري جلب الجودات محلياً...',
+      'file_not_found': 'لم يتم العثور على ملفات مدعومة',
+      'video': 'فيديو',
+      'audio': 'صوت',
+    };
+    return translations[key] ?? key;
   }
 }
