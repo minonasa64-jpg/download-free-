@@ -21,19 +21,19 @@ dependencies:
   share_plus: ^8.0.3
   shared_preferences: ^2.2.2
 
-  # جلب بيانات يوتيوب (البديل الجديد للسيرفر)
+  # جلب بيانات يوتيوب 
   youtube_explode_dart: ^2.5.3
 
-  # مكتبة دمج الصوت والصورة (FFmpeg)
-  ffmpeg_kit_flutter_min_gpl: ^6.0.3
+  # مكتبة دمج الصوت والصورة (تم التغيير إلى النسخة min الأخف والأكثر استقراراً)
+  ffmpeg_kit_flutter_min: ^6.0.3
 
-  # مشغلات الميديا (تم تثبيت chewie لتجنب أخطاء التوافق)
+  # مشغلات الميديا
   video_player: ^2.8.2
   chewie: 1.7.5
   video_thumbnail: ^0.5.3
   audioplayers: ^5.2.1
 
-  # الإشعارات والإعلانات (تم تثبيت AdMob ليتوافق مع Kotlin)
+  # الإشعارات والإعلانات 
   flutter_local_notifications: ^17.1.2
   google_mobile_ads: 4.0.0
 
@@ -46,7 +46,7 @@ dev_dependencies:
 flutter_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/icon/app_icon.png" # تأكد من مسار أيقونتك هنا
+  image_path: "assets/icon/app_icon.png"
 
 flutter:
   uses-material-design: true
