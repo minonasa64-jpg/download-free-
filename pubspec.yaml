@@ -1,27 +1,41 @@
 name: pro_downloader
-description: A new Flutter project for downloading videos.
+description: "A new Flutter project for downloading videos."
+publish_to: 'none'
 
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.2.0 <4.0.0'
+  sdk: '>=3.3.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
+
+  # واجهة المستخدم والأيقونات
   cupertino_icons: ^1.0.2
+
+  # مكتبات التحميل والمسارات الأساسية
   dio: ^5.4.0
   path_provider: ^2.1.2
   permission_handler: ^11.3.0
   share_plus: ^8.0.3
-  youtube_explode_dart: ^2.5.3
-  video_player: ^2.8.2
-  chewie: 1.7.5 # تم التثبيت على هذا الإصدار لتجنب خطأ withValues
   shared_preferences: ^2.2.2
+
+  # جلب بيانات يوتيوب (البديل الجديد للسيرفر)
+  youtube_explode_dart: ^2.5.3
+
+  # مكتبة دمج الصوت والصورة (FFmpeg)
+  ffmpeg_kit_flutter_min_gpl: ^6.0.3
+
+  # مشغلات الميديا (تم تثبيت chewie لتجنب أخطاء التوافق)
+  video_player: ^2.8.2
+  chewie: 1.7.5
   video_thumbnail: ^0.5.3
   audioplayers: ^5.2.1
+
+  # الإشعارات والإعلانات (تم تثبيت AdMob ليتوافق مع Kotlin)
   flutter_local_notifications: ^17.1.2
-  google_mobile_ads: 4.0.0 # تم التثبيت على هذا الإصدار ليتوافق مع Dart 3.3.4
+  google_mobile_ads: 4.0.0
 
 dev_dependencies:
   flutter_test:
@@ -29,10 +43,10 @@ dev_dependencies:
   flutter_lints: ^3.0.0
   flutter_launcher_icons: ^0.13.1
 
+flutter_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/app_icon.png" # تأكد من مسار أيقونتك هنا
+
 flutter:
   uses-material-design: true
-
-flutter_launcher_icons:
-  android: "launcher_icon"
-  image_path: "icon.png"
-  min_sdk_android: 21
