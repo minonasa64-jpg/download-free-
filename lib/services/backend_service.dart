@@ -1,360 +1,161 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:ffmpeg_kit_flutter_min_gpl/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_min_gpl/return_code.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-class DownloadTask {
-  final int id;
-  final String title;
-  final bool isAudio;
-  double progress;
-  String downloaded;
-  String total;
+class DownloadService {
+  final YoutubeExplode _yt = YoutubeExplode();
+  final Dio _dio = Dio();
 
-  DownloadTask({
-    required this.id,
-    required this.title,
-    required this.isAudio,
-    this.progress = 0.0,
-    this.downloaded = "0.0",
-    this.total = "0.0",
-  });
-}
-
-class BackendService {
-  static final BackendService _instance = BackendService._internal();
-  factory BackendService() => _instance;
-  BackendService._internal();
-
-  final ValueNotifier<String> langNotifier = ValueNotifier<String>('ar');
-  final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
-  
-  final ValueNotifier<List<DownloadTask>> activeDownloads = ValueNotifier([]);
-
-  final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
-
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'https://Download-free-online-production.up.railway.app', 
-    connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(minutes: 5),
-  ));
-
-  Future<void> initBackend() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedLang = prefs.getString('app_lang') ?? 'ar';
-    final savedTheme = prefs.getString('app_theme') ?? 'dark';
-    
-    langNotifier.value = savedLang;
-    themeNotifier.value = savedTheme == 'dark' ? ThemeMode.dark : ThemeMode.light;
-
-    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-    await _notificationsPlugin.initialize(initializationSettings);
-  }
-
-  Future<void> changeLanguage(String lang) async {
-    langNotifier.value = lang;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('app_lang', lang);
-  }
-
-  Future<void> changeTheme(String theme) async {
-    themeNotifier.value = theme == 'dark' ? ThemeMode.dark : ThemeMode.light;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('app_theme', theme);
-  }
-
-  // تم دمج كلمات شريط التنقل وقسم الروابط في القاموس
-  String t(String key) {
-    final ar = {
-      'youtube': 'يوتيوب', 'link': 'الروابط', 'downloads': 'تنزيلاتي', 'settings': 'إعدادات',
-      'search': 'بحث', 'discover': 'اكتشف وحمّل', 'search_hint': 'ابحث في يوتيوب...', 
-      'start_search': 'ابحث عن أي فيديو أو مقطع صوتي\nبجودة عالية وبكل سهولة',
-      'download_btn': 'تحميل', 'related': 'فيديوهات ذات صلة', 
-      'have_link': 'لديك رابط؟', 'paste_here': 'الصق رابط الفيديو هنا لتحميله مباشرة',
-      'downloading': 'جاري التنزيل...', 'completed': 'اكتمل التنزيل', 
-      'formats_title': 'اختر الجودة المطلوبة', 'video': 'فيديوهات', 'audio': 'موسيقى', 
-      'downloaded': 'الملفات المحملة', 'general': 'عام', 'dl_settings': 'إعدادات التنزيل', 
-      'notif': 'الإشعارات', 'theme': 'السمة', 'language': 'اللغة', 'more_tools': 'أدوات إضافية',
-      'share_app': 'شارك التطبيق', 'clean_cache': 'تنظيف الملفات المؤقتة', 'about': 'حول التطبيق',
-      'no_audio': 'لا توجد موسيقى محملة', 'no_video': 'لا توجد فيديوهات محملة',
-      'downloading_now': 'جاري تنزيل:', 'file_not_found': 'الملف غير موجود أو تم حذفه',
-      'no_results': 'لم نتمكن من العثور على أي نتائج 😔', 'search_error': 'حدث خطأ أثناء البحث. تحقق من الاتصال.',
-      'invalid_link': 'الرابط غير صالح', 'extracting': 'جاري استخراج الجودات...',
-    };
-    final en = {
-      'youtube': 'YouTube', 'link': 'Links', 'downloads': 'Downloads', 'settings': 'Settings',
-      'search': 'Search', 'discover': 'Discover & Download', 'search_hint': 'Search YouTube...', 
-      'start_search': 'Search for any video or audio\nin high quality easily',
-      'download_btn': 'Download', 'related': 'Related Videos', 
-      'have_link': 'Have a link?', 'paste_here': 'Paste the video link here to download',
-      'downloading': 'Downloading...', 'completed': 'Download Completed', 
-      'formats_title': 'Select Quality', 'video': 'Videos', 'audio': 'Music', 
-      'downloaded': 'Downloaded Files', 'general': 'General', 'dl_settings': 'Download Settings', 
-      'notif': 'Notifications', 'theme': 'Theme', 'language': 'Language', 'more_tools': 'More Tools',
-      'share_app': 'Share App', 'clean_cache': 'Clean Cache', 'about': 'About',
-      'no_audio': 'No music downloaded', 'no_video': 'No videos downloaded',
-      'downloading_now': 'Downloading:', 'file_not_found': 'File not found or deleted',
-      'no_results': 'No results found 😔', 'search_error': 'Search error. Check connection.',
-      'invalid_link': 'Invalid link', 'extracting': 'Extracting formats...',
-    };
-    final fr = {
-      'youtube': 'YouTube', 'link': 'Liens', 'downloads': 'Téléchargements', 'settings': 'Paramètres',
-      'search': 'Recherche', 'discover': 'Découvrez et Téléchargez', 'search_hint': 'Rechercher sur YouTube...', 
-      'start_search': 'Recherchez des vidéos ou des audios\nen haute qualité facilement',
-      'download_btn': 'Télécharger', 'related': 'Vidéos similaires', 
-      'have_link': 'Vous avez un lien ?', 'paste_here': 'Collez le lien ici pour télécharger',
-      'downloading': 'Téléchargement...', 'completed': 'Téléchargement terminé', 
-      'formats_title': 'Sélectionnez la qualité', 'video': 'Vidéos', 'audio': 'Musique', 
-      'downloaded': 'Fichiers téléchargés', 'general': 'Général', 'dl_settings': 'Paramètres de téléchargement', 
-      'notif': 'Notifications', 'theme': 'Thème', 'language': 'Langue', 'more_tools': 'Plus d\'outils',
-      'share_app': 'Partager l\'appli', 'clean_cache': 'Vider le cache', 'about': 'À propos',
-      'no_audio': 'Aucune musique téléchargée', 'no_video': 'Aucune vidéo téléchargée',
-      'downloading_now': 'Téléchargement:', 'file_not_found': 'Fichier introuvable',
-      'no_results': 'Aucun résultat 😔', 'search_error': 'Erreur de recherche.',
-      'invalid_link': 'Lien invalide', 'extracting': 'Extraction des formats...',
-    };
-    
-    if (langNotifier.value == 'en') return en[key] ?? key;
-    if (langNotifier.value == 'fr') return fr[key] ?? key;
-    return ar[key] ?? key;
-  }
-
-  Future<Map<String, dynamic>> extractMediaLinks(String url) async {
+  /// دالة لجلب معلومات الفيديو بناءً على الرابط
+  Future<Video> getVideoInfo(String url) async {
     try {
-      final formData = FormData.fromMap({'url': url});
-      final response = await _dio.post('/api/extract', data: formData);
-      
-      if (response.statusCode == 200) {
-        final data = response.data as Map<String, dynamic>;
-        if (data['status'] == 'success') {
-           List<Map<String, dynamic>> videoList = [];
-           List<Map<String, dynamic>> audioList = [];
-
-           for (var f in data['formats'] ?? []) {
-             bool isAudioOnly = (f['vcodec'] == 'none' || f['vcodec'] == null) && f['acodec'] != 'none';
-             
-             String sizeStr = 'Unknown';
-             if (f['filesize'] != null) {
-               try {
-                 double sizeMb = (double.parse(f['filesize'].toString()) / (1024 * 1024));
-                 sizeStr = sizeMb.toStringAsFixed(1);
-               } catch (_) {}
-             }
-
-             Map<String, dynamic> formatData = {
-               'quality_name': f['format_note'] ?? f['resolution'] ?? f['format_id'] ?? 'Unknown',
-               'url': f['url'],
-               'ext': f['ext'] ?? 'mp4',
-               'size': sizeStr
-             };
-
-             if (isAudioOnly) {
-               if (formatData['ext'] == 'mp3' || formatData['ext'] == 'm4a') {
-                 audioList.add(formatData);
-               }
-             } else {
-               videoList.add(formatData);
-             }
-           }
-           
-           return {
-             'title': data['title'],
-             'video': videoList,
-             'audio': audioList,
-           };
-        } else {
-          throw Exception(data['message'] ?? 'Unknown error from server');
-        }
-      } else {
-        throw Exception('Server Error: ${response.statusCode}');
-      }
-    } on DioException catch (e) {
-      if (e.response != null) {
-        String serverErrorMsg = 'Server Rejected: ${e.response?.statusCode}';
-        try {
-          if (e.response?.data != null && e.response?.data is Map) {
-            final data = e.response?.data as Map;
-            if (data.containsKey('message')) {
-              serverErrorMsg = data['message'].toString();
-            }
-          }
-        } catch (_) {}
-        throw Exception(serverErrorMsg);
-      } else {
-        throw Exception('Connection Timeout or Server Offline');
-      }
+      var video = await _yt.videos.get(url);
+      return video;
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception('فشل في جلب معلومات الفيديو: $e');
     }
   }
 
-  Future<void> startDownloadProcess({
-    required String downloadUrl,
-    required String title,
-    required String extension,
-    required bool isAudio,
+  /// دالة لطلب الصلاحيات قبل التحميل
+  Future<bool> _requestPermissions() async {
+    if (Platform.isAndroid) {
+      if (await Permission.storage.request().isGranted ||
+          await Permission.manageExternalStorage.request().isGranted) {
+        return true;
+      }
+      return false;
+    }
+    return true; // للايفون (إن وجد مستقبلاً)
+  }
+
+  /// الدالة الرئيسية للتحميل (الفيديو والصوت ودمجهما)
+  Future<String> downloadAndMerge(
+    String url, {
+    required Function(int, int) onReceiveProgress,
+    required Function(String) onStatusChanged,
   }) async {
+    bool hasPermission = await _requestPermissions();
+    if (!hasPermission) {
+      throw Exception('لم يتم منح صلاحيات التخزين');
+    }
+
+    onStatusChanged('جاري تحليل الرابط...');
+
     try {
+      // 1. الحصول على مسارات التحميل
+      var manifest = await _yt.videos.streamsClient.getManifest(url);
+      var video = await _yt.videos.get(url);
+      String safeTitle = video.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+
+      // 2. اختيار أعلى جودة فيديو (بدون صوت عادة)
+      var videoStreamInfo = manifest.muxed.withHighestBitrate();
+      var videoOnlyStreamInfo = manifest.videoOnly.withHighestBitrate();
+      
+      // نختار أعلى جودة متوفرة (سواء كانت مدمجة أو مفصولة)
+      var selectedVideoStream = videoOnlyStreamInfo.size > videoStreamInfo.size
+          ? videoOnlyStreamInfo
+          : videoStreamInfo;
+
+      // 3. اختيار أعلى جودة صوت
+      var audioStreamInfo = manifest.audioOnly.withHighestBitrate();
+
+      // إعداد مسارات الملفات المؤقتة
+      Directory tempDir = await getTemporaryDirectory();
+      String tempVideoPath = '${tempDir.path}/$safeTitle\_video.mp4';
+      String tempAudioPath = '${tempDir.path}/$safeTitle\_audio.m4a';
+
+      // مسار الملف النهائي في هاتف المستخدم (مجلد التنزيلات)
+      Directory? downloadsDir;
       if (Platform.isAndroid) {
-        final sdkInt = int.tryParse(Platform.version.split('.')[0]) ?? 0;
-        if (sdkInt >= 13) {
-          await Permission.photos.request();
-          await Permission.videos.request();
-          await Permission.audio.request();
-          await Permission.notification.request();
-        } else {
-          await Permission.storage.request();
+        downloadsDir = Directory('/storage/emulated/0/Download');
+        if (!await downloadsDir.exists()) {
+           downloadsDir = await getExternalStorageDirectory();
         }
-      }
-
-      Directory? dir;
-      if (Platform.isAndroid) {
-        // الحل الجذري لمشكلة الـ 0%: مسار Movies متاح دائماً للكتابة بدون قيود الأندرويد المعقدة
-        dir = Directory('/storage/emulated/0/Movies/Boykta');
       } else {
-        final docDir = await getApplicationDocumentsDirectory();
-        dir = Directory('${docDir.path}/Boykta');
+        downloadsDir = await getApplicationDocumentsDirectory();
       }
-      
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
+      String finalOutputPath = '${downloadsDir!.path}/$safeTitle.mp4';
 
-      final cleanTitle = title.replaceAll(RegExp(r'[^\w\s]+'), '').trim();
-      final savePath = '${dir.path}/$cleanTitle.$extension';
-
-      int notifId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
-      DownloadTask task = DownloadTask(id: notifId, title: cleanTitle, isAudio: isAudio);
-      
-      List<DownloadTask> currentList = List.from(activeDownloads.value);
-      currentList.add(task);
-      activeDownloads.value = currentList;
-
-      int lastUpdate = 0; 
-
-      await _dio.download(
-        downloadUrl,
-        savePath,
+      // 4. تحميل ملف الفيديو
+      onStatusChanged('جاري تحميل الفيديو...');
+      await _downloadFile(
+        selectedVideoStream.url.toString(),
+        tempVideoPath,
         onReceiveProgress: (received, total) {
-          if (total != -1) {
-            final progress = received / total;
-            final downloadedStr = (received / (1024 * 1024)).toStringAsFixed(1);
-            final totalStr = (total / (1024 * 1024)).toStringAsFixed(1);
-            
-            task.progress = progress;
-            task.downloaded = downloadedStr;
-            task.total = totalStr;
-
-            int now = DateTime.now().millisecondsSinceEpoch;
-            if (now - lastUpdate > 1000) {
-              lastUpdate = now;
-              activeDownloads.value = List.from(activeDownloads.value);
-              
-              _notificationsPlugin.show(
-                notifId,
-                '${t('downloading_now')} $cleanTitle',
-                '$downloadedStr MB / $totalStr MB',
-                NotificationDetails(
-                  android: AndroidNotificationDetails(
-                    'download_channel',
-                    'تنزيلات Boykta',
-                    channelDescription: 'يظهر تقدم التنزيل',
-                    importance: Importance.low,
-                    priority: Priority.low,
-                    showProgress: true,
-                    maxProgress: 100,
-                    progress: (progress * 100).toInt(),
-                    ongoing: true,
-                    onlyAlertOnce: true,
-                  ),
-                ),
-              );
-            }
-          }
+          // يمكنك تعديل هذه الدالة لتحديث واجهة المستخدم بنسبة التحميل
+          // نحن نمرر تقدم الفيديو هنا كنسبة أساسية
+          onReceiveProgress(received, total); 
         },
       );
-      
-      activeDownloads.value = activeDownloads.value.where((t) => t.id != notifId).toList();
-      _notificationsPlugin.cancel(notifId);
-      
-      _notificationsPlugin.show(
-        notifId + 1,
-        '🎉 ${t('completed')}',
-        cleanTitle,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'download_channel',
-            'تنزيلات Boykta',
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-        ),
+
+      // إذا كانت الجودة المختارة تحتوي على صوت مدمج، لا نحتاج للدمج
+      if (selectedVideoStream == videoStreamInfo) {
+        onStatusChanged('جاري نقل الملف النهائي...');
+        File(tempVideoPath).copySync(finalOutputPath);
+        File(tempVideoPath).deleteSync(); // تنظيف
+        _yt.close();
+        return finalOutputPath;
+      }
+
+      // 5. تحميل ملف الصوت (لأن الفيديو بجودة عالية وبدون صوت)
+      onStatusChanged('جاري تحميل الصوت...');
+      await _downloadFile(
+        audioStreamInfo.url.toString(),
+        tempAudioPath,
+        onReceiveProgress: (received, total) {
+          // يمكن تتبع تقدم الصوت هنا إذا أردت
+        },
       );
 
-    } catch (e) {
-      activeDownloads.value = activeDownloads.value.where((t) => t.title != title).toList();
-    }
-  }
+      // 6. عملية الدمج باستخدام FFmpeg
+      onStatusChanged('جاري دمج الفيديو والصوت (قد يستغرق بعض الوقت)...');
+      String command = '-i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a aac "$finalOutputPath"';
+      
+      var session = await FFmpegKit.execute(command);
+      var returnCode = await session.getReturnCode();
 
-  Future<List<FileSystemEntity>> getDownloadedFiles() async {
-    try {
-      Directory? dir;
-      if (Platform.isAndroid) {
-        dir = Directory('/storage/emulated/0/Movies/Boykta');
+      if (ReturnCode.isSuccess(returnCode)) {
+        onStatusChanged('تم الدمج بنجاح!');
+        // 7. تنظيف الملفات المؤقتة
+        File(tempVideoPath).deleteSync();
+        File(tempAudioPath).deleteSync();
+        _yt.close();
+        return finalOutputPath;
       } else {
-        final docDir = await getApplicationDocumentsDirectory();
-        dir = Directory('${docDir.path}/Boykta');
+        var failLog = await session.getFailStackTrace();
+        throw Exception('فشل الدمج: $failLog');
       }
 
-      if (await dir.exists()) {
-        final List<FileSystemEntity> files = dir.listSync();
-        files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
-        return files.where((f) => f is File).toList();
-      }
-      return [];
     } catch (e) {
-      return [];
+      _yt.close();
+      throw Exception('حدث خطأ أثناء العملية: $e');
     }
   }
 
-  Future<void> deleteFile(String path) async {
-    final file = File(path);
-    if (await file.exists()) {
-      await file.delete();
+  /// دالة مساعدة لتحميل الملفات عبر Dio
+  Future<void> _downloadFile(
+    String url,
+    String savePath, {
+    required Function(int, int) onReceiveProgress,
+  }) async {
+    try {
+      await _dio.download(
+        url,
+        savePath,
+        onReceiveProgress: onReceiveProgress,
+        options: Options(
+          headers: {
+            // إضافة headers لتبدو كمتصفح حقيقي لتجاوز قيود يوتيوب
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          }
+        )
+      );
+    } catch (e) {
+      throw Exception('خطأ في تحميل الملف: $e');
     }
-  }
-
-  Future<Map<String, dynamic>> getDownloadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    return {
-      'downloadMobile': prefs.getBool('downloadMobile') ?? true,
-      'download_path': prefs.getString('download_path') ?? 'مسار Boykta العام',
-      'max_tasks': prefs.getInt('max_tasks') ?? 4,
-      'speed_limit': prefs.getString('speed_limit') ?? 'غير محدود',
-    };
-  }
-
-  Future<void> updateDownloadSetting(String key, dynamic value) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (value is bool) await prefs.setBool(key, value);
-    if (value is String) await prefs.setString(key, value);
-    if (value is int) await prefs.setInt(key, value);
-  }
-
-  Future<Map<String, bool>> getNotificationSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    return {
-      'n_prog': prefs.getBool('n_prog') ?? true,
-      'n_comp': prefs.getBool('n_comp') ?? true,
-    };
-  }
-
-  Future<void> updateNotificationSetting(String key, bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(key, value);
   }
 }
