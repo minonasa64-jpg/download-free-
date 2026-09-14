@@ -11,29 +11,24 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # واجهة المستخدم والأيقونات
   cupertino_icons: ^1.0.2
 
-  # مكتبات التحميل والمسارات الأساسية
   dio: ^5.4.0
   path_provider: ^2.1.2
   permission_handler: ^11.3.0
   share_plus: ^8.0.3
   shared_preferences: ^2.2.2
 
-  # جلب بيانات يوتيوب 
   youtube_explode_dart: ^2.5.3
 
-  # مكتبة دمج الصوت والصورة (تم التغيير إلى النسخة min الأخف والأكثر استقراراً)
-  ffmpeg_kit_flutter_min: ^6.0.3
+  # المكتبة الكاملة المستقرة لدمج الصوت والصورة
+  ffmpeg_kit_flutter: ^6.0.3
 
-  # مشغلات الميديا
   video_player: ^2.8.2
   chewie: 1.7.5
   video_thumbnail: ^0.5.3
   audioplayers: ^5.2.1
 
-  # الإشعارات والإعلانات 
   flutter_local_notifications: ^17.1.2
   google_mobile_ads: 4.0.0
 
