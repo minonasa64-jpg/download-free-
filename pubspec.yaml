@@ -21,8 +21,8 @@ dependencies:
 
   youtube_explode_dart: ^2.5.3
 
-  # المكتبة الكاملة المستقرة لدمج الصوت والصورة
-  ffmpeg_kit_flutter: ^6.0.3
+  # استخدام إصدار أقدم ومستقر من مكتبة FFmpeg
+  ffmpeg_kit_flutter: ^5.1.0
 
   video_player: ^2.8.2
   chewie: 1.7.5
