@@ -2,15 +2,15 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-import 'package:ffmpeg_kit_flutter_min_gpl/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_min_gpl/return_code.dart';
+// تم تحديث الاستيراد ليتوافق مع مكتبة min الجديدة
+import 'package:ffmpeg_kit_flutter_min/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_min/return_code.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-class DownloadService {
+class BackendService {
   final YoutubeExplode _yt = YoutubeExplode();
   final Dio _dio = Dio();
 
-  /// دالة لجلب معلومات الفيديو بناءً على الرابط
   Future<Video> getVideoInfo(String url) async {
     try {
       var video = await _yt.videos.get(url);
@@ -20,7 +20,6 @@ class DownloadService {
     }
   }
 
-  /// دالة لطلب الصلاحيات قبل التحميل
   Future<bool> _requestPermissions() async {
     if (Platform.isAndroid) {
       if (await Permission.storage.request().isGranted ||
@@ -29,14 +28,13 @@ class DownloadService {
       }
       return false;
     }
-    return true; // للايفون (إن وجد مستقبلاً)
+    return true; 
   }
 
-  /// الدالة الرئيسية للتحميل (الفيديو والصوت ودمجهما)
   Future<String> downloadAndMerge(
     String url, {
-    required Function(int, int) onReceiveProgress,
     required Function(String) onStatusChanged,
+    required Function(int, int) onReceiveProgress,
   }) async {
     bool hasPermission = await _requestPermissions();
     if (!hasPermission) {
@@ -46,29 +44,23 @@ class DownloadService {
     onStatusChanged('جاري تحليل الرابط...');
 
     try {
-      // 1. الحصول على مسارات التحميل
       var manifest = await _yt.videos.streamsClient.getManifest(url);
       var video = await _yt.videos.get(url);
       String safeTitle = video.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
 
-      // 2. اختيار أعلى جودة فيديو (بدون صوت عادة)
       var videoStreamInfo = manifest.muxed.withHighestBitrate();
       var videoOnlyStreamInfo = manifest.videoOnly.withHighestBitrate();
       
-      // نختار أعلى جودة متوفرة (سواء كانت مدمجة أو مفصولة)
       var selectedVideoStream = videoOnlyStreamInfo.size > videoStreamInfo.size
           ? videoOnlyStreamInfo
           : videoStreamInfo;
 
-      // 3. اختيار أعلى جودة صوت
       var audioStreamInfo = manifest.audioOnly.withHighestBitrate();
 
-      // إعداد مسارات الملفات المؤقتة
       Directory tempDir = await getTemporaryDirectory();
       String tempVideoPath = '${tempDir.path}/$safeTitle\_video.mp4';
       String tempAudioPath = '${tempDir.path}/$safeTitle\_audio.m4a';
 
-      // مسار الملف النهائي في هاتف المستخدم (مجلد التنزيلات)
       Directory? downloadsDir;
       if (Platform.isAndroid) {
         downloadsDir = Directory('/storage/emulated/0/Download');
@@ -80,38 +72,30 @@ class DownloadService {
       }
       String finalOutputPath = '${downloadsDir!.path}/$safeTitle.mp4';
 
-      // 4. تحميل ملف الفيديو
       onStatusChanged('جاري تحميل الفيديو...');
       await _downloadFile(
         selectedVideoStream.url.toString(),
         tempVideoPath,
         onReceiveProgress: (received, total) {
-          // يمكنك تعديل هذه الدالة لتحديث واجهة المستخدم بنسبة التحميل
-          // نحن نمرر تقدم الفيديو هنا كنسبة أساسية
           onReceiveProgress(received, total); 
         },
       );
 
-      // إذا كانت الجودة المختارة تحتوي على صوت مدمج، لا نحتاج للدمج
       if (selectedVideoStream == videoStreamInfo) {
         onStatusChanged('جاري نقل الملف النهائي...');
         File(tempVideoPath).copySync(finalOutputPath);
-        File(tempVideoPath).deleteSync(); // تنظيف
+        File(tempVideoPath).deleteSync();
         _yt.close();
         return finalOutputPath;
       }
 
-      // 5. تحميل ملف الصوت (لأن الفيديو بجودة عالية وبدون صوت)
       onStatusChanged('جاري تحميل الصوت...');
       await _downloadFile(
         audioStreamInfo.url.toString(),
         tempAudioPath,
-        onReceiveProgress: (received, total) {
-          // يمكن تتبع تقدم الصوت هنا إذا أردت
-        },
+        onReceiveProgress: (received, total) {},
       );
 
-      // 6. عملية الدمج باستخدام FFmpeg
       onStatusChanged('جاري دمج الفيديو والصوت (قد يستغرق بعض الوقت)...');
       String command = '-i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a aac "$finalOutputPath"';
       
@@ -120,7 +104,6 @@ class DownloadService {
 
       if (ReturnCode.isSuccess(returnCode)) {
         onStatusChanged('تم الدمج بنجاح!');
-        // 7. تنظيف الملفات المؤقتة
         File(tempVideoPath).deleteSync();
         File(tempAudioPath).deleteSync();
         _yt.close();
@@ -136,7 +119,6 @@ class DownloadService {
     }
   }
 
-  /// دالة مساعدة لتحميل الملفات عبر Dio
   Future<void> _downloadFile(
     String url,
     String savePath, {
@@ -149,7 +131,6 @@ class DownloadService {
         onReceiveProgress: onReceiveProgress,
         options: Options(
           headers: {
-            // إضافة headers لتبدو كمتصفح حقيقي لتجاوز قيود يوتيوب
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
           }
         )
