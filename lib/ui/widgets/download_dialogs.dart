@@ -4,11 +4,19 @@ import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
 
 class DownloadProgressDialog extends StatefulWidget {
-  final String url;
+  final String selectedUrl;
+  final String title;
+  final String ext;
+  final bool needsMerge;
+  final String highestAudioUrl;
 
   const DownloadProgressDialog({
     super.key,
-    required this.url,
+    required this.selectedUrl,
+    required this.title,
+    required this.ext,
+    required this.needsMerge,
+    required this.highestAudioUrl,
   });
 
   @override
@@ -18,7 +26,7 @@ class DownloadProgressDialog extends StatefulWidget {
 class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
   final BackendService _backend = BackendService();
   double _progress = 0.0;
-  String _statusText = "جاري تحضير الملفات...";
+  String _statusText = "جاري التحضير...";
   bool _isFinished = false;
   bool _hasError = false;
   String _errorMessage = "";
@@ -26,13 +34,17 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
   @override
   void initState() {
     super.initState();
-    _startFullDownloadProcess();
+    _startDownloadProcess();
   }
 
-  Future<void> _startFullDownloadProcess() async {
+  Future<void> _startDownloadProcess() async {
     try {
       await _backend.downloadAndMerge(
-        widget.url,
+        selectedUrl: widget.selectedUrl,
+        title: widget.title,
+        ext: widget.ext,
+        needsMerge: widget.needsMerge,
+        highestAudioUrl: widget.highestAudioUrl,
         onStatusChanged: (status) {
           if (mounted) {
             setState(() {
@@ -115,7 +127,7 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                     child: const Icon(Icons.check_rounded, color: Colors.green, size: 50),
                   ),
                   const SizedBox(height: 15),
-                  const Text('تم التنزيل والدمج بنجاح! 🎉', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('اكتمل التنزيل بنجاح! 🎉', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 5),
                   const Text('الملف متوفر الآن في مجلد التنزيلات بجهازك.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
                   const SizedBox(height: 20),
@@ -138,20 +150,22 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 25),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      value: _progress,
-                      minHeight: 10,
-                      backgroundColor: Colors.black.withOpacity(0.5),
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.cyan),
+                  if (_statusText.contains('دمج') == false) ...[ // إخفاء الشريط أثناء الدمج
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: _progress,
+                        minHeight: 10,
+                        backgroundColor: Colors.black.withOpacity(0.5),
+                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.cyan),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 15),
-                  Text(
-                    '${(_progress * 100).toStringAsFixed(1)}%', 
-                    style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 16)
-                  ),
+                    const SizedBox(height: 15),
+                    Text(
+                      '${(_progress * 100).toStringAsFixed(1)}%', 
+                      style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 16)
+                    ),
+                  ]
                 ]
               ],
             ),
