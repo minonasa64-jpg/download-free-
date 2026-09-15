@@ -31,12 +31,33 @@ jobs:
       - name: 🏗️ بناء هياكل فلاتر الأساسية
         run: flutter create --no-pub --project-name pro_downloader --platforms=android .
 
+      - name: 🔧 الإصلاح الجذري لمستودعات Gradle لمكتبة FFmpeg
+        run: |
+          # 1. كسر حماية المستودعات في settings.gradle
+          sed -i 's/FAIL_ON_PROJECT_REPOS/PREFER_PROJECT/g' android/settings.gradle || true
+          sed -i 's/RepositoriesMode.FAIL_ON_PROJECT_REPOS/RepositoriesMode.PREFER_PROJECT/g' android/settings.gradle || true
+          
+          # 2. حقن مستودعات MavenCentral إجبارياً
+          cat <<EOF >> android/build.gradle
+          
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url 'https://jitpack.io' }
+              }
+          }
+          EOF
+          
+          # 3. التأكد من استخدام حزمة full
+          echo "ffmpegKitPackage=full" >> android/gradle.properties
+
       - name: 🌐 حقن جميع الصلاحيات ومعرف AdMob إجبارياً
         run: |
           sed -i '/<manifest xmlns:android=/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' android/app/src/main/AndroidManifest.xml
           sed -i '/<activity/i \        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>' android/app/src/main/AndroidManifest.xml
 
-      - name: ⬆️ رفع الحد الأدنى لإصدار الأندرويد إلى 24
+      - name: ⬆️ رفع الحد الأدنى لإصدار الأندرويد إلى 24 (لحزمة FFmpeg Full)
         run: |
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle
           sed -i 's/minSdkVersion 19/minSdkVersion 24/g' android/app/build.gradle
