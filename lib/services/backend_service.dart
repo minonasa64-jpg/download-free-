@@ -2,9 +2,9 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-// تم تعديل الاستيراد هنا
-import 'package:ffmpeg_kit_flutter_video/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_video/return_code.dart';
+// تم إرجاع الاستيراد للمكتبة الكاملة
+import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class BackendService {
