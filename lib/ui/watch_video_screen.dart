@@ -5,6 +5,7 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import '../core/app_colors.dart';
 import '../services/backend_service.dart';
+import '../services/ad_service.dart';
 import 'widgets/download_dialogs.dart';
 
 class WatchVideoScreen extends StatefulWidget {
@@ -126,14 +127,33 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     }
   }
 
+  // فلترة وتجنب التكرار الذكي للجودات (نفس دالة links_tab)
+  List<Map<String, dynamic>> _processFormats(List<Map<String, dynamic>> formats) {
+    if (formats.isEmpty) return [];
+    var uniqueFormats = <String, Map<String, dynamic>>{};
+    for (var f in formats) {
+      uniqueFormats[f['quality_name']] = f; 
+    }
+    var sortedList = uniqueFormats.values.toList();
+    
+    sortedList.sort((a, b) {
+      double sizeA = double.tryParse(a['size'].toString()) ?? 0.0;
+      double sizeB = double.tryParse(b['size'].toString()) ?? 0.0;
+      return sizeB.compareTo(sizeA); // الأكبر أولاً
+    });
+    return sortedList;
+  }
+
   Future<void> _handleExtraction() async {
     setState(() => _isLoadingExtraction = true);
     try {
       final result = await _backend.extractMediaLinks(widget.video.url);
       
       final String videoTitle = result['title'] as String;
-      final List<Map<String, dynamic>> videoList = List<Map<String, dynamic>>.from(result['video'] ?? []);
-      final List<Map<String, dynamic>> audioList = List<Map<String, dynamic>>.from(result['audio'] ?? []);
+      final String highestAudioUrl = result['highestAudioUrl'] as String;
+      
+      final List<Map<String, dynamic>> videoList = _processFormats(List<Map<String, dynamic>>.from(result['video'] ?? []));
+      final List<Map<String, dynamic>> audioList = _processFormats(List<Map<String, dynamic>>.from(result['audio'] ?? []));
 
       if (mounted && (videoList.isNotEmpty || audioList.isNotEmpty)) {
         showModalBottomSheet(
@@ -143,6 +163,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
           builder: (context) {
             return FormatSelectionSheet(
               title: videoTitle,
+              highestAudioUrl: highestAudioUrl,
               videoFormats: videoList,
               audioFormats: audioList,
             );
@@ -155,7 +176,6 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       }
     } catch (e) {
       if (mounted) {
-        // تم تغيير هذه الرسالة لتعرض الخطأ الفعلي القادم من Railway
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('الخطأ: ${e.toString().replaceAll('Exception: ', '')}'),
@@ -335,6 +355,196 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
           )
         ],
       ),
+    );
+  }
+}
+
+// نافذة اختيار الجودة الشفافة (BottomSheet) تم إعادتها للعمل مع النظام الجديد
+class FormatSelectionSheet extends StatefulWidget {
+  final String title;
+  final String highestAudioUrl;
+  final List<Map<String, dynamic>> videoFormats;
+  final List<Map<String, dynamic>> audioFormats;
+
+  const FormatSelectionSheet({
+    super.key,
+    required this.title,
+    required this.highestAudioUrl,
+    required this.videoFormats,
+    required this.audioFormats,
+  });
+
+  @override
+  State<FormatSelectionSheet> createState() => _FormatSelectionSheetState();
+}
+
+class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
+  Map<String, dynamic>? _selectedFormat;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.75,
+          decoration: BoxDecoration(
+            color: AppColors.surface.withOpacity(0.8),
+            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
+          ),
+          child: DefaultTabController(
+            length: 2,
+            child: Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 15, bottom: 5),
+                  width: 50,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.all(15),
+                  child: Text(
+                    'اختر الجودة المطلوبة', 
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
+                  ),
+                ),
+                const TabBar(
+                  indicatorColor: AppColors.cyan,
+                  labelColor: AppColors.cyan,
+                  unselectedLabelColor: AppColors.textMuted,
+                  tabs: [
+                    Tab(icon: Icon(Icons.video_library), text: 'فيديو'),
+                    Tab(icon: Icon(Icons.library_music), text: 'صوت'),
+                  ],
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _buildList(widget.videoFormats),
+                      _buildList(widget.audioFormats),
+                    ],
+                  ),
+                ),
+                if (_selectedFormat != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.primaryGradient,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        ),
+                        onPressed: () {
+                          // إغلاق نافذة الاختيار
+                          Navigator.pop(context); 
+                          
+                          // إظهار إعلان
+                          AdService().showInterstitialAd();
+                          
+                          // فتح نافذة تقدم التحميل والدمج
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => DownloadProgressDialog(
+                              selectedUrl: _selectedFormat!['url'],
+                              title: widget.title,
+                              ext: _selectedFormat!['ext'],
+                              needsMerge: _selectedFormat!['needs_merge'],
+                              highestAudioUrl: widget.highestAudioUrl,
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'بدء التنزيل', 
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                        ),
+                      ),
+                    ),
+                  )
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildList(List<Map<String, dynamic>> formats) {
+    if (formats.isEmpty) return const Center(child: Text('غير متوفر', style: TextStyle(color: AppColors.textMuted)));
+    
+    return ListView.builder(
+      physics: const BouncingScrollPhysics(),
+      itemCount: formats.length,
+      itemBuilder: (context, index) {
+        final format = formats[index];
+        final isSelected = _selectedFormat == format;
+        return InkWell(
+          onTap: () => setState(() => _selectedFormat = format),
+          child: Container(
+            color: isSelected ? AppColors.cyan.withOpacity(0.1) : Colors.transparent,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            child: Row(
+              children: [
+                Icon(
+                  isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  color: isSelected ? AppColors.cyan : AppColors.textMuted,
+                ),
+                const SizedBox(width: 15),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      format['quality_name'], 
+                      style: TextStyle(
+                        color: isSelected ? AppColors.cyan : AppColors.textPrimary, 
+                        fontWeight: FontWeight.bold
+                      )
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'MB ${format['size']}', 
+                      style: const TextStyle(color: AppColors.textMuted, fontSize: 12)
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                if (format['needs_merge'] == true)
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.orange.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text('عالية الجودة', style: TextStyle(color: AppColors.orange, fontSize: 9)),
+                  ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    format['ext'].toString().toUpperCase(), 
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
