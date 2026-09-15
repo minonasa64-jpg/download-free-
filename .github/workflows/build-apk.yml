@@ -31,7 +31,7 @@ jobs:
       - name: 🏗️ بناء هياكل فلاتر الأساسية
         run: flutter create --no-pub --project-name pro_downloader --platforms=android .
 
-      - name: ️ الخيار النووي: إعادة كتابة جذور الأندرويد لكسر أخطاء FFmpeg
+      - name: ☢️ الخيار النووي: إعادة كتابة جذور الأندرويد لكسر أخطاء FFmpeg
         run: |
           # 1. حذف ملف settings.gradle الافتراضي وكتابة واحد جديد يكسر حماية المستودعات
           rm android/settings.gradle
