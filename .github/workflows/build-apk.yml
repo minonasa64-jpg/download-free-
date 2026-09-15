@@ -29,47 +29,8 @@ jobs:
       - name: Create Flutter Android Project
         run: flutter create --no-pub --project-name pro_downloader --platforms=android .
 
-      - name: Fix FFmpeg Settings and Repositories
+      - name: Update Android Configuration
         run: |
-          rm -f android/settings.gradle
-          cat << 'EOF' > android/settings.gradle
-          pluginManagement {
-              def flutterSdkPath = {
-                  def properties = new Properties()
-                  file("local.properties").withInputStream { properties.load(it) }
-                  def flutterSdkPath = properties.getProperty("flutter.sdk")
-                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-                  return flutterSdkPath
-              }
-              settings.ext.flutterSdkPath = flutterSdkPath()
-              includeBuild("${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle")
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-
-          plugins {
-              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "7.3.0" apply false
-              id "org.jetbrains.kotlin.android" version "1.7.10" apply false
-          }
-
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
-              repositories {
-                  google()
-                  mavenCentral()
-                  maven { url 'https://jitpack.io' }
-              }
-          }
-
-          include ':app'
-          EOF
-          
-          echo "ext.ffmpegKitPackage = 'full'" >> android/gradle.properties
-          
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle
           sed -i 's/minSdkVersion 19/minSdkVersion 24/g' android/app/build.gradle
           sed -i 's/minSdkVersion 21/minSdkVersion 24/g' android/app/build.gradle
