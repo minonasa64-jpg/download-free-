@@ -21,8 +21,8 @@ dependencies:
 
   youtube_explode_dart: ^2.5.3
 
-  # تم تصحيح رقم الإصدار إلى النسخة الموجودة فعلياً في المستودع
-  ffmpeg_helper: ^1.0.1 
+  # عدنا للمكتبة الأصلية والمستقرة 
+  ffmpeg_kit_flutter: ^6.0.3
 
   video_player: ^2.8.2
   chewie: 1.7.5
