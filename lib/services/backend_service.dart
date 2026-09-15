@@ -2,15 +2,15 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter/return_code.dart';
+// تم تعديل الاستيراد هنا
+import 'package:ffmpeg_kit_flutter_video/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_video/return_code.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class BackendService {
   final YoutubeExplode _yt = YoutubeExplode();
   final Dio _dio = Dio();
 
-  // محاكاة استجابة السيرفر القديم لجلب جميع الجودات
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     try {
       var manifest = await _yt.videos.streamsClient.getManifest(url);
@@ -18,18 +18,16 @@ class BackendService {
 
       List<Map<String, dynamic>> videoFormats = [];
       
-      // الجودات العالية (بدون صوت مدمج - تحتاج دمج)
       for (var stream in manifest.videoOnly) {
         videoFormats.add({
           'url': stream.url.toString(),
           'quality_name': stream.qualityLabel,
           'size': stream.size.totalMegaBytes.toStringAsFixed(1),
-          'ext': 'mp4', // نوحد المخرج ليكون mp4 دائماً
+          'ext': 'mp4', 
           'needs_merge': true,
         });
       }
       
-      // الجودات العادية (بصوت مدمج - لا تحتاج دمج)
       for (var stream in manifest.muxed) {
         videoFormats.add({
           'url': stream.url.toString(),
@@ -40,7 +38,6 @@ class BackendService {
         });
       }
 
-      // الجودات الصوتية
       List<Map<String, dynamic>> audioFormats = [];
       for (var stream in manifest.audioOnly) {
         audioFormats.add({
@@ -52,7 +49,6 @@ class BackendService {
         });
       }
 
-      // أعلى جودة صوت للدمج لاحقاً
       String highestAudioUrl = manifest.audioOnly.withHighestBitrate().url.toString();
 
       return {
@@ -78,7 +74,6 @@ class BackendService {
     return true; 
   }
 
-  // الدالة الذكية للتحميل والدمج (تعمل محلياً)
   Future<String> downloadAndMerge({
     required String selectedUrl,
     required String title,
@@ -110,7 +105,6 @@ class BackendService {
 
     try {
       if (!needsMerge) {
-        // حالة: صوت فقط أو فيديو مدمج جاهز
         onStatusChanged('جاري تحميل الملف...');
         await _downloadFile(
           selectedUrl,
@@ -119,7 +113,6 @@ class BackendService {
         );
         return finalOutputPath;
       } else {
-        // حالة: فيديو عالي الجودة مفصول عن الصوت (يحتاج FFmpeg)
         String tempVideoPath = '${tempDir.path}/$safeTitle\_video.mp4';
         String tempAudioPath = '${tempDir.path}/$safeTitle\_audio.m4a';
 
@@ -130,11 +123,11 @@ class BackendService {
           onReceiveProgress: onReceiveProgress,
         );
 
-        onStatusChanged('جاري تحميل الصوت الأصلي الدمج...');
+        onStatusChanged('جاري تحميل الصوت الأصلي للدمج...');
         await _downloadFile(
           highestAudioUrl,
           tempAudioPath,
-          onReceiveProgress: (received, total) {}, // تجاهل نسبة الصوت لعدم إرباك الواجهة
+          onReceiveProgress: (received, total) {}, 
         );
 
         onStatusChanged('جاري المعالجة والدمج (قد يستغرق بعض الوقت)...');
@@ -179,7 +172,6 @@ class BackendService {
     }
   }
 
-  // ترجمة النصوص السابقة
   String t(String key) {
     Map<String, String> translations = {
       'have_link': 'لديك رابط؟',
