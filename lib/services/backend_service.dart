@@ -2,9 +2,9 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:permission_handler/permission_handler.dart';
-// الاستيراد الجديد لمكتبة FFmpeg البديلة
-import 'package:ffmpeg_helper/ffmpeg_helper.dart';
 
 class BackendService {
   final YoutubeExplode _yt = YoutubeExplode();
@@ -130,28 +130,19 @@ class BackendService {
         );
 
         onStatusChanged('جاري المعالجة والدمج (قد يستغرق بعض الوقت)...');
+        String command = '-i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a aac "$finalOutputPath"';
         
-        // استخدام ffmpeg_helper لتنفيذ أمر الدمج
-        FFmpegCommand command = FFmpegCommand(
-          inputs: [
-            FFmpegInput(path: tempVideoPath),
-            FFmpegInput(path: tempAudioPath),
-          ],
-          output: FFmpegOutput(
-            path: finalOutputPath,
-            options: ['-c:v', 'copy', '-c:a', 'aac'],
-          ),
-        );
+        var session = await FFmpegKit.execute(command);
+        var returnCode = await session.getReturnCode();
 
-        bool success = await FFmpegHelper.execute(command);
-
-        if (success) {
+        if (ReturnCode.isSuccess(returnCode)) {
           onStatusChanged('تم الدمج بنجاح!');
           File(tempVideoPath).deleteSync();
           File(tempAudioPath).deleteSync();
           return finalOutputPath;
         } else {
-          throw Exception('فشل الدمج باستخدام FFmpegHelper.');
+          var failLog = await session.getFailStackTrace();
+          throw Exception('فشل الدمج: $failLog');
         }
       }
     } catch (e) {
