@@ -9,7 +9,6 @@ on:
 
 jobs:
   build:
-    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
@@ -31,9 +30,8 @@ jobs:
       - name: Create Flutter Android Project
         run: flutter create --no-pub --project-name pro_downloader --platforms=android .
 
-      - name: 🚀 الحل الجذري والنهائي: توجيه مسار FFmpeg للمستودع الجديد
+      - name: Apply FFmpeg Resolution Strategy
         run: |
-          # حقن استراتيجية تحويل المسار للنسخة المدعومة التي لم تُحذف من الإنترنت
           cat << 'EOF' >> android/build.gradle
           
           allprojects {
@@ -47,7 +45,6 @@ jobs:
           }
           EOF
           
-          # رفع الحد الأدنى لإصدار الأندرويد كالعادة
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle
           sed -i 's/minSdkVersion 19/minSdkVersion 24/g' android/app/build.gradle
           sed -i 's/minSdkVersion 21/minSdkVersion 24/g' android/app/build.gradle
@@ -59,6 +56,9 @@ jobs:
 
       - name: Install Dependencies
         run: flutter pub get
+
+      - name: Generate Launcher Icons
+        run: dart run flutter_launcher_icons || true
 
       - name: Build Release APK
         run: flutter build apk --release
