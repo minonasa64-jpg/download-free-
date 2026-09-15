@@ -2,10 +2,8 @@ name: Build Flutter APK
 
 on:
   push:
-    branches:
-      - main
-      - master
-  workflow_dispatch: 
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -13,29 +11,28 @@ jobs:
     runs-on: ubuntu-latest 
 
     steps:
-      - name: 📥 سحب الكود من المستودع
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: ☕ إعداد بيئة جافا
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17' 
 
-      - name: 🐦 إعداد بيئة فلاتر المستقرة (3.19.6)
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.6'
           channel: 'stable' 
 
-      - name: 🏗️ بناء هياكل فلاتر الأساسية
+      - name: Create Flutter Android Project
         run: flutter create --no-pub --project-name pro_downloader --platforms=android .
 
-      - name: ☢️ الخيار النووي: إعادة كتابة جذور الأندرويد لكسر أخطاء FFmpeg
+      - name: Fix FFmpeg Settings and Repositories
         run: |
-          # 1. حذف ملف settings.gradle الافتراضي وكتابة واحد جديد يكسر حماية المستودعات
-          rm android/settings.gradle
-          cat <<EOF > android/settings.gradle
+          rm -f android/settings.gradle
+          cat << 'EOF' > android/settings.gradle
           pluginManagement {
               def flutterSdkPath = {
                   def properties = new Properties()
@@ -45,20 +42,21 @@ jobs:
                   return flutterSdkPath
               }
               settings.ext.flutterSdkPath = flutterSdkPath()
-              includeBuild("\${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle")
+              includeBuild("${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle")
               repositories {
                   google()
                   mavenCentral()
                   gradlePluginPortal()
               }
           }
+
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
               id "com.android.application" version "7.3.0" apply false
               id "org.jetbrains.kotlin.android" version "1.7.10" apply false
           }
+
           dependencyResolutionManagement {
-              // السر كله هنا: إجبار السيرفر على قبول المستودعات الخارجية
               repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
               repositories {
                   google()
@@ -66,35 +64,31 @@ jobs:
                   maven { url 'https://jitpack.io' }
               }
           }
+
           include ':app'
           EOF
           
-          # 2. حقن حزمة full بقوة في قلب ملف البناء
-          sed -i 's/buildscript {/buildscript {\n    ext.ffmpegKitPackage = "full"/g' android/build.gradle
+          echo "ext.ffmpegKitPackage = 'full'" >> android/gradle.properties
           
-          # 3. خطوة تأكيدية ثانية
-          echo "ffmpegKitPackage=full" >> android/gradle.properties
-          
-          # 4. رفع الحد الأدنى لإصدار الأندرويد إلى 24 الإجباري لحزمة full
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle
           sed -i 's/minSdkVersion 19/minSdkVersion 24/g' android/app/build.gradle
           sed -i 's/minSdkVersion 21/minSdkVersion 24/g' android/app/build.gradle
 
-      - name: 🌐 حقن جميع الصلاحيات ومعرف AdMob إجبارياً
+      - name: Inject Permissions and AdMob
         run: |
           sed -i '/<manifest xmlns:android=/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' android/app/src/main/AndroidManifest.xml
           sed -i '/<activity/i \        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>' android/app/src/main/AndroidManifest.xml
 
-      - name: 📦 تحميل الحزم والمكتبات
+      - name: Get Packages
         run: flutter pub get
 
-      - name: 🎨 دمج الأيقونة الجديدة
+      - name: Generate Launcher Icons
         run: dart run flutter_launcher_icons || true
 
-      - name: 🛠️ بناء ملف APK النهائي
+      - name: Build APK
         run: flutter build apk --release
 
-      - name: 📤 رفع ملف التطبيق
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
