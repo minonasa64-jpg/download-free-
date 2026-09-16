@@ -22,7 +22,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   final yt.YoutubeExplode _yt = yt.YoutubeExplode();
   
   VideoPlayerController? _videoPlayerController;
-  VideoPlayerController? _audioPlayerController; // المشغل الخفي للصوت
+  VideoPlayerController? _audioPlayerController;
   ChewieController? _chewieController;
   
   final ScrollController _relatedScrollController = ScrollController();
@@ -30,6 +30,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   bool _isLoadingExtraction = false;
   bool _isLoadingVideo = true;
   bool _hasPlayerError = false;
+  bool _isMutedPreview = false;
   
   List<yt.Video> _relatedVideos = [];
   yt.VideoSearchList? _relatedSearchPage;
@@ -57,13 +58,11 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       String? videoUrl;
       String? audioUrl;
       
-      // 1. إذا كان الفيديو يحتوي على صوت وصورة مدمجين جاهزين
       if (muxedStreams.isNotEmpty) {
         muxedStreams.sort((a, b) => a.videoResolution.height.compareTo(b.videoResolution.height));
         videoUrl = muxedStreams.last.url.toString();
-      } 
-      // 2. إذا كان الصوت مفصولاً عن الصورة (مثل الفيديوهات الموسيقية)
-      else {
+        _isMutedPreview = false;
+      } else {
         var videoOnlyStreams = manifest.videoOnly.toList();
         var audioOnlyStreams = manifest.audioOnly;
         
@@ -71,56 +70,53 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
           videoOnlyStreams.sort((a, b) => a.videoResolution.height.compareTo(b.videoResolution.height));
           videoUrl = videoOnlyStreams.last.url.toString();
           audioUrl = audioOnlyStreams.withHighestBitrate().url.toString();
+          _isMutedPreview = false;
+        } else if (videoOnlyStreams.isNotEmpty) {
+          videoOnlyStreams.sort((a, b) => a.videoResolution.height.compareTo(b.videoResolution.height));
+          videoUrl = videoOnlyStreams.last.url.toString();
+          _isMutedPreview = true;
         }
       }
 
+      // إضافة هوية المتصفح (User-Agent) لتخطي حظر يوتيوب للمشغلات الخارجية
+      const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      };
+
       if (videoUrl != null) {
-        _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+        _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(videoUrl), httpHeaders: headers);
         
-        // خوارزمية دمج المشغلين (Dual-Player Sync)
         if (audioUrl != null) {
-          _audioPlayerController = VideoPlayerController.networkUrl(Uri.parse(audioUrl));
+          _audioPlayerController = VideoPlayerController.networkUrl(Uri.parse(audioUrl), httpHeaders: headers);
           
           await Future.wait([
             _videoPlayerController!.initialize(),
             _audioPlayerController!.initialize(),
           ]);
           
-          // كتم صوت الفيديو الأساسي للاحتياط
           await _videoPlayerController!.setVolume(0.0);
           
-          // مراقبة الفيديو الأساسي لجعل مشغل الصوت يتبعه كظله
           _videoPlayerController!.addListener(() {
             if (_audioPlayerController == null) return;
-            
             final vidVal = _videoPlayerController!.value;
             final audVal = _audioPlayerController!.value;
             
-            // مزامنة زر كتم الصوت في الواجهة
             if (vidVal.volume != audVal.volume) {
                _audioPlayerController!.setVolume(vidVal.volume);
             }
-
-            // مزامنة دائرة التحميل (Buffering)
             if (vidVal.isBuffering) {
               if (audVal.isPlaying) _audioPlayerController!.pause();
             } else {
-              // مزامنة التشغيل والإيقاف
               if (vidVal.isPlaying && !audVal.isPlaying) {
                 _audioPlayerController!.play();
               } else if (!vidVal.isPlaying && audVal.isPlaying) {
                 _audioPlayerController!.pause();
               }
             }
-
-            // مزامنة التقديم والتأخير (الفرق المسموح نصف ثانية)
             final diff = (vidVal.position - audVal.position).inMilliseconds.abs();
-            if (diff > 500) {
-              _audioPlayerController!.seekTo(vidVal.position);
-            }
+            if (diff > 500) _audioPlayerController!.seekTo(vidVal.position);
           });
         } else {
-          // إذا كان الفيديو مدمجاً جاهزاً
           await _videoPlayerController!.initialize();
         }
 
@@ -151,11 +147,14 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
 
   Future<void> _fetchRelatedVideos() async {
     try {
-      var results = await _yt.search.search(widget.video.title);
+      // 1. البحث أولاً باسم القناة لضمان الحصول على نتائج
+      var results = await _yt.search.search(widget.video.author);
       var filteredList = results.whereType<yt.Video>().where((v) => v.id.value != widget.video.id.value).toList();
       
+      // 2. إذا فشل، نبحث بأول 3 كلمات من العنوان فقط
       if (filteredList.isEmpty) {
-        results = await _yt.search.search(widget.video.author);
+        String shortTitle = widget.video.title.split(' ').take(3).join(' ');
+        results = await _yt.search.search(shortTitle);
         filteredList = results.whereType<yt.Video>().where((v) => v.id.value != widget.video.id.value).toList();
       }
 
@@ -255,7 +254,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   @override
   void dispose() {
     _videoPlayerController?.dispose();
-    _audioPlayerController?.dispose(); // تنظيف المشغل الخفي
+    _audioPlayerController?.dispose();
     _chewieController?.dispose();
     _relatedScrollController.dispose();
     _yt.close();
@@ -298,7 +297,31 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                       ],
                     ),
                   )
-                : Chewie(controller: _chewieController!),
+                : Stack(
+                    children: [
+                      Chewie(controller: _chewieController!),
+                      if (_isMutedPreview)
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.volume_off, color: Colors.white, size: 14),
+                                SizedBox(width: 5),
+                                Text('معاينة بدون صوت', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
           ),
               
           Expanded(
@@ -510,7 +533,10 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                         ),
                         onPressed: () {
                           Navigator.pop(context); 
-                          AdService().showInterstitialAd();
+                          
+                          try {
+                            AdService().showInterstitialAd();
+                          } catch (_) {}
                           
                           showDialog(
                             context: context,
