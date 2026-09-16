@@ -54,11 +54,9 @@ class BackendService {
     langNotifier.value = savedLang;
     themeNotifier.value = savedTheme == 'dark' ? ThemeMode.dark : ThemeMode.light;
 
-    // الحل الجذري لمنع الانهيار: استخدام أيقونة التطبيق الافتراضية
-    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('launch_background');
+    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
     const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
     
-    // منع الانهيار في حال فشل تهيئة الإشعارات (كما يحدث في المحاكيات أو البناء الجديد)
     try {
       await _notificationsPlugin.initialize(initializationSettings);
     } catch (e) {
@@ -272,7 +270,7 @@ class BackendService {
               ),
             );
           } catch (e) {
-            // تجاهل خطأ الإشعارات لمنع الانهيار
+            // تجاهل
           }
         }
       }
