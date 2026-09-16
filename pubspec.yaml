@@ -21,7 +21,6 @@ dependencies:
 
   youtube_explode_dart: ^2.5.3
 
-  # عدنا للمكتبة الأصلية والمستقرة 
   ffmpeg_kit_flutter: ^6.0.3
 
   video_player: ^2.8.2
@@ -39,9 +38,10 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
 
 flutter_icons:
-  android: "launcher_icon"
+  android: true
   ios: true
-  image_path: "assets/icon.png"
+  # عدل هذا المسار ليتطابق تماماً مع مكان صورتك (مثلاً "assets/icon.png" أو "assets/icon/app_icon.png")
+  image_path: "assets/icon.png" 
 
 flutter:
   uses-material-design: true
