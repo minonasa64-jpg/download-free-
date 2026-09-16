@@ -7,11 +7,21 @@ import 'ui/main_navigation.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // تهيئة الخدمات
-  await BackendService().initBackend();
-  await AdService.init(); // تهيئة إعلانات AdMob
-  AdService().loadInterstitialAd(); // تحميل أول إعلان بيني في الذاكرة
+  // حماية التطبيق من الانهيار إذا فشلت تهيئة الخدمات في الخلفية
+  try {
+    await BackendService().initBackend();
+  } catch (e) {
+    debugPrint('Backend Init Error: $e');
+  }
 
+  try {
+    await AdService.init(); 
+    AdService().loadInterstitialAd();
+  } catch (e) {
+    debugPrint('AdMob Init Error: $e');
+  }
+
+  // انطلاق التطبيق بغض النظر عن أي أخطاء في الخلفية
   runApp(const BoyktaApp());
 }
 
