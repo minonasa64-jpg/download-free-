@@ -37,10 +37,11 @@ dev_dependencies:
   flutter_lints: ^3.0.0
   flutter_launcher_icons: ^0.13.1
 
-flutter_icons:
+# تم تصحيح الاسم وإيقاف توليد أيقونات الآيفون لمنع الخطأ
+flutter_launcher_icons:
   android: true
-  ios: true
-  # عدل هذا المسار ليتطابق تماماً مع مكان صورتك (مثلاً "assets/icon.png" أو "assets/icon/app_icon.png")
+  ios: false
+  # تأكد أن هذا المسار يطابق مكان صورتك بالضبط
   image_path: "assets/icon.png" 
 
 flutter:
