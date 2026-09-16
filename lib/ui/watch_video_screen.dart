@@ -22,6 +22,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   final yt.YoutubeExplode _yt = yt.YoutubeExplode();
   
   VideoPlayerController? _videoPlayerController;
+  VideoPlayerController? _audioPlayerController; // المشغل الخفي للصوت
   ChewieController? _chewieController;
   
   final ScrollController _relatedScrollController = ScrollController();
@@ -53,12 +54,75 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       var manifest = await _yt.videos.streamsClient.getManifest(widget.video.id);
       var muxedStreams = manifest.muxed.toList();
       
+      String? videoUrl;
+      String? audioUrl;
+      
+      // 1. إذا كان الفيديو يحتوي على صوت وصورة مدمجين جاهزين
       if (muxedStreams.isNotEmpty) {
         muxedStreams.sort((a, b) => a.videoResolution.height.compareTo(b.videoResolution.height));
-        var streamUrl = muxedStreams.last.url.toString();
+        videoUrl = muxedStreams.last.url.toString();
+      } 
+      // 2. إذا كان الصوت مفصولاً عن الصورة (مثل الفيديوهات الموسيقية)
+      else {
+        var videoOnlyStreams = manifest.videoOnly.toList();
+        var audioOnlyStreams = manifest.audioOnly;
+        
+        if (videoOnlyStreams.isNotEmpty && audioOnlyStreams.isNotEmpty) {
+          videoOnlyStreams.sort((a, b) => a.videoResolution.height.compareTo(b.videoResolution.height));
+          videoUrl = videoOnlyStreams.last.url.toString();
+          audioUrl = audioOnlyStreams.withHighestBitrate().url.toString();
+        }
+      }
 
-        _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(streamUrl));
-        await _videoPlayerController!.initialize();
+      if (videoUrl != null) {
+        _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+        
+        // خوارزمية دمج المشغلين (Dual-Player Sync)
+        if (audioUrl != null) {
+          _audioPlayerController = VideoPlayerController.networkUrl(Uri.parse(audioUrl));
+          
+          await Future.wait([
+            _videoPlayerController!.initialize(),
+            _audioPlayerController!.initialize(),
+          ]);
+          
+          // كتم صوت الفيديو الأساسي للاحتياط
+          await _videoPlayerController!.setVolume(0.0);
+          
+          // مراقبة الفيديو الأساسي لجعل مشغل الصوت يتبعه كظله
+          _videoPlayerController!.addListener(() {
+            if (_audioPlayerController == null) return;
+            
+            final vidVal = _videoPlayerController!.value;
+            final audVal = _audioPlayerController!.value;
+            
+            // مزامنة زر كتم الصوت في الواجهة
+            if (vidVal.volume != audVal.volume) {
+               _audioPlayerController!.setVolume(vidVal.volume);
+            }
+
+            // مزامنة دائرة التحميل (Buffering)
+            if (vidVal.isBuffering) {
+              if (audVal.isPlaying) _audioPlayerController!.pause();
+            } else {
+              // مزامنة التشغيل والإيقاف
+              if (vidVal.isPlaying && !audVal.isPlaying) {
+                _audioPlayerController!.play();
+              } else if (!vidVal.isPlaying && audVal.isPlaying) {
+                _audioPlayerController!.pause();
+              }
+            }
+
+            // مزامنة التقديم والتأخير (الفرق المسموح نصف ثانية)
+            final diff = (vidVal.position - audVal.position).inMilliseconds.abs();
+            if (diff > 500) {
+              _audioPlayerController!.seekTo(vidVal.position);
+            }
+          });
+        } else {
+          // إذا كان الفيديو مدمجاً جاهزاً
+          await _videoPlayerController!.initialize();
+        }
 
         if (mounted) {
           setState(() {
@@ -127,7 +191,6 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     }
   }
 
-  // فلترة وتجنب التكرار الذكي للجودات (نفس دالة links_tab)
   List<Map<String, dynamic>> _processFormats(List<Map<String, dynamic>> formats) {
     if (formats.isEmpty) return [];
     var uniqueFormats = <String, Map<String, dynamic>>{};
@@ -139,7 +202,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     sortedList.sort((a, b) {
       double sizeA = double.tryParse(a['size'].toString()) ?? 0.0;
       double sizeB = double.tryParse(b['size'].toString()) ?? 0.0;
-      return sizeB.compareTo(sizeA); // الأكبر أولاً
+      return sizeB.compareTo(sizeA);
     });
     return sortedList;
   }
@@ -192,6 +255,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   @override
   void dispose() {
     _videoPlayerController?.dispose();
+    _audioPlayerController?.dispose(); // تنظيف المشغل الخفي
     _chewieController?.dispose();
     _relatedScrollController.dispose();
     _yt.close();
@@ -359,7 +423,6 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   }
 }
 
-// نافذة اختيار الجودة الشفافة (BottomSheet) تم إعادتها للعمل مع النظام الجديد
 class FormatSelectionSheet extends StatefulWidget {
   final String title;
   final String highestAudioUrl;
@@ -446,13 +509,9 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                           padding: const EdgeInsets.symmetric(vertical: 15),
                         ),
                         onPressed: () {
-                          // إغلاق نافذة الاختيار
                           Navigator.pop(context); 
-                          
-                          // إظهار إعلان
                           AdService().showInterstitialAd();
                           
-                          // فتح نافذة تقدم التحميل والدمج
                           showDialog(
                             context: context,
                             barrierDismissible: false,
