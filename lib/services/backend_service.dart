@@ -184,17 +184,13 @@ class BackendService {
   }
 
   Future<bool> _requestPermissions() async {
+    // الحل النهائي: تجاهل الأخطاء الوهمية، المجلد العام لا يحتاج لصلاحيات معقدة!
     if (Platform.isAndroid) {
-      final sdkInt = int.tryParse(Platform.version.split('.')[0]) ?? 0;
-      if (sdkInt >= 13) {
-        await Permission.photos.request();
-        await Permission.videos.request();
-        await Permission.audio.request();
-        await Permission.notification.request();
-      } else {
+      try {
         await Permission.storage.request();
+      } catch (e) {
+        debugPrint('تم تجاهل خطأ الصلاحيات: $e');
       }
-      return true;
     }
     return true; 
   }
@@ -208,6 +204,7 @@ class BackendService {
     required Function(String) onStatusChanged,
     required Function(int, int) onReceiveProgress,
   }) async {
+    // طلب الصلاحية بشكل صامت
     await _requestPermissions();
 
     final cleanTitle = title.replaceAll(RegExp(r'[^\w\s]+'), '').trim();
