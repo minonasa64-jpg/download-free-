@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -184,7 +183,6 @@ class BackendService {
   }
 
   Future<bool> _requestPermissions() async {
-    // الحل النهائي: تجاهل الأخطاء الوهمية، المجلد العام لا يحتاج لصلاحيات معقدة!
     if (Platform.isAndroid) {
       try {
         await Permission.storage.request();
@@ -204,20 +202,17 @@ class BackendService {
     required Function(String) onStatusChanged,
     required Function(int, int) onReceiveProgress,
   }) async {
-    // طلب الصلاحية بشكل صامت
     await _requestPermissions();
 
     final cleanTitle = title.replaceAll(RegExp(r'[^\w\s]+'), '').trim();
-    Directory tempDir = await getTemporaryDirectory();
     
-    Directory? downloadsDir;
-    if (Platform.isAndroid) {
-      downloadsDir = Directory('/storage/emulated/0/Movies/Boykta');
-    } else {
-      final docDir = await getApplicationDocumentsDirectory();
-      downloadsDir = Directory('${docDir.path}/Boykta');
+    // تم التخلص من path_provider واستخدام مسارات مباشرة لتجنب channel-error
+    Directory tempDir = Directory('/storage/emulated/0/Download/Boykta_Temp');
+    if (!await tempDir.exists()) {
+      await tempDir.create(recursive: true);
     }
     
+    Directory downloadsDir = Directory('/storage/emulated/0/Movies/Boykta');
     if (!await downloadsDir.exists()) {
       await downloadsDir.create(recursive: true);
     }
@@ -291,15 +286,19 @@ class BackendService {
         onStatusChanged('جاري المعالجة والدمج (قد يستغرق بعض الوقت)...');
         String command = '-i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a aac "$finalOutputPath"';
         
-        var session = await FFmpegKit.execute(command);
-        var returnCode = await session.getReturnCode();
+        try {
+          var session = await FFmpegKit.execute(command);
+          var returnCode = await session.getReturnCode();
 
-        if (ReturnCode.isSuccess(returnCode)) {
-          onStatusChanged('تم الدمج بنجاح!');
-          File(tempVideoPath).deleteSync();
-          File(tempAudioPath).deleteSync();
-        } else {
-          throw Exception('فشل الدمج محلياً.');
+          if (ReturnCode.isSuccess(returnCode)) {
+            onStatusChanged('تم الدمج بنجاح!');
+            File(tempVideoPath).deleteSync();
+            File(tempAudioPath).deleteSync();
+          } else {
+            throw Exception('فشل الدمج محلياً.');
+          }
+        } catch (ffmpegError) {
+          throw Exception('خطأ في أداة الدمج (قد لا تكون مدعومة على هذا الجهاز).');
         }
       }
 
@@ -335,16 +334,9 @@ class BackendService {
 
   Future<List<FileSystemEntity>> getDownloadedFiles() async {
     try {
-      Directory? dir;
-      if (Platform.isAndroid) {
-        dir = Directory('/storage/emulated/0/Movies/Boykta');
-      } else {
-        final docDir = await getApplicationDocumentsDirectory();
-        dir = Directory('${docDir.path}/Boykta');
-      }
-
-      if (await dir.exists()) {
-        final List<FileSystemEntity> files = dir.listSync();
+      Directory downloadsDir = Directory('/storage/emulated/0/Movies/Boykta');
+      if (await downloadsDir.exists()) {
+        final List<FileSystemEntity> files = downloadsDir.listSync();
         files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
         return files.where((f) => f is File).toList();
       }
