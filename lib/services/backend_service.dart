@@ -39,7 +39,6 @@ class BackendService {
 
   final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
   
-  // إضافة YoutubeExplode للخدمة
   final YoutubeExplode _yt = YoutubeExplode();
 
   final Dio _dio = Dio(BaseOptions(
@@ -55,9 +54,16 @@ class BackendService {
     langNotifier.value = savedLang;
     themeNotifier.value = savedTheme == 'dark' ? ThemeMode.dark : ThemeMode.light;
 
-    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+    // الحل الجذري لمنع الانهيار: استخدام أيقونة التطبيق الافتراضية
+    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('launch_background');
     const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-    await _notificationsPlugin.initialize(initializationSettings);
+    
+    // منع الانهيار في حال فشل تهيئة الإشعارات (كما يحدث في المحاكيات أو البناء الجديد)
+    try {
+      await _notificationsPlugin.initialize(initializationSettings);
+    } catch (e) {
+      debugPrint('Failed to initialize notifications: $e');
+    }
   }
 
   Future<void> changeLanguage(String lang) async {
@@ -127,7 +133,6 @@ class BackendService {
     return ar[key] ?? key;
   }
 
-  // التحديث: الجلب المحلي (Serverless) بدلاً من السيرفر القديم
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     try {
       var manifest = await _yt.videos.streamsClient.getManifest(url);
@@ -196,7 +201,6 @@ class BackendService {
     return true; 
   }
 
-  // الدالة الجديدة للتحميل والدمج محلياً
   Future<String> downloadAndMerge({
     required String selectedUrl,
     required String title,
@@ -225,7 +229,6 @@ class BackendService {
     
     String finalOutputPath = '${downloadsDir.path}/$cleanTitle.$ext';
 
-    // تسجيل التحميل في القائمة والإشعارات
     int notifId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
     DownloadTask task = DownloadTask(id: notifId, title: cleanTitle, isAudio: ext == 'mp3');
     
@@ -249,24 +252,28 @@ class BackendService {
           lastUpdate = now;
           activeDownloads.value = List.from(activeDownloads.value);
           
-          _notificationsPlugin.show(
-            notifId,
-            '${t('downloading_now')} $cleanTitle',
-            '$downloadedStr MB / $totalStr MB',
-            NotificationDetails(
-              android: AndroidNotificationDetails(
-                'download_channel',
-                'تنزيلات Boykta',
-                importance: Importance.low,
-                priority: Priority.low,
-                showProgress: true,
-                maxProgress: 100,
-                progress: (progress * 100).toInt(),
-                ongoing: true,
-                onlyAlertOnce: true,
+          try {
+            _notificationsPlugin.show(
+              notifId,
+              '${t('downloading_now')} $cleanTitle',
+              '$downloadedStr MB / $totalStr MB',
+              NotificationDetails(
+                android: AndroidNotificationDetails(
+                  'download_channel',
+                  'تنزيلات Boykta',
+                  importance: Importance.low,
+                  priority: Priority.low,
+                  showProgress: true,
+                  maxProgress: 100,
+                  progress: (progress * 100).toInt(),
+                  ongoing: true,
+                  onlyAlertOnce: true,
+                ),
               ),
-            ),
-          );
+            );
+          } catch (e) {
+            // تجاهل خطأ الإشعارات لمنع الانهيار
+          }
         }
       }
       onReceiveProgress(received, total);
@@ -302,19 +309,23 @@ class BackendService {
       }
 
       activeDownloads.value = activeDownloads.value.where((t) => t.id != notifId).toList();
-      _notificationsPlugin.cancel(notifId);
-      _notificationsPlugin.show(
-        notifId + 1,
-        '🎉 ${t('completed')}',
-        cleanTitle,
-        const NotificationDetails(
-          android: AndroidNotificationDetails('download_channel', 'تنزيلات Boykta', importance: Importance.high, priority: Priority.high),
-        ),
-      );
+      try {
+        _notificationsPlugin.cancel(notifId);
+        _notificationsPlugin.show(
+          notifId + 1,
+          '🎉 ${t('completed')}',
+          cleanTitle,
+          const NotificationDetails(
+            android: AndroidNotificationDetails('download_channel', 'تنزيلات Boykta', importance: Importance.high, priority: Priority.high),
+          ),
+        );
+      } catch (e) {
+        // تجاهل
+      }
       return finalOutputPath;
     } catch (e) {
       activeDownloads.value = activeDownloads.value.where((t) => t.id != notifId).toList();
-      _notificationsPlugin.cancel(notifId);
+      try { _notificationsPlugin.cancel(notifId); } catch (_) {}
       throw Exception('حدث خطأ: $e');
     }
   }
