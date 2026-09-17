@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
 import '../local_video_player_screen.dart'; 
@@ -306,6 +307,18 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
     final fileName = file.path.split('/').last;
     final isCurrentlyPlaying = _currentAudio?.path == file.path;
 
+    String sizeStr = '';
+    try {
+      if (file.existsSync()) {
+        final bytes = file.lengthSync();
+        if (bytes >= 1024 * 1024) {
+          sizeStr = '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+        } else {
+          sizeStr = '${(bytes / 1024).toStringAsFixed(1)} KB';
+        }
+      }
+    } catch (_) {}
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: ClipRRect(
@@ -346,18 +359,43 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                           fontSize: 13
                         )
                       ),
+                      if (sizeStr.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          sizeStr,
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (!isAudio)
+                      IconButton(
+                        icon: const Icon(Icons.audiotrack_rounded, color: AppColors.magenta, size: 22),
+                        tooltip: _backend.t('convert_to_mp3'),
+                        onPressed: () => _convertVideo(file),
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.share_rounded, color: Colors.white70, size: 20),
+                      tooltip: _backend.t('share'),
+                      onPressed: () {
+                        Share.shareXFiles([XFile(file.path)], text: fileName);
+                      },
+                    ),
                     IconButton(
                       icon: Icon(
                         isAudio 
                           ? (isCurrentlyPlaying && _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill) 
                           : Icons.play_circle_fill, 
                         color: isAudio && isCurrentlyPlaying ? AppColors.magenta : AppColors.cyan, 
-                        size: 38
+                        size: 34
                       ),
                       onPressed: () {
                         if (file.existsSync()) {
@@ -373,7 +411,7 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                       },
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded, color: AppColors.orange, size: 24),
+                      icon: const Icon(Icons.delete_outline_rounded, color: AppColors.orange, size: 22),
                       onPressed: () => _deleteFile(file.path, file, isAudio),
                     ),
                   ],
@@ -429,6 +467,33 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
       await _backend.deleteFile(path);
     } catch (e) {
       _loadFiles(); 
+    }
+  }
+
+  Future<void> _convertVideo(File file) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_backend.t('converting')),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    bool success = await _backend.convertVideoToMp3(
+      videoFile: file,
+      onStatus: (status) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(status),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+    );
+
+    if (success && mounted) {
+      _loadFiles();
     }
   }
 

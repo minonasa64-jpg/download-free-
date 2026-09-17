@@ -92,6 +92,8 @@ class BackendService {
       'downloading_now': 'جاري تنزيل:', 'file_not_found': 'الملف غير موجود أو تم حذفه',
       'no_results': 'لم نتمكن من العثور على أي نتائج 😔', 'search_error': 'حدث خطأ أثناء البحث. تحقق من الاتصال.',
       'invalid_link': 'الرابط غير صالح', 'extracting': 'جاري استخراج الجودات محلياً...',
+      'share': 'مشاركة', 'convert_to_mp3': 'تحويل إلى صوت (MP3)', 'converting': 'جاري استخراج الصوت...',
+      'converted_success': 'تم استخراج الصوت بنجاح!', 'convert_failed': 'فشل استخراج الصوت', 'size': 'الحجم',
     };
     final en = {
       'youtube': 'YouTube', 'link': 'Links', 'downloads': 'Downloads', 'settings': 'Settings',
@@ -108,6 +110,8 @@ class BackendService {
       'downloading_now': 'Downloading:', 'file_not_found': 'File not found or deleted',
       'no_results': 'No results found 😔', 'search_error': 'Search error. Check connection.',
       'invalid_link': 'Invalid link', 'extracting': 'Extracting local formats...',
+      'share': 'Share', 'convert_to_mp3': 'Convert to MP3', 'converting': 'Extracting audio...',
+      'converted_success': 'Audio extracted successfully!', 'convert_failed': 'Failed to extract audio', 'size': 'Size',
     };
     final fr = {
       'youtube': 'YouTube', 'link': 'Liens', 'downloads': 'Téléchargements', 'settings': 'Paramètres',
@@ -124,6 +128,8 @@ class BackendService {
       'downloading_now': 'Téléchargement:', 'file_not_found': 'Fichier introuvable',
       'no_results': 'Aucun résultat 😔', 'search_error': 'Erreur de recherche.',
       'invalid_link': 'Lien invalide', 'extracting': 'Extraction des formats...',
+      'share': 'Partager', 'convert_to_mp3': 'Convertir en MP3', 'converting': 'Extraction audio...',
+      'converted_success': 'Audio extrait avec succès !', 'convert_failed': 'Échec de l\'extraction audio', 'size': 'Taille',
     };
     
     if (langNotifier.value == 'en') return en[key] ?? key;
@@ -419,6 +425,36 @@ class BackendService {
     final file = File(path);
     if (await file.exists()) {
       await file.delete();
+    }
+  }
+
+  Future<bool> convertVideoToMp3({
+    required File videoFile,
+    required Function(String) onStatus,
+  }) async {
+    try {
+      Directory downloadsDir = await _getDownloadsDir();
+      String rawName = videoFile.path.split('/').last;
+      String nameWithoutExt = rawName.contains('.') 
+          ? rawName.substring(0, rawName.lastIndexOf('.')) 
+          : rawName;
+      String outputMp3Path = '${downloadsDir.path}/${nameWithoutExt}_audio.mp3';
+
+      onStatus(t('converting'));
+      String command = '-y -i "${videoFile.path}" -vn -c:a aac "$outputMp3Path"';
+      var session = await FFmpegKit.execute(command);
+      var returnCode = await session.getReturnCode();
+      
+      if (ReturnCode.isSuccess(returnCode)) {
+        onStatus(t('converted_success'));
+        return true;
+      } else {
+        onStatus(t('convert_failed'));
+        return false;
+      }
+    } catch (e) {
+      onStatus(t('convert_failed'));
+      return false;
     }
   }
 
