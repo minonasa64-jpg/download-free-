@@ -3,6 +3,7 @@ import 'core/app_colors.dart';
 import 'services/backend_service.dart';
 import 'services/ad_service.dart';
 import 'ui/main_navigation.dart';
+import 'ui/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +46,7 @@ class BoyktaApp extends StatelessWidget {
             scaffoldBackgroundColor: AppColors.background,
             primaryColor: AppColors.cyan,
           ),
-          home: const MainNavigation(),
+          home: const SplashScreen(),
         );
       },
     );

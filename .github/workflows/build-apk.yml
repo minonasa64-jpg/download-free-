@@ -40,7 +40,7 @@ jobs:
           tree = ET.parse(path)
           root = tree.getroot()
           
-          perms = ['android.permission.INTERNET', 'android.permission.WRITE_EXTERNAL_STORAGE', 'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.READ_MEDIA_VIDEO', 'android.permission.READ_MEDIA_AUDIO', 'android.permission.MANAGE_EXTERNAL_STORAGE', 'com.google.android.gms.permission.AD_ID']
+          perms = ['android.permission.INTERNET', 'android.permission.WRITE_EXTERNAL_STORAGE', 'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.READ_MEDIA_VIDEO', 'android.permission.READ_MEDIA_AUDIO', 'android.permission.MANAGE_EXTERNAL_STORAGE', 'com.google.android.gms.permission.AD_ID', 'android.permission.POST_NOTIFICATIONS']
           for p in perms:
               e = ET.Element('uses-permission')
               e.set('{http://schemas.android.com/apk/res/android}name', p)
@@ -65,15 +65,26 @@ jobs:
               configurations.all {
                   resolutionStrategy.eachDependency { DependencyResolveDetails details ->
                       if (details.requested.group == 'com.arthenica') {
-                          details.useTarget group: 'dev.ffmpegkit-maintained', name: 'ffmpeg-kit-full', version: '8.1.7'
+                          if (details.requested.name.contains('ffmpeg-kit')) {
+                              details.useTarget group: 'dev.ffmpegkit-maintained', name: details.requested.name, version: '8.1.7'
+                          } else {
+                              details.useTarget group: 'dev.ffmpegkit-maintained', name: 'ffmpeg-kit-full', version: '8.1.7'
+                          }
                       }
                   }
               }
           }
           EOF
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle
-          sed -i 's/minSdkVersion 19/minSdkVersion 24/g' android/app/build.gradle
-          sed -i 's/minSdkVersion 21/minSdkVersion 24/g' android/app/build.gradle
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i -E 's/minSdkVersion\s+[0-9]+/minSdkVersion 24/g' android/app/build.gradle || true
+            sed -i -E 's/minSdkVersion\s+flutter\.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle || true
+            sed -i -E 's/minSdk\s*=\s*[0-9]+/minSdk = 24/g' android/app/build.gradle || true
+            sed -i -E 's/minSdk\s*=\s*flutter\.minSdkVersion/minSdk = 24/g' android/app/build.gradle || true
+          fi
+          if [ -f "android/app/build.gradle.kts" ]; then
+            sed -i -E 's/minSdk\s*=\s*[0-9]+/minSdk = 24/g' android/app/build.gradle.kts || true
+            sed -i -E 's/minSdk\s*=\s*flutter\.minSdkVersion/minSdk = 24/g' android/app/build.gradle.kts || true
+          fi
 
       - name: Install Dependencies
         run: flutter pub get

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -185,12 +186,66 @@ class BackendService {
   Future<bool> _requestPermissions() async {
     if (Platform.isAndroid) {
       try {
-        await Permission.storage.request();
+        await [
+          Permission.storage,
+          Permission.videos,
+          Permission.audio,
+          Permission.manageExternalStorage,
+          Permission.notification,
+        ].request();
       } catch (e) {
         debugPrint('تم تجاهل خطأ الصلاحيات: $e');
       }
     }
     return true; 
+  }
+
+  Future<Directory> _getTempDir() async {
+    try {
+      Directory temp = Directory('/storage/emulated/0/Download/Boykta_Temp');
+      if (!await temp.exists()) await temp.create(recursive: true);
+      return temp;
+    } catch (_) {
+      try {
+        final extDir = await getExternalStorageDirectory();
+        if (extDir != null) {
+          final dir = Directory('${extDir.path}/Boykta_Temp');
+          if (!await dir.exists()) await dir.create(recursive: true);
+          return dir;
+        }
+      } catch (_) {}
+      final docDir = await getApplicationDocumentsDirectory();
+      final dir = Directory('${docDir.path}/Boykta_Temp');
+      if (!await dir.exists()) await dir.create(recursive: true);
+      return dir;
+    }
+  }
+
+  Future<Directory> _getDownloadsDir() async {
+    try {
+      Directory moviesDir = Directory('/storage/emulated/0/Movies/Boykta');
+      if (!await moviesDir.exists()) await moviesDir.create(recursive: true);
+      return moviesDir;
+    } catch (_) {
+      try {
+        Directory dlDir = Directory('/storage/emulated/0/Download/Boykta');
+        if (!await dlDir.exists()) await dlDir.create(recursive: true);
+        return dlDir;
+      } catch (_) {
+        try {
+          final extDir = await getExternalStorageDirectory();
+          if (extDir != null) {
+            final dir = Directory('${extDir.path}/Boykta');
+            if (!await dir.exists()) await dir.create(recursive: true);
+            return dir;
+          }
+        } catch (_) {}
+        final docDir = await getApplicationDocumentsDirectory();
+        final dir = Directory('${docDir.path}/Boykta');
+        if (!await dir.exists()) await dir.create(recursive: true);
+        return dir;
+      }
+    }
   }
 
   Future<String> downloadAndMerge({
@@ -206,16 +261,9 @@ class BackendService {
 
     final cleanTitle = title.replaceAll(RegExp(r'[^\w\s]+'), '').trim();
     
-    // تم التخلص من path_provider واستخدام مسارات مباشرة لتجنب channel-error
-    Directory tempDir = Directory('/storage/emulated/0/Download/Boykta_Temp');
-    if (!await tempDir.exists()) {
-      await tempDir.create(recursive: true);
-    }
-    
-    Directory downloadsDir = Directory('/storage/emulated/0/Movies/Boykta');
-    if (!await downloadsDir.exists()) {
-      await downloadsDir.create(recursive: true);
-    }
+    // مسارات مرنة ومتوافقة مع كافة إصدارات الأندرويد
+    Directory tempDir = await _getTempDir();
+    Directory downloadsDir = await _getDownloadsDir();
     
     String finalOutputPath = '${downloadsDir.path}/$cleanTitle.$ext';
 
@@ -334,13 +382,34 @@ class BackendService {
 
   Future<List<FileSystemEntity>> getDownloadedFiles() async {
     try {
-      Directory downloadsDir = Directory('/storage/emulated/0/Movies/Boykta');
-      if (await downloadsDir.exists()) {
-        final List<FileSystemEntity> files = downloadsDir.listSync();
-        files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
-        return files.where((f) => f is File).toList();
+      List<FileSystemEntity> allFiles = [];
+      Set<String> visitedPaths = {};
+
+      List<Directory> targetDirs = [];
+      try { targetDirs.add(Directory('/storage/emulated/0/Movies/Boykta')); } catch (_) {}
+      try { targetDirs.add(Directory('/storage/emulated/0/Download/Boykta')); } catch (_) {}
+      try {
+        final extDir = await getExternalStorageDirectory();
+        if (extDir != null) targetDirs.add(Directory('${extDir.path}/Boykta'));
+      } catch (_) {}
+      try {
+        final docDir = await getApplicationDocumentsDirectory();
+        targetDirs.add(Directory('${docDir.path}/Boykta'));
+      } catch (_) {}
+
+      for (var dir in targetDirs) {
+        if (await dir.exists()) {
+          for (var f in dir.listSync()) {
+            if (f is File && !visitedPaths.contains(f.path)) {
+              visitedPaths.add(f.path);
+              allFiles.add(f);
+            }
+          }
+        }
       }
-      return [];
+
+      allFiles.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+      return allFiles;
     } catch (e) {
       return [];
     }
