@@ -94,6 +94,18 @@ class BackendService {
       'invalid_link': 'الرابط غير صالح', 'extracting': 'جاري استخراج الجودات محلياً...',
       'share': 'مشاركة', 'convert_to_mp3': 'تحويل إلى صوت (MP3)', 'converting': 'جاري استخراج الصوت...',
       'converted_success': 'تم استخراج الصوت بنجاح!', 'convert_failed': 'فشل استخراج الصوت', 'size': 'الحجم',
+      'vault': 'الخزنة الآمنة', 'vault_desc': 'حفظ الفيديوهات والصوتيات برمز PIN سري',
+      'set_pin': 'تعيين رمز PIN للخزنة', 'enter_pin': 'أدخل رمز PIN للخزنة',
+      'pin_hint': 'أدخل رمزاً مكوناً من 4 أرقام', 'pin_set_success': 'تم تعيين الرمز السري بنجاح',
+      'wrong_pin': 'الرمز السري غير صحيح!', 'move_to_vault': 'قفل في الخزنة',
+      'moved_to_vault_success': 'تم نقل الملف إلى الخزنة الآمنة بنجاح 🔒',
+      'restore_from_vault': 'إلغاء القفل (استرجاع للتنزيلات العامة)',
+      'restored_success': 'تم استرجاع الملف إلى التنزيلات العامة 🔓',
+      'vault_empty': 'الخزنة فارغة حالياً. يمكنك قفل أي ملف من قائمة التنزيلات.',
+      'wifi_only': 'التحميل عبر Wi-Fi فقط', 'wifi_only_desc': 'توفير باقة بيانات الهاتف الخلوية',
+      'wifi_warning': 'تنبيه: تم إيقاف التحميل لأن خيار (Wi-Fi فقط) مفعل',
+      'auto_retry_active': 'الاستئناف التلقائي مفعل', 'retrying_download': 'جاري إعادة محاولة التحميل...',
+      'quick_platforms': 'منصات سريعة مدعومة', 'clipboard_detected': 'تم رصد رابط في الحافظة! اضغط للصق والفحص',
     };
     final en = {
       'youtube': 'YouTube', 'link': 'Links', 'downloads': 'Downloads', 'settings': 'Settings',
@@ -112,6 +124,18 @@ class BackendService {
       'invalid_link': 'Invalid link', 'extracting': 'Extracting local formats...',
       'share': 'Share', 'convert_to_mp3': 'Convert to MP3', 'converting': 'Extracting audio...',
       'converted_success': 'Audio extracted successfully!', 'convert_failed': 'Failed to extract audio', 'size': 'Size',
+      'vault': 'Private Vault', 'vault_desc': 'Protect private media with a PIN code',
+      'set_pin': 'Set Vault PIN', 'enter_pin': 'Enter Vault PIN',
+      'pin_hint': 'Enter 4-digit code', 'pin_set_success': 'PIN set successfully',
+      'wrong_pin': 'Incorrect PIN code!', 'move_to_vault': 'Lock in Vault',
+      'moved_to_vault_success': 'File moved to Private Vault 🔒',
+      'restore_from_vault': 'Unlock (Restore to Downloads)',
+      'restored_success': 'File restored to public downloads 🔓',
+      'vault_empty': 'Vault is currently empty. Lock any media from downloads.',
+      'wifi_only': 'Download on Wi-Fi Only', 'wifi_only_desc': 'Save cellular mobile data usage',
+      'wifi_warning': 'Download paused: Wi-Fi Only option is enabled',
+      'auto_retry_active': 'Auto-Resume & Retry Active', 'retrying_download': 'Retrying download...',
+      'quick_platforms': 'Quick Platforms', 'clipboard_detected': 'Link found in clipboard! Tap to analyze',
     };
     final fr = {
       'youtube': 'YouTube', 'link': 'Liens', 'downloads': 'Téléchargements', 'settings': 'Paramètres',
@@ -130,6 +154,18 @@ class BackendService {
       'invalid_link': 'Lien invalide', 'extracting': 'Extraction des formats...',
       'share': 'Partager', 'convert_to_mp3': 'Convertir en MP3', 'converting': 'Extraction audio...',
       'converted_success': 'Audio extrait avec succès !', 'convert_failed': 'Échec de l\'extraction audio', 'size': 'Taille',
+      'vault': 'Coffre-fort privé', 'vault_desc': 'Protéger vos médias avec un code PIN',
+      'set_pin': 'Définir code PIN', 'enter_pin': 'Entrez le code PIN',
+      'pin_hint': 'Code à 4 chiffres', 'pin_set_success': 'Code PIN défini avec succès',
+      'wrong_pin': 'Code PIN incorrect !', 'move_to_vault': 'Verrouiller dans le coffre',
+      'moved_to_vault_success': 'Fichier déplacé vers le coffre-fort 🔒',
+      'restore_from_vault': 'Déverrouiller (Restaurer)',
+      'restored_success': 'Fichier restauré vers les téléchargements 🔓',
+      'vault_empty': 'Le coffre est vide. Verrouillez vos médias depuis la liste.',
+      'wifi_only': 'Télécharger via Wi-Fi uniquement', 'wifi_only_desc': 'Économiser les données mobiles',
+      'wifi_warning': 'Téléchargement suspendu: Wi-Fi uniquement activé',
+      'auto_retry_active': 'Reprise automatique active', 'retrying_download': 'Nouvelle tentative en cours...',
+      'quick_platforms': 'Plateformes rapides', 'clipboard_detected': 'Lien détecté dans le presse-papiers !',
     };
     
     if (langNotifier.value == 'en') return en[key] ?? key;
@@ -379,10 +415,111 @@ class BackendService {
   }
 
   Future<void> _downloadFile(String url, String savePath, Function(int, int) onReceiveProgress) async {
+    int maxRetries = 3;
+    int attempt = 0;
+
+    while (attempt < maxRetries) {
+      attempt++;
+      try {
+        await _dio.download(
+          url,
+          savePath,
+          deleteOnError: false,
+          onReceiveProgress: onReceiveProgress,
+        );
+        return;
+      } catch (e) {
+        if (attempt >= maxRetries) {
+          // محاولة أخيرة مع تفريغ الملف التالف
+          try {
+            final f = File(savePath);
+            if (await f.exists()) await f.delete();
+            await _dio.download(url, savePath, onReceiveProgress: onReceiveProgress);
+            return;
+          } catch (err) {
+            throw Exception('فشل التحميل بعد عدة محاولات تلقائية: $err');
+          }
+        }
+        await Future.delayed(Duration(seconds: attempt * 2));
+      }
+    }
+  }
+
+  // ==========================
+  // الخزنة الآمنة (Private Vault)
+  // ==========================
+  Future<Directory> _getVaultDir() async {
+    final docDir = await getApplicationDocumentsDirectory();
+    final dir = Directory('${docDir.path}/.vault_private');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
+  Future<bool> isVaultPinSet() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pin = prefs.getString('vault_pin');
+    return pin != null && pin.isNotEmpty;
+  }
+
+  Future<bool> verifyVaultPin(String pin) async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedPin = prefs.getString('vault_pin');
+    return savedPin == pin;
+  }
+
+  Future<void> setVaultPin(String pin) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('vault_pin', pin);
+  }
+
+  Future<bool> moveToVault(File file) async {
     try {
-      await _dio.download(url, savePath, onReceiveProgress: onReceiveProgress);
+      if (!await file.exists()) return false;
+      final vaultDir = await _getVaultDir();
+      final fileName = file.path.split('/').last;
+      final targetPath = '${vaultDir.path}/$fileName';
+      await file.copy(targetPath);
+      await file.delete();
+      return true;
     } catch (e) {
-      throw Exception('خطأ في التحميل: $e');
+      debugPrint('Error moving to vault: $e');
+      return false;
+    }
+  }
+
+  Future<bool> restoreFromVault(File file) async {
+    try {
+      if (!await file.exists()) return false;
+      final downloadsDir = await _getDownloadsDir();
+      final fileName = file.path.split('/').last;
+      final targetPath = '${downloadsDir.path}/$fileName';
+      await file.copy(targetPath);
+      await file.delete();
+      return true;
+    } catch (e) {
+      debugPrint('Error restoring from vault: $e');
+      return false;
+    }
+  }
+
+  Future<List<FileSystemEntity>> getVaultFiles() async {
+    try {
+      final vaultDir = await _getVaultDir();
+      if (!await vaultDir.exists()) return [];
+      final files = vaultDir.listSync().whereType<File>().toList();
+      files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+      return files;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<void> deleteVaultFile(String path) async {
+    final file = File(path);
+    if (await file.exists()) {
+      await file.delete();
     }
   }
 
@@ -462,6 +599,7 @@ class BackendService {
     final prefs = await SharedPreferences.getInstance();
     return {
       'downloadMobile': prefs.getBool('downloadMobile') ?? true,
+      'wifi_only': prefs.getBool('wifi_only') ?? false,
       'download_path': prefs.getString('download_path') ?? 'مسار Boykta العام',
       'max_tasks': prefs.getInt('max_tasks') ?? 4,
       'speed_limit': prefs.getString('speed_limit') ?? 'غير محدود',

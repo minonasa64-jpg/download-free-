@@ -21,12 +21,36 @@ class _LinksTabState extends State<LinksTab> {
   bool _hasResult = false;
   Map<String, dynamic>? _mediaData;
   Map<String, dynamic>? _selectedFormat;
+  String? _detectedClipboardUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkClipboardForMedia();
+  }
+
+  Future<void> _checkClipboardForMedia() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      if (data != null && data.text != null) {
+        final text = data.text!.trim();
+        if ((text.startsWith('http://') || text.startsWith('https://')) && text.length > 10) {
+          if (mounted) {
+            setState(() {
+              _detectedClipboardUrl = text;
+            });
+          }
+        }
+      }
+    } catch (_) {}
+  }
   
   Future<void> _pasteFromClipboard() async {
     final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
     if (clipboardData != null && clipboardData.text != null) {
       setState(() {
-        _urlController.text = clipboardData.text!;
+        _urlController.text = clipboardData.text!.trim();
+        _detectedClipboardUrl = null;
       });
     }
   }
@@ -134,99 +158,172 @@ class _LinksTabState extends State<LinksTab> {
   Widget _buildInputSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLight.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.05)),
-            ),
-            child: Column(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.background.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: TextField(
-                    controller: _urlController,
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-                    decoration: const InputDecoration(
-                      hintText: 'https://...',
-                      hintStyle: TextStyle(color: AppColors.textMuted),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
-                    ),
-                  ),
+      child: Column(
+        children: [
+          if (_detectedClipboardUrl != null) ...[
+            GestureDetector(
+              onTap: () {
+                _urlController.text = _detectedClipboardUrl!;
+                setState(() => _detectedClipboardUrl = null);
+                _analyzeLink();
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.cyan.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.cyan.withOpacity(0.4)),
                 ),
-                const SizedBox(height: 15),
-                Row(
+                child: Row(
                   children: [
+                    const Icon(Icons.auto_awesome, color: AppColors.cyan, size: 18),
+                    const SizedBox(width: 8),
                     Expanded(
-                      flex: 1,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.surface,
-                          foregroundColor: AppColors.textPrimary,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: Colors.white.withOpacity(0.1)),
-                          ),
-                        ),
-                        onPressed: _pasteFromClipboard,
-                        icon: const Icon(Icons.content_paste, size: 18),
-                        label: const Text('لصق', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: Text(
+                        _backend.t('clipboard_detected'),
+                        style: const TextStyle(color: AppColors.cyan, fontSize: 12, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      flex: 2,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: AppColors.primaryGradient,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.cyan.withOpacity(0.3),
-                              blurRadius: 10,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: _analyzeLink,
-                          child: Text(
-                            _backend.t('download_btn'),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
+                    const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 12),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLight.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.05)),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.background.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: TextField(
+                        controller: _urlController,
+                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                        decoration: const InputDecoration(
+                          hintText: 'https://...',
+                          hintStyle: TextStyle(color: AppColors.textMuted),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 15),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 1,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.surface,
+                              foregroundColor: AppColors.textPrimary,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                              ),
+                            ),
+                            onPressed: _pasteFromClipboard,
+                            icon: const Icon(Icons.content_paste, size: 18),
+                            label: const Text('لصق', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.cyan.withOpacity(0.3),
+                                  blurRadius: 10,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: _analyzeLink,
+                              child: Text(
+                                _backend.t('download_btn'),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+          const SizedBox(height: 18),
+          _buildQuickPlatforms(),
+        ],
       ),
+    );
+  }
+
+  Widget _buildQuickPlatforms() {
+    final platforms = [
+      {'name': 'YouTube', 'icon': Icons.smart_display_rounded, 'color': Colors.redAccent},
+      {'name': 'TikTok', 'icon': Icons.music_note_rounded, 'color': AppColors.cyan},
+      {'name': 'Instagram', 'icon': Icons.camera_alt_rounded, 'color': AppColors.magenta},
+      {'name': 'Facebook', 'icon': Icons.facebook_rounded, 'color': Colors.blueAccent},
+    ];
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: platforms.map((p) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(p['icon'] as IconData, size: 14, color: p['color'] as Color),
+              const SizedBox(width: 5),
+              Text(
+                p['name'] as String,
+                style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 

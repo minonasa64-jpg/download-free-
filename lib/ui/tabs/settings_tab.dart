@@ -15,6 +15,7 @@ class _SettingsTabState extends State<SettingsTab> {
   final BackendService _backend = BackendService();
   
   bool _downloadViaMobile = true;
+  bool _wifiOnly = false;
   String _downloadPath = '/storage/emulated/0/Download';
   int _maxTasks = 4;
   String _speedLimit = 'غير محدود';
@@ -35,6 +36,7 @@ class _SettingsTabState extends State<SettingsTab> {
     if (mounted) {
       setState(() {
         _downloadViaMobile = dlSettings['downloadMobile'];
+        _wifiOnly = dlSettings['wifi_only'] ?? false;
         _downloadPath = dlSettings['download_path'];
         _maxTasks = dlSettings['max_tasks'];
         _speedLimit = dlSettings['speed_limit'];
@@ -97,6 +99,40 @@ class _SettingsTabState extends State<SettingsTab> {
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
             onTap: () => _showStoragePathDialog(context),
+          ),
+          _buildGlassTile(
+            context,
+            icon: Icons.wifi_rounded,
+            title: _backend.t('wifi_only'),
+            subtitle: _backend.t('wifi_only_desc'),
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: Switch(
+              value: _wifiOnly,
+              activeColor: AppColors.cyan,
+              onChanged: (val) {
+                _updateDownload('wifi_only', val);
+                setState(() => _wifiOnly = val);
+              },
+            ),
+          ),
+          _buildGlassTile(
+            context,
+            icon: Icons.replay_circle_filled_rounded,
+            title: _backend.t('auto_retry_active'),
+            subtitle: 'إعادة المحاولة التلقائية واستئناف التحميل',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.cyan.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text('نشط ⚡', style: TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold)),
+            ),
           ),
 
           const SizedBox(height: 15),

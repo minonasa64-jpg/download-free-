@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
 import '../local_video_player_screen.dart'; 
+import '../vault_screen.dart'; 
 
 class DownloadsTab extends StatefulWidget {
   const DownloadsTab({super.key});
@@ -102,6 +103,192 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
     }
   }
 
+  void _openVault() async {
+    final hasPin = await _backend.isVaultPinSet();
+    if (!mounted) return;
+
+    if (!hasPin) {
+      _showSetVaultPinDialog();
+    } else {
+      _showEnterVaultPinDialog();
+    }
+  }
+
+  void _showSetVaultPinDialog() {
+    final pinCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.shield_rounded, color: AppColors.cyan, size: 24),
+            const SizedBox(width: 8),
+            Text(_backend.t('set_pin'), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_backend.t('vault_desc'), style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: pinCtrl,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white, letterSpacing: 8, fontSize: 20),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: '••••',
+                hintStyle: const TextStyle(color: Colors.white38, letterSpacing: 8),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
+            onPressed: () async {
+              if (pinCtrl.text.trim().length == 4) {
+                await _backend.setVaultPin(pinCtrl.text.trim());
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(_backend.t('pin_set_success')), backgroundColor: AppColors.cyan.withOpacity(0.9)),
+                  );
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const VaultScreen())).then((_) => _loadFiles());
+                }
+              }
+            },
+            child: const Text('حفظ والدخول', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEnterVaultPinDialog() {
+    final pinCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.lock_rounded, color: AppColors.cyan, size: 24),
+            const SizedBox(width: 8),
+            Text(_backend.t('enter_pin'), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: pinCtrl,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white, letterSpacing: 8, fontSize: 20),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: '••••',
+                hintStyle: const TextStyle(color: Colors.white38, letterSpacing: 8),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
+            onPressed: () async {
+              final isCorrect = await _backend.verifyVaultPin(pinCtrl.text.trim());
+              if (isCorrect) {
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const VaultScreen())).then((_) => _loadFiles());
+                }
+              } else {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(_backend.t('wrong_pin')), backgroundColor: AppColors.orange),
+                  );
+                }
+              }
+            },
+            child: const Text('دخول', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _lockFileInVault(File file) async {
+    final hasPin = await _backend.isVaultPinSet();
+    if (!hasPin) {
+      _showSetVaultPinDialog();
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(
+          children: [
+            const Icon(Icons.shield_rounded, color: AppColors.cyan, size: 22),
+            const SizedBox(width: 8),
+            Text(_backend.t('move_to_vault'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'هل تريد نقل هذا الملف إلى الخزنة الآمنة المحمية برمز PIN؟',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('نقل وقفل', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await _backend.moveToVault(file);
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_backend.t('moved_to_vault_success')), backgroundColor: AppColors.cyan.withOpacity(0.9)),
+          );
+          _loadFiles();
+        }
+      }
+    }
+  }
+
   @override
   void dispose() {
     _backend.activeDownloads.removeListener(_onActiveDownloadsChanged);
@@ -119,11 +306,38 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(25, 30, 25, 10),
-                // دمج دالة الترجمة هنا
-                child: Text(
-                  _backend.t('downloads'), 
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary)
+                padding: const EdgeInsets.fromLTRB(25, 25, 25, 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _backend.t('downloads'), 
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary)
+                    ),
+                    InkWell(
+                      onTap: _openVault,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: AppColors.cyan.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.cyan.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.shield_rounded, size: 16, color: AppColors.cyan),
+                            const SizedBox(width: 6),
+                            Text(
+                              _backend.t('vault'),
+                              style: const TextStyle(color: AppColors.cyan, fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               
@@ -382,6 +596,11 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                         tooltip: _backend.t('convert_to_mp3'),
                         onPressed: () => _convertVideo(file),
                       ),
+                    IconButton(
+                      icon: const Icon(Icons.lock_outline_rounded, color: AppColors.cyan, size: 21),
+                      tooltip: _backend.t('move_to_vault'),
+                      onPressed: () => _lockFileInVault(file),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.share_rounded, color: Colors.white70, size: 20),
                       tooltip: _backend.t('share'),
