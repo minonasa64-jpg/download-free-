@@ -961,10 +961,21 @@ class _LinksTabState extends State<LinksTab> {
     }
     var sortedList = uniqueFormats.values.toList();
 
+    // ترتيب القائمة تصاعدياً من أدنى جودة إلى أعلى جودة
     sortedList.sort((a, b) {
+      int orderA = a['quality_order'] is int 
+          ? a['quality_order'] 
+          : (int.tryParse(a['quality_order']?.toString() ?? '') ?? 0);
+      int orderB = b['quality_order'] is int 
+          ? b['quality_order'] 
+          : (int.tryParse(b['quality_order']?.toString() ?? '') ?? 0);
+      
+      if (orderA != 0 && orderB != 0 && orderA != orderB) {
+        return orderA.compareTo(orderB);
+      }
       double sizeA = double.tryParse(a['size'].toString()) ?? 0.0;
       double sizeB = double.tryParse(b['size'].toString()) ?? 0.0;
-      return sizeB.compareTo(sizeA);
+      return sizeA.compareTo(sizeB);
     });
     return sortedList;
   }
@@ -983,6 +994,8 @@ class _LinksTabState extends State<LinksTab> {
       itemBuilder: (context, index) {
         final format = formats[index];
         final isSelected = _selectedFormat == format;
+        final String? badge = format['quality_badge'];
+        final String? desc = format['quality_desc'];
 
         return InkWell(
           onTap: () {
@@ -992,53 +1005,101 @@ class _LinksTabState extends State<LinksTab> {
           },
           child: Container(
             color: isSelected ? AppColors.cyan.withOpacity(0.1) : Colors.transparent,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                  color: isSelected ? AppColors.cyan : AppColors.textMuted,
-                  size: 20,
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Icon(
+                    isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                    color: isSelected ? AppColors.cyan : AppColors.textMuted,
+                    size: 20,
+                  ),
                 ),
-                const SizedBox(width: 15),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            format['quality_name'],
+                            style: TextStyle(
+                              color: isSelected ? AppColors.cyan : AppColors.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          if (badge != null) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isSelected 
+                                    ? AppColors.cyan.withOpacity(0.2) 
+                                    : AppColors.surfaceLight,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                badge,
+                                style: TextStyle(
+                                  color: isSelected ? AppColors.cyan : AppColors.textSecondary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (desc != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          desc,
+                          style: TextStyle(
+                            color: isSelected ? AppColors.cyan.withOpacity(0.85) : AppColors.textMuted,
+                            fontSize: 11,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 3),
+                      Text(
+                        'الحجم: ${format['size']} MB',
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      format['quality_name'],
-                      style: TextStyle(
-                        color: isSelected ? AppColors.cyan : AppColors.textPrimary,
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLight,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        format['ext'].toString().toUpperCase(),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'MB ${format['size']}',
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-                    ),
+                    if (format['needs_merge'] == true) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.orange.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('دقة أصلية', style: TextStyle(color: AppColors.orange, fontSize: 9)),
+                      ),
+                    ],
                   ],
-                ),
-                const Spacer(),
-                if (format['needs_merge'] == true)
-                  Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.orange.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text('عالية الجودة', style: TextStyle(color: AppColors.orange, fontSize: 9)),
-                  ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    format['ext'].toString().toUpperCase(),
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
-                  ),
                 ),
               ],
             ),

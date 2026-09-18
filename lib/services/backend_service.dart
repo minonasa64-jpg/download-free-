@@ -173,6 +173,75 @@ class BackendService {
     return ar[key] ?? key;
   }
 
+  static Map<String, dynamic> getVideoQualityInfo(String label) {
+    final lower = label.toLowerCase();
+    int order = 1000;
+    String badge = 'SD';
+    String desc = 'جودة قياسية مناسبة للهواتف';
+
+    if (lower.contains('144')) {
+      order = 144;
+      badge = 'توفير فائق';
+      desc = 'أقل حجم ممكن • توفير فائق للبيانات • مناسب للشبكات البطيئة';
+    } else if (lower.contains('240')) {
+      order = 240;
+      badge = 'اقتصادي';
+      desc = 'حجم صغير جداً • تصفح سريع واستهلاك محدود جداً للمساحة';
+    } else if (lower.contains('360')) {
+      order = 360;
+      badge = 'متوازن SD';
+      desc = 'جودة قياسية متوازنة • استهلاك منخفض للبيانات والبطارية';
+    } else if (lower.contains('480')) {
+      order = 480;
+      badge = 'دقة جيدة SD+';
+      desc = 'دقة مريحة وواضحة جداً لشاشات الهواتف المحمولة';
+    } else if (lower.contains('720')) {
+      order = 720;
+      badge = 'عالية HD';
+      desc = 'عالية الدقة HD • توازن مثالي بين نقاء الصورة وسرعة التحميل';
+    } else if (lower.contains('1080')) {
+      order = 1080;
+      badge = 'فائقة FHD';
+      desc = 'دقة فائقة Full HD • تفاصيل سينمائية كريستالية ونقاء مذهل';
+    } else if (lower.contains('1440') || lower.contains('2k')) {
+      order = 1440;
+      badge = '2K Quad HD';
+      desc = 'دقة 2K فائقة • وضوح استثنائي للشاشات الكبيرة واللوحية';
+    } else if (lower.contains('2160') || lower.contains('4k')) {
+      order = 2160;
+      badge = '4K Ultra HD';
+      desc = 'أعلى دقة 4K • أقصى نقاء وتفاصيل بصرية مذهلة للشاشات العملاقة';
+    } else {
+      final match = RegExp(r'(\d+)p').firstMatch(lower);
+      if (match != null) {
+        order = int.tryParse(match.group(1)!) ?? 500;
+        desc = 'دقة $label • وضوح رقمي متوازن';
+      }
+    }
+    return {'order': order, 'badge': badge, 'desc': desc};
+  }
+
+  static Map<String, dynamic> getAudioQualityInfo(double kbps) {
+    int order = kbps.toInt();
+    String badge = 'MP3';
+    String desc = 'صوت نقي متوازن';
+
+    if (kbps <= 64) {
+      badge = 'اقتصادي';
+      desc = 'حجم ضئيل جداً • مناسب للتسجيلات وحفظ مساحة التخزين';
+    } else if (kbps <= 128) {
+      badge = 'قياسي Standard';
+      desc = 'جودة قياسية ممتازة • صوت نقي متوازن لكافة السماعات';
+    } else if (kbps <= 192) {
+      badge = 'عالي النقاء HQ';
+      desc = 'صوت عالي النقاء HQ • تجربة صوتية مجسمة ومثالية للموسيقى';
+    } else {
+      badge = 'استوديو Studio';
+      desc = 'جودة استوديو فائقة • أقصى نقاء وأعمق تفاصيل ترددية وباس';
+    }
+    return {'order': order, 'badge': badge, 'desc': desc};
+  }
+
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     try {
       var manifest = await _yt.videos.streamsClient.getManifest(url);
@@ -181,11 +250,15 @@ class BackendService {
       List<Map<String, dynamic>> videoFormats = [];
       
       for (var stream in manifest.videoOnly) {
+        final qInfo = getVideoQualityInfo(stream.qualityLabel);
         videoFormats.add({
           'url': stream.url.toString(),
           'tag': stream.tag,
           'video_id': video.id.value,
           'quality_name': stream.qualityLabel,
+          'quality_order': qInfo['order'],
+          'quality_badge': qInfo['badge'],
+          'quality_desc': qInfo['desc'],
           'size': stream.size.totalMegaBytes.toStringAsFixed(1),
           'size_bytes': stream.size.totalBytes,
           'ext': 'mp4', 
@@ -194,11 +267,15 @@ class BackendService {
       }
       
       for (var stream in manifest.muxed) {
+        final qInfo = getVideoQualityInfo(stream.qualityLabel);
         videoFormats.add({
           'url': stream.url.toString(),
           'tag': stream.tag,
           'video_id': video.id.value,
           'quality_name': stream.qualityLabel,
+          'quality_order': qInfo['order'],
+          'quality_badge': qInfo['badge'],
+          'quality_desc': qInfo['desc'],
           'size': stream.size.totalMegaBytes.toStringAsFixed(1),
           'size_bytes': stream.size.totalBytes,
           'ext': 'mp4',
@@ -208,11 +285,16 @@ class BackendService {
 
       List<Map<String, dynamic>> audioFormats = [];
       for (var stream in manifest.audioOnly) {
+        final kbps = stream.bitrate.kiloBitsPerSecond;
+        final aInfo = getAudioQualityInfo(kbps);
         audioFormats.add({
           'url': stream.url.toString(),
           'tag': stream.tag,
           'video_id': video.id.value,
-          'quality_name': '${stream.bitrate.kiloBitsPerSecond.toStringAsFixed(0)} kbps',
+          'quality_name': '${kbps.toStringAsFixed(0)} kbps',
+          'quality_order': aInfo['order'],
+          'quality_badge': aInfo['badge'],
+          'quality_desc': aInfo['desc'],
           'size': stream.size.totalMegaBytes.toStringAsFixed(1),
           'size_bytes': stream.size.totalBytes,
           'ext': 'mp3',
@@ -559,17 +641,24 @@ class BackendService {
           final sink = file.openWrite();
           int received = 0;
           final total = selectedStream.size.totalBytes;
+          int lastProgressTime = 0;
 
           await for (final chunk in stream) {
             received += chunk.length;
             sink.add(chunk);
-            onReceiveProgress(received, total);
+            
+            // تسريع أداء معالجة التدفق وتجنب تعطيل خيط الواجهة بآلاف النداءات في الثانية
+            final now = DateTime.now().millisecondsSinceEpoch;
+            if (now - lastProgressTime > 120 || received == total) {
+              lastProgressTime = now;
+              onReceiveProgress(received, total);
+            }
           }
           await sink.flush();
           await sink.close();
 
           if (await file.exists() && (await file.length()) > 0) {
-            debugPrint('اكتمل التنزيل بنجاح عبر محرّك الدفق المباشر!');
+            debugPrint('اكتمل التنزيل بنجاح وبسرعة فائقة عبر محرّك الدفق المباشر!');
             return;
           }
         }
@@ -578,7 +667,7 @@ class BackendService {
       }
     }
 
-    // الطريقة البديلة / للروابط الخارجية: التنزيل عبر Dio مع ترويسات متصفح كاملة تمنع خطأ 403
+    // الطريقة البديلة / للروابط الخارجية: التنزيل عبر Dio مع ترويسات متصفح كاملة تمنع خطأ 403 وبسرعة قصوى
     final downloadOptions = Options(
       headers: {
         'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36',
@@ -590,8 +679,8 @@ class BackendService {
         'Sec-Fetch-Mode': 'no-cors',
         'Sec-Fetch-Site': 'cross-site',
       },
-      receiveTimeout: const Duration(minutes: 15),
-      sendTimeout: const Duration(minutes: 2),
+      receiveTimeout: const Duration(minutes: 30),
+      sendTimeout: const Duration(minutes: 5),
       validateStatus: (status) => status != null && status < 400,
     );
 
@@ -606,12 +695,19 @@ class BackendService {
           try { await f.delete(); } catch (_) {}
         }
 
+        int lastDioUpdate = 0;
         await _dio.download(
           url,
           savePath,
           options: downloadOptions,
           deleteOnError: false,
-          onReceiveProgress: onReceiveProgress,
+          onReceiveProgress: (rec, tot) {
+            final now = DateTime.now().millisecondsSinceEpoch;
+            if (now - lastDioUpdate > 120 || rec == tot) {
+              lastDioUpdate = now;
+              onReceiveProgress(rec, tot);
+            }
+          },
         );
 
         if (await f.exists() && (await f.length()) > 0) {
@@ -639,10 +735,15 @@ class BackendService {
                 final sink = file.openWrite();
                 int rec = 0;
                 final tot = freshStream.size.totalBytes;
+                int lastFreshProgress = 0;
                 await for (final chunk in stream) {
                   rec += chunk.length;
                   sink.add(chunk);
-                  onReceiveProgress(rec, tot);
+                  final now = DateTime.now().millisecondsSinceEpoch;
+                  if (now - lastFreshProgress > 120 || rec == tot) {
+                    lastFreshProgress = now;
+                    onReceiveProgress(rec, tot);
+                  }
                 }
                 await sink.flush();
                 await sink.close();

@@ -174,7 +174,31 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                       '${(_progress * 100).toStringAsFixed(1)}%',
                       style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 16),
                     ),
-                  ]
+                  ],
+                  const SizedBox(height: 20),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.cyan,
+                      side: const BorderSide(color: AppColors.cyan, width: 1.2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    ),
+                    icon: const Icon(Icons.arrow_downward_rounded, size: 18),
+                    label: const Text(
+                      'المتابعة في الخلفية 📥',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('يستمر التحميل الآن في الخلفية... يمكنك متابعة تقدمه من الإشعارات أو تبويب التنزيلات.'),
+                          backgroundColor: AppColors.surface,
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                    },
+                  ),
                 ]
               ],
             ),
@@ -437,12 +461,37 @@ class _BatchDownloadProgressDialogState extends State<BatchDownloadProgressDialo
                     ],
                   ),
                   const SizedBox(height: 20),
-                  TextButton(
-                    onPressed: () {
-                      _isCancelled = true;
-                      Navigator.pop(context);
-                    },
-                    child: const Text('إلغاء المتبقي', style: TextStyle(color: AppColors.orange)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.cyan,
+                          side: const BorderSide(color: AppColors.cyan),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        ),
+                        icon: const Icon(Icons.arrow_downward_rounded, size: 16),
+                        label: const Text('في الخلفية 📥', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('يستمر التحميل الدُفعي في الخلفية...'),
+                              backgroundColor: AppColors.surface,
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                        },
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          _isCancelled = true;
+                          Navigator.pop(context);
+                        },
+                        child: const Text('إلغاء المتبقي', style: TextStyle(color: AppColors.orange, fontSize: 12)),
+                      ),
+                    ],
                   ),
                 ],
               ],

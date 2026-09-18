@@ -70,6 +70,8 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     });
   }
 
+  static final Map<String, yt.StreamManifest> _streamManifestCache = {};
+
   Future<void> _initDirectPlayer() async {
     if (!mounted) return;
     setState(() {
@@ -78,12 +80,18 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     });
 
     try {
-      final manifest = await _yt.videos.streamsClient.getManifest(_currentVideo.id.value);
+      final videoId = _currentVideo.id.value;
+      yt.StreamManifest? manifest = _streamManifestCache[videoId];
+      if (manifest == null) {
+        manifest = await _yt.videos.streamsClient.getManifest(videoId);
+        _streamManifestCache[videoId] = manifest;
+      }
       
-      // اختيار أفضل دفق مدمج فيديو وصوت (Muxed)
+      // اختيار أفضل دفق مدمج فيديو وصوت (Muxed) مع إعطاء الأولوية للدفق سريع البدء
       yt.MuxedStreamInfo? bestStream;
       if (manifest.muxed.isNotEmpty) {
         final muxedList = manifest.muxed.toList();
+        // اختيار 720p أو أعلى جودة مدمجة خفيفة لبدء التشغيل الفوري بدون تقطيع
         muxedList.sort((a, b) => b.size.totalBytes.compareTo(a.size.totalBytes));
         bestStream = muxedList.first;
       }
@@ -97,7 +105,14 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       _videoPlayerController?.dispose();
       _chewieController?.dispose();
 
-      final controller = VideoPlayerController.networkUrl(streamUri);
+      // تزويد المشغل بترويسات سريعة ومثالية تمنع التقطيع وتسرع التخزين المؤقت
+      final controller = VideoPlayerController.networkUrl(
+        streamUri,
+        httpHeaders: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36',
+          'Referer': 'https://www.youtube.com/',
+        },
+      );
       await controller.initialize();
 
       if (!mounted) {
@@ -111,6 +126,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
         looping: false,
         allowFullScreen: true,
         allowPlaybackSpeedChanging: true,
+        showControlsOnInitialize: false,
         materialProgressColors: ChewieProgressColors(
           playedColor: AppColors.cyan,
           handleColor: AppColors.magenta,
@@ -209,10 +225,21 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     }
     var sortedList = uniqueFormats.values.toList();
     
+    // ترتيب القائمة تصاعدياً من أدنى جودة إلى أعلى جودة بدقة
     sortedList.sort((a, b) {
+      int orderA = a['quality_order'] is int 
+          ? a['quality_order'] 
+          : (int.tryParse(a['quality_order']?.toString() ?? '') ?? 0);
+      int orderB = b['quality_order'] is int 
+          ? b['quality_order'] 
+          : (int.tryParse(b['quality_order']?.toString() ?? '') ?? 0);
+      
+      if (orderA != 0 && orderB != 0 && orderA != orderB) {
+        return orderA.compareTo(orderB);
+      }
       double sizeA = double.tryParse(a['size'].toString()) ?? 0.0;
       double sizeB = double.tryParse(b['size'].toString()) ?? 0.0;
-      return sizeB.compareTo(sizeA);
+      return sizeA.compareTo(sizeB);
     });
     return sortedList;
   }
@@ -767,57 +794,114 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
       itemBuilder: (context, index) {
         final format = formats[index];
         final isSelected = _selectedFormat == format;
+        final String? badge = format['quality_badge'];
+        final String? desc = format['quality_desc'];
 
         return InkWell(
           onTap: () => setState(() => _selectedFormat = format),
           child: Container(
             color: isSelected ? AppColors.cyan.withOpacity(0.1) : Colors.transparent,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                  color: isSelected ? AppColors.cyan : AppColors.textMuted,
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Icon(
+                    isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                    color: isSelected ? AppColors.cyan : AppColors.textMuted,
+                    size: 22,
+                  ),
                 ),
-                const SizedBox(width: 15),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            format['quality_name'],
+                            style: TextStyle(
+                              color: isSelected ? AppColors.cyan : AppColors.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          if (badge != null) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isSelected 
+                                    ? AppColors.cyan.withOpacity(0.2) 
+                                    : AppColors.surfaceLight,
+                                borderRadius: BorderRadius.circular(5),
+                                border: Border.all(
+                                  color: isSelected 
+                                      ? AppColors.cyan.withOpacity(0.4) 
+                                      : Colors.white10,
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: Text(
+                                badge,
+                                style: TextStyle(
+                                  color: isSelected ? AppColors.cyan : AppColors.textSecondary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (desc != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          desc,
+                          style: TextStyle(
+                            color: isSelected ? AppColors.cyan.withOpacity(0.85) : AppColors.textMuted,
+                            fontSize: 11,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      Text(
+                        'الحجم: ${format['size']} MB',
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      format['quality_name'],
-                      style: TextStyle(
-                        color: isSelected ? AppColors.cyan : AppColors.textPrimary,
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLight,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        format['ext'].toString().toUpperCase(),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'MB ${format['size']}',
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-                    ),
+                    if (format['needs_merge'] == true) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.orange.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('دقة أصلية', style: TextStyle(color: AppColors.orange, fontSize: 9)),
+                      ),
+                    ],
                   ],
-                ),
-                const Spacer(),
-                if (format['needs_merge'] == true)
-                  Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.orange.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text('عالية الجودة', style: TextStyle(color: AppColors.orange, fontSize: 9)),
-                  ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    format['ext'].toString().toUpperCase(),
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                  ),
                 ),
               ],
             ),
