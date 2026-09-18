@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -76,7 +78,7 @@ jobs:
         run: |
           find android/app/src/main -name "MainActivity.kt" | while read file; do
             cat << 'EOF' > "$file"
-          package com.boykta.app
+          package com.boykta.pro_downloader
 
           import android.app.PictureInPictureParams
           import android.os.Build
@@ -156,3 +158,27 @@ jobs:
         with:
           name: app-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Create or Update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v1.2.1"
+          RELEASE_TITLE="Boykta Pro v1.2.1 - تنزيل مباشر للـ APK"
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          
+          NOTES="🚀 **Boykta Pro v1.2.1** - التحديث الجديد لتطبيق التنزيل والتشغيل المتقدم!
+
+          ### ✨ أبرز التحسينات والإصلاحات في هذا الإصدار:
+          - 🎵 **إصلاح صانع النغمات وقص الصوت (Audio Trimmer):** تصحيح تشفير الصوت وحاوية الملفات الصوتية لضمان عمل النغمات المقصوصة على جميع مشغلات ومحددات نغمات الرنين في أندرويد.
+          - 🌐 **تحسين خادم المشاركة عبر Wi-Fi (Web Share):** دعم التبديل التلقائي للمنافذ المتاحة لتفادي أي تعارض بالشبكة.
+          - 🎬 **سلاسة تشغيل الفيديو:** تحسين تحرير الذاكرة ومشغلات الفيديو عند التبديل السريع بين المقاطع المقترحة.
+          - ⚡ **توحيد حزمة أندرويد ودعم صورة داخل صورة (PiP):** مطابقة الـ Package Name لضمان الإطلاق السلس دون أي انهيار.
+          
+          📲 **التثبيت:** قم بتنزيل ملف \`app-release.apk\` المرفق أدناه وتثبيته مباشرة على جهاز الأندرويد."
+
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$APK_PATH" --clobber
+          else
+            gh release create "$TAG" "$APK_PATH" --title "$RELEASE_TITLE" --notes "$NOTES"
+          fi

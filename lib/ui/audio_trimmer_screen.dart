@@ -118,15 +118,45 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
       final cleanName = rawName.replaceAll(RegExp(r'[^\w\s]+'), '').trim();
 
       final parentDir = widget.file.parent;
-      final outPath = '${parentDir.path}/${cleanName}_ringtone_${_startSeconds.toInt()}s_${_endSeconds.toInt()}s.mp3';
+      final lowerPath = widget.file.path.toLowerCase();
+      final isSourceMp3 = lowerPath.endsWith('.mp3');
+      final ext = isSourceMp3 ? 'mp3' : 'm4a';
+      final outPath = '${parentDir.path}/${cleanName}_ringtone_${_startSeconds.toInt()}s_${_endSeconds.toInt()}s.$ext';
 
       final startStr = _startSeconds.toStringAsFixed(1);
       final durationStr = (_endSeconds - _startSeconds).toStringAsFixed(1);
 
-      final command = '-y -ss $startStr -t $durationStr -i "${widget.file.path}" -vn -c:a aac -b:a 192k "$outPath"';
+      // أمر FFmpeg متوافق: إذا كان الملف الأصلي mp3 ننسخ التيار الصوتي بدقة وسرعة، وإذا كان صيغة أخرى نرمز بتيار AAC متوافق مع حاوية m4a
+      final command = isSourceMp3
+          ? '-y -ss $startStr -t $durationStr -i "${widget.file.path}" -vn -c:a copy "$outPath"'
+          : '-y -ss $startStr -t $durationStr -i "${widget.file.path}" -vn -c:a aac -b:a 192k "$outPath"';
 
-      final session = await FFmpegKit.execute(command);
-      final returnCode = await session.getReturnCode();
+      var session = await FFmpegKit.execute(command);
+      var returnCode = await session.getReturnCode();
+
+      // محاولة بديلة احتياطية في حال تعذر القص المباشر
+      if (!ReturnCode.isSuccess(returnCode) || !await File(outPath).exists()) {
+        final fallbackOut = '${parentDir.path}/${cleanName}_ringtone_${_startSeconds.toInt()}s_${_endSeconds.toInt()}s.m4a';
+        final fallbackCmd = '-y -ss $startStr -t $durationStr -i "${widget.file.path}" -vn -c:a aac -b:a 192k "$fallbackOut"';
+        session = await FFmpegKit.execute(fallbackCmd);
+        returnCode = await session.getReturnCode();
+        if (ReturnCode.isSuccess(returnCode) && await File(fallbackOut).exists()) {
+          final resultFile = File(fallbackOut);
+          if (mounted) {
+            setState(() {
+              _isProcessing = false;
+              _trimmedResultFile = resultFile;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('تم إنشاء النغمة بنجاح! 🎵'),
+                backgroundColor: AppColors.cyan,
+              ),
+            );
+          }
+          return;
+        }
+      }
 
       if (ReturnCode.isSuccess(returnCode) && await File(outPath).exists()) {
         final resultFile = File(outPath);

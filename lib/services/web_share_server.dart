@@ -36,8 +36,22 @@ class WebShareServer {
 
   Future<bool> startServer() async {
     if (_server != null) return true;
+    final candidatePorts = [8080, 8088, 8888, 5000, 3000];
+    for (final p in candidatePorts) {
+      try {
+        _server = await HttpServer.bind(InternetAddress.anyIPv4, p);
+        port = p;
+        break;
+      } catch (e) {
+        debugPrint('المنفذ $p غير متاح: $e');
+      }
+    }
+    if (_server == null) {
+      _addLog('تعذر تشغيل الخادم على أي من المنافذ المتاحة');
+      isRunningNotifier.value = false;
+      return false;
+    }
     try {
-      _server = await HttpServer.bind(InternetAddress.anyIPv4, port);
       isRunningNotifier.value = true;
       _addLog('تم تشغيل خادم المشاركة بنجاح على المنفذ $port');
 

@@ -189,6 +189,8 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   void _changeVideo(yt.Video newVideo) {
     if (_currentVideo.id.value == newVideo.id.value) return;
     
+    _videoPlayerController?.pause();
+    _chewieController?.pause();
     _youtubeController.load(newVideo.id.value);
     setState(() {
       _currentVideo = newVideo;
