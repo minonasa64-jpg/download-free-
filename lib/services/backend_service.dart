@@ -540,28 +540,38 @@ class BackendService {
           }
         }
 
-        selectedStream ??= manifest.muxed.withHighestVideoQuality();
-
-        final stream = _yt.videos.streamsClient.get(selectedStream);
-        final file = File(savePath);
-        if (await file.exists()) {
-          try { await file.delete(); } catch (_) {}
+        if (selectedStream == null) {
+          if (manifest.muxed.isNotEmpty) {
+            final muxedList = manifest.muxed.toList();
+            muxedList.sort((a, b) => b.size.totalBytes.compareTo(a.size.totalBytes));
+            selectedStream = muxedList.first;
+          } else if (manifest.streams.isNotEmpty) {
+            selectedStream = manifest.streams.first;
+          }
         }
-        final sink = file.openWrite();
-        int received = 0;
-        final total = selectedStream.size.totalBytes;
 
-        await for (final chunk in stream) {
-          received += chunk.length;
-          sink.add(chunk);
-          onReceiveProgress(received, total);
-        }
-        await sink.flush();
-        await sink.close();
+        if (selectedStream != null) {
+          final stream = _yt.videos.streamsClient.get(selectedStream);
+          final file = File(savePath);
+          if (await file.exists()) {
+            try { await file.delete(); } catch (_) {}
+          }
+          final sink = file.openWrite();
+          int received = 0;
+          final total = selectedStream.size.totalBytes;
 
-        if (await file.exists() && (await file.length()) > 0) {
-          debugPrint('اكتمل التنزيل بنجاح عبر محرّك الدفق المباشر!');
-          return;
+          await for (final chunk in stream) {
+            received += chunk.length;
+            sink.add(chunk);
+            onReceiveProgress(received, total);
+          }
+          await sink.flush();
+          await sink.close();
+
+          if (await file.exists() && (await file.length()) > 0) {
+            debugPrint('اكتمل التنزيل بنجاح عبر محرّك الدفق المباشر!');
+            return;
+          }
         }
       } catch (ytErr) {
         debugPrint('تعذر التنزيل المباشر عبر streamsClient: $ytErr، جاري التحويل للمحرّك البديل');
@@ -614,21 +624,30 @@ class BackendService {
           if (targetVideoId != null && targetVideoId.isNotEmpty) {
             try {
               final manifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
-              final freshStream = manifest.muxed.withHighestVideoQuality();
-              final stream = _yt.videos.streamsClient.get(freshStream);
-              final file = File(savePath);
-              if (await file.exists()) await file.delete();
-              final sink = file.openWrite();
-              int rec = 0;
-              final tot = freshStream.size.totalBytes;
-              await for (final chunk in stream) {
-                rec += chunk.length;
-                sink.add(chunk);
-                onReceiveProgress(rec, tot);
+              StreamInfo? freshStream;
+              if (manifest.muxed.isNotEmpty) {
+                final muxedList = manifest.muxed.toList();
+                muxedList.sort((a, b) => b.size.totalBytes.compareTo(a.size.totalBytes));
+                freshStream = muxedList.first;
+              } else if (manifest.streams.isNotEmpty) {
+                freshStream = manifest.streams.first;
               }
-              await sink.flush();
-              await sink.close();
-              if (await file.exists() && (await file.length()) > 0) return;
+              if (freshStream != null) {
+                final stream = _yt.videos.streamsClient.get(freshStream);
+                final file = File(savePath);
+                if (await file.exists()) await file.delete();
+                final sink = file.openWrite();
+                int rec = 0;
+                final tot = freshStream.size.totalBytes;
+                await for (final chunk in stream) {
+                  rec += chunk.length;
+                  sink.add(chunk);
+                  onReceiveProgress(rec, tot);
+                }
+                await sink.flush();
+                await sink.close();
+                if (await file.exists() && (await file.length()) > 0) return;
+              }
             } catch (_) {}
           }
           throw Exception('فشل التحميل بعد عدة محاولات تلقائية: $e');

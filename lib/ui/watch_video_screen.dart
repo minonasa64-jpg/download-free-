@@ -81,12 +81,16 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       final manifest = await _yt.videos.streamsClient.getManifest(_currentVideo.id.value);
       
       // اختيار أفضل دفق مدمج فيديو وصوت (Muxed)
-      final muxedStreams = manifest.muxed.sortByVideoQuality();
       yt.MuxedStreamInfo? bestStream;
-      if (muxedStreams.isNotEmpty) {
-        bestStream = muxedStreams.last;
+      if (manifest.muxed.isNotEmpty) {
+        final muxedList = manifest.muxed.toList();
+        muxedList.sort((a, b) => b.size.totalBytes.compareTo(a.size.totalBytes));
+        bestStream = muxedList.first;
       }
-      bestStream ??= manifest.muxed.withHighestVideoQuality();
+
+      if (bestStream == null) {
+        throw Exception('لا يوجد دفق مباشر متاح');
+      }
 
       final streamUri = bestStream.url;
 
