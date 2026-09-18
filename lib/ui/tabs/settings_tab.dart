@@ -22,6 +22,8 @@ class _SettingsTabState extends State<SettingsTab> {
   bool _wifiOnly = false;
   bool _calculatorDisguise = false;
   bool _biometricEnabled = false;
+  bool _multiThreadDownload = true;
+  int _downloadThreads = 8;
 
   @override
   void initState() {
@@ -32,11 +34,15 @@ class _SettingsTabState extends State<SettingsTab> {
   Future<void> _loadSettings() async {
     final dl = await _backend.getDownloadSettings();
     final notif = await _backend.getNotificationSettings();
+    final mt = await _backend.isMultiThreadDownloadEnabled();
+    final th = await _backend.getDownloadThreads();
     if (mounted) {
       setState(() {
         _downloadPath = dl['download_path'] ?? 'مسار Boykta العام';
         _wifiOnly = dl['wifi_only'] ?? false;
         _completeNotif = notif['n_comp'] ?? true;
+        _multiThreadDownload = mt;
+        _downloadThreads = th;
       });
     }
     final disguise = await _backend.isCalculatorDisguiseEnabled();
@@ -308,6 +314,83 @@ class _SettingsTabState extends State<SettingsTab> {
 
           const SizedBox(height: 15),
           _buildSectionHeader(_backend.t('dl_settings')),
+          
+          _buildGlassTile(
+            context,
+            icon: Icons.electric_bolt_rounded,
+            title: 'التنزيل متعدد الخطوط (Multi-Threaded Turbo)',
+            subtitle: _multiThreadDownload 
+                ? 'مفعل: تقسيم الملف إلى $_downloadThreads خطوط متزامنة لتسريع التنزيل ⚡' 
+                : 'معطل: التنزيل عبر خط اتصال تقليدي واحد',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: Switch(
+              value: _multiThreadDownload,
+              activeColor: AppColors.cyan,
+              onChanged: (val) async {
+                await _backend.setMultiThreadDownloadEnabled(val);
+                setState(() => _multiThreadDownload = val);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(val ? 'تم تفعيل التنزيل متعدد الخطوط 🚀' : 'تم تعطيل التنزيل متعدد الخطوط'),
+                      backgroundColor: AppColors.cyan,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+
+          if (_multiThreadDownload)
+            _buildGlassTile(
+              context,
+              icon: Icons.alt_route_rounded,
+              title: 'عدد خطوط التنزيل المتزامنة',
+              subtitle: '$_downloadThreads قنوات اتصال متوازية في نفس الوقت',
+              textColor: textColor,
+              subtitleColor: subtitleColor,
+              surfaceColor: surfaceColor,
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.cyan.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.cyan.withOpacity(0.4)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    value: _downloadThreads,
+                    dropdownColor: AppColors.surface,
+                    icon: const Icon(Icons.arrow_drop_down, color: AppColors.cyan),
+                    style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 13),
+                    items: const [
+                      DropdownMenuItem(value: 2, child: Text('2 خطوط')),
+                      DropdownMenuItem(value: 4, child: Text('4 خطوط')),
+                      DropdownMenuItem(value: 8, child: Text('8 خطوط (توربو ⚡)')),
+                      DropdownMenuItem(value: 16, child: Text('16 خط (خارق 🚀)')),
+                    ],
+                    onChanged: (val) async {
+                      if (val != null) {
+                        await _backend.setDownloadThreads(val);
+                        setState(() => _downloadThreads = val);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('تم ضبط عدد خطوط التنزيل إلى $val خطوط ⚡'),
+                              backgroundColor: AppColors.cyan,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ),
           
           _buildGlassTile(
             context,

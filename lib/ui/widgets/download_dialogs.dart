@@ -36,11 +36,25 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
   bool _isFinished = false;
   bool _hasError = false;
   String _errorMessage = "";
+  bool _isMultiThreaded = true;
+  int _threadsCount = 8;
 
   @override
   void initState() {
     super.initState();
+    _loadMultiThreadInfo();
     _startDownloadProcess();
+  }
+
+  Future<void> _loadMultiThreadInfo() async {
+    final mt = await _backend.isMultiThreadDownloadEnabled();
+    final th = await _backend.getDownloadThreads();
+    if (mounted) {
+      setState(() {
+        _isMultiThreaded = mt;
+        _threadsCount = th;
+      });
+    }
   }
 
   Future<void> _startDownloadProcess() async {
@@ -152,13 +166,34 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                   )
                 ] else ...[
                   const CircularProgressIndicator(color: AppColors.cyan),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
+                  if (_isMultiThreaded)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.cyan.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.cyan.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.speed_rounded, color: AppColors.cyan, size: 14),
+                          const SizedBox(width: 5),
+                          Text(
+                            'تنزيل متعدد الخطوط: $_threadsCount قنوات متزامنة ⚡',
+                            style: const TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
                   Text(
                     _statusText,
                     style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 25),
+                  const SizedBox(height: 20),
                   if (_statusText.contains('دمج') == false) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
@@ -169,7 +204,25 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                         valueColor: const AlwaysStoppedAnimation<Color>(AppColors.cyan),
                       ),
                     ),
-                    const SizedBox(height: 15),
+                    if (_isMultiThreaded) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(_threadsCount, (idx) {
+                          final isChunkDone = (_progress * _threadsCount) > idx;
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                            width: (_threadsCount > 8) ? 9 : 14,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: isChunkDone ? AppColors.cyan : Colors.white24,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
                     Text(
                       '${(_progress * 100).toStringAsFixed(1)}%',
                       style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 16),

@@ -242,10 +242,39 @@ class BackendService {
     return {'order': order, 'badge': badge, 'desc': desc};
   }
 
+  static final Map<String, Map<String, dynamic>> _mediaLinksCache = {};
+  static final Map<String, StreamManifest> _streamManifestCache = {};
+
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     try {
-      var manifest = await _yt.videos.streamsClient.getManifest(url);
-      var video = await _yt.videos.get(url);
+      String videoIdStr = '';
+      try {
+        videoIdStr = VideoId(url).value;
+      } catch (_) {
+        final match = RegExp(r'(?:v=|\/)([0-9A-Za-z_-]{11})').firstMatch(url);
+        if (match != null) videoIdStr = match.group(1)!;
+      }
+
+      // التحقق أولاً من الكاش لظهور فوري 0ms بدون أي انتظار
+      if (videoIdStr.isNotEmpty && _mediaLinksCache.containsKey(videoIdStr)) {
+        return _mediaLinksCache[videoIdStr]!;
+      }
+
+      final dynamic target = videoIdStr.isNotEmpty ? VideoId(videoIdStr) : url;
+
+      // جلب المانيفست ومعلومات الفيديو بالتوازي الفوري لتخفيض وقت الانتظار لأكثر من النصف
+      final results = await Future.wait([
+        _yt.videos.streamsClient.getManifest(target),
+        _yt.videos.get(target),
+      ]);
+
+      var manifest = results[0] as StreamManifest;
+      var video = results[1] as Video;
+
+      if (videoIdStr.isNotEmpty) {
+        _streamManifestCache[videoIdStr] = manifest;
+      }
+      _streamManifestCache[video.id.value] = manifest;
 
       List<Map<String, dynamic>> videoFormats = [];
       
@@ -308,7 +337,10 @@ class BackendService {
 
       List<Map<String, dynamic>> subtitlesList = [];
       try {
-        var ccManifest = await _yt.videos.closedCaptions.getManifest(video.id);
+        var ccManifest = await _yt.videos.closedCaptions.getManifest(video.id).timeout(
+          const Duration(milliseconds: 600),
+          onTimeout: () => throw 'timeout',
+        );
         for (var track in ccManifest.tracks) {
           subtitlesList.add({
             'name': track.language.name,
@@ -319,7 +351,7 @@ class BackendService {
         }
       } catch (_) {}
 
-      return {
+      final mediaResult = {
         'id': video.id.value,
         'title': video.title,
         'thumbnail': video.thumbnails.highResUrl,
@@ -329,6 +361,11 @@ class BackendService {
         'audio': audioFormats,
         'subtitles': subtitlesList,
       };
+
+      if (videoIdStr.isNotEmpty) {
+        _mediaLinksCache[videoIdStr] = mediaResult;
+      }
+      return mediaResult;
     } catch (e) {
       throw Exception('فشل في جلب البيانات: $e');
     }
@@ -610,7 +647,11 @@ class BackendService {
     if (targetVideoId != null && targetVideoId.isNotEmpty) {
       try {
         debugPrint('جاري التنزيل المباشر عبر YoutubeExplode: videoId=$targetVideoId, tag=$targetTag');
-        final manifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
+        StreamManifest? manifest = _streamManifestCache[targetVideoId];
+        if (manifest == null) {
+          manifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
+          _streamManifestCache[targetVideoId] = manifest;
+        }
         StreamInfo? selectedStream;
 
         if (targetTag != null) {
@@ -632,36 +673,54 @@ class BackendService {
           }
         }
 
-        if (selectedStream != null) {
-          final stream = _yt.videos.streamsClient.get(selectedStream);
-          final file = File(savePath);
-          if (await file.exists()) {
-            try { await file.delete(); } catch (_) {}
-          }
-          final sink = file.openWrite();
-          int received = 0;
-          final total = selectedStream.size.totalBytes;
-          int lastProgressTime = 0;
+    // الطريقة الأولى الأساسية: فحص ما إذا كان الرابط يدعم التنزيل متعدد الخطوط (Multi-Threaded Turbo Download)
+    // لتقسيم الملف إلى قنوات متزامنة لتسريع التنزيل بأقصى سرعة اتصال ممكنة
+    final isMultiThread = await isMultiThreadDownloadEnabled();
+    final threadCount = await getDownloadThreads();
 
-          await for (final chunk in stream) {
-            received += chunk.length;
-            sink.add(chunk);
-            
-            // تسريع أداء معالجة التدفق وتجنب تعطيل خيط الواجهة بآلاف النداءات في الثانية
-            final now = DateTime.now().millisecondsSinceEpoch;
-            if (now - lastProgressTime > 120 || received == total) {
-              lastProgressTime = now;
-              onReceiveProgress(received, total);
-            }
-          }
-          await sink.flush();
-          await sink.close();
+    if (isMultiThread && selectedStream != null && selectedStream.size.totalBytes > 1024 * 1024) {
+      final parallelOk = await _downloadParallelChunks(
+        directUrl: selectedStream.url.toString(),
+        savePath: savePath,
+        totalBytes: selectedStream.size.totalBytes,
+        onReceiveProgress: onReceiveProgress,
+        customThreads: threadCount,
+      );
+      if (parallelOk) {
+        debugPrint('اكتمل التنزيل بنجاح وبسرعة خارقة عبر القنوات المتوازية متعددة الخطوط (Multi-Part $threadCount)!');
+        return;
+      }
+    }
 
-          if (await file.exists() && (await file.length()) > 0) {
-            debugPrint('اكتمل التنزيل بنجاح وبسرعة فائقة عبر محرّك الدفق المباشر!');
-            return;
-          }
+    if (selectedStream != null) {
+      final stream = _yt.videos.streamsClient.get(selectedStream);
+      final file = File(savePath);
+      if (await file.exists()) {
+        try { await file.delete(); } catch (_) {}
+      }
+      final sink = file.openWrite();
+      int received = 0;
+      final total = selectedStream.size.totalBytes;
+      int lastProgressTime = 0;
+
+      await for (final chunk in stream) {
+        received += chunk.length;
+        sink.add(chunk);
+        
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - lastProgressTime > 100 || received == total) {
+          lastProgressTime = now;
+          onReceiveProgress(received, total);
         }
+      }
+      await sink.flush();
+      await sink.close();
+
+      if (await file.exists() && (await file.length()) > 0) {
+        debugPrint('اكتمل التنزيل بنجاح وبسرعة فائقة عبر محرّك الدفق المباشر!');
+        return;
+      }
+    }
       } catch (ytErr) {
         debugPrint('تعذر التنزيل المباشر عبر streamsClient: $ytErr، جاري التحويل للمحرّك البديل');
       }
@@ -683,6 +742,37 @@ class BackendService {
       sendTimeout: const Duration(minutes: 5),
       validateStatus: (status) => status != null && status < 400,
     );
+
+    // في حال تفعيل التنزيل متعدد الخطوط للروابط المباشرة، نفحص إمكانية تقسيم الملف وتسريعه
+    if (isMultiThread) {
+      try {
+        final headRes = await _dio.head(
+          url,
+          options: Options(
+            headers: downloadOptions.headers,
+            followRedirects: true,
+            validateStatus: (s) => s != null && s < 400,
+          ),
+        );
+        final clStr = headRes.headers.value('content-length');
+        final contentLength = int.tryParse(clStr ?? '');
+        if (contentLength != null && contentLength > 2 * 1024 * 1024) {
+          final parallelOk = await _downloadParallelChunks(
+            directUrl: url,
+            savePath: savePath,
+            totalBytes: contentLength,
+            onReceiveProgress: onReceiveProgress,
+            customThreads: threadCount,
+          );
+          if (parallelOk) {
+            debugPrint('اكتمل تنزيل الرابط المباشر بنجاح عبر $threadCount خطوط متزامنة!');
+            return;
+          }
+        }
+      } catch (probeErr) {
+        debugPrint('ملاحظة: السيرفر لا يدعم التجزئة للرابط المباشر، جاري التحميل بالتدفق المباشر: $probeErr');
+      }
+    }
 
     int maxRetries = 3;
     int attempt = 0;
@@ -756,6 +846,155 @@ class BackendService {
         await Future.delayed(Duration(seconds: attempt * 2));
       }
     }
+  }
+
+  // =========================================================================
+  // محرك التنزيل متعدد الخطوط التوربو (Multi-Threaded Turbo Download Engine)
+  // يقسم الملف إلى خطوط وقنوات اتصال متزامنة لتسريع التنزيل بأقصى سرعة ممكنة
+  // =========================================================================
+  Future<bool> isMultiThreadDownloadEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('multi_thread_download_enabled') ?? true;
+  }
+
+  Future<void> setMultiThreadDownloadEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('multi_thread_download_enabled', enabled);
+  }
+
+  Future<int> getDownloadThreads() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('download_threads') ?? 8; // الافتراضي 8 خطوط توربو
+  }
+
+  Future<void> setDownloadThreads(int count) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('download_threads', count);
+  }
+
+  Future<bool> _downloadParallelChunks({
+    required String directUrl,
+    required String savePath,
+    required int totalBytes,
+    required Function(int, int) onReceiveProgress,
+    int? customThreads,
+  }) async {
+    int effectiveParts = 8;
+    try {
+      final configuredThreads = customThreads ?? await getDownloadThreads();
+      effectiveParts = configuredThreads.clamp(2, 16);
+      final int partSize = (totalBytes / effectiveParts).ceil();
+      final List<int> receivedParts = List.filled(effectiveParts, 0);
+      int lastReported = 0;
+
+      void updateCombinedProgress(int partIndex, int rec) {
+        receivedParts[partIndex] = rec;
+        final totalRec = receivedParts.reduce((a, b) => a + b);
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - lastReported > 80 || totalRec >= totalBytes) {
+          lastReported = now;
+          onReceiveProgress(totalRec > totalBytes ? totalBytes : totalRec, totalBytes);
+        }
+      }
+
+      final futures = List.generate(effectiveParts, (i) async {
+        final start = i * partSize;
+        final end = (i == effectiveParts - 1) ? totalBytes - 1 : (i + 1) * partSize - 1;
+        if (start >= totalBytes) return;
+        final actualEnd = (end >= totalBytes) ? totalBytes - 1 : end;
+        final partFile = '$savePath.part$i';
+        
+        int partAttempts = 0;
+        bool partSuccess = false;
+        while (partAttempts < 3 && !partSuccess) {
+          partAttempts++;
+          try {
+            final partDio = Dio(BaseOptions(
+              connectTimeout: const Duration(seconds: 8),
+              receiveTimeout: const Duration(minutes: 20),
+            ));
+
+            await partDio.download(
+              directUrl,
+              partFile,
+              options: Options(
+                headers: {
+                  'Range': 'bytes=$start-$actualEnd',
+                  'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36',
+                  'Referer': 'https://www.youtube.com/',
+                  'Accept': '*/*',
+                },
+              ),
+              onReceiveProgress: (rec, _) => updateCombinedProgress(i, rec),
+            );
+
+            final pf = File(partFile);
+            if (await pf.exists() && (await pf.length()) > 0) {
+              partSuccess = true;
+            }
+          } catch (err) {
+            debugPrint('إعادة محاولة مسار التنزيل المتعدد $i (المحاولة $partAttempts): $err');
+            if (partAttempts >= 3) rethrow;
+            await Future.delayed(Duration(milliseconds: 350 * partAttempts));
+          }
+        }
+      });
+
+      await Future.wait(futures);
+
+      final finalFile = File(savePath);
+      if (await finalFile.exists()) {
+        try { await finalFile.delete(); } catch (_) {}
+      }
+      final sink = finalFile.openWrite();
+      for (int i = 0; i < effectiveParts; i++) {
+        final partFile = File('$savePath.part$i');
+        if (await partFile.exists()) {
+          await sink.addStream(partFile.openRead());
+          try { await partFile.delete(); } catch (_) {}
+        }
+      }
+      await sink.flush();
+      await sink.close();
+
+      return await finalFile.exists() && (await finalFile.length()) > 0;
+    } catch (e) {
+      debugPrint('تنبيه: التنزيل متعدد الخطوط لم يكتمل ($e)، يتم الرجوع للتدفق المباشر.');
+      for (int i = 0; i < effectiveParts; i++) {
+        try {
+          final p = File('$savePath.part$i');
+          if (await p.exists()) await p.delete();
+        } catch (_) {}
+      }
+      return false;
+    }
+  }
+
+  // بدء التنزيل في الخلفية بشكل مستقل تماماً عن دورة حياة الواجهات والنوافذ
+  Future<String> startDownloadInBackground({
+    required String selectedUrl,
+    required String title,
+    required String ext,
+    required bool needsMerge,
+    required String highestAudioUrl,
+    String? videoId,
+    int? videoTag,
+    int? highestAudioTag,
+    Function(String)? onStatusChanged,
+    Function(int, int)? onReceiveProgress,
+  }) {
+    return downloadAndMerge(
+      selectedUrl: selectedUrl,
+      title: title,
+      ext: ext,
+      needsMerge: needsMerge,
+      highestAudioUrl: highestAudioUrl,
+      videoId: videoId,
+      videoTag: videoTag,
+      highestAudioTag: highestAudioTag,
+      onStatusChanged: onStatusChanged ?? (_) {},
+      onReceiveProgress: onReceiveProgress ?? (_, __) {},
+    );
   }
 
   // ==========================
@@ -916,6 +1155,8 @@ class BackendService {
       'download_path': prefs.getString('download_path') ?? 'مسار Boykta العام',
       'max_tasks': prefs.getInt('max_tasks') ?? 4,
       'speed_limit': prefs.getString('speed_limit') ?? 'غير محدود',
+      'multi_thread': prefs.getBool('multi_thread_download_enabled') ?? true,
+      'threads_count': prefs.getInt('download_threads') ?? 8,
     };
   }
 
