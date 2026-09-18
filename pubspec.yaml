@@ -28,7 +28,7 @@ dependencies:
   chewie: 1.7.5
 
   # مشغل الفيديوهات المتقدم pod_player
-  pod_player: ^0.2.3
+  pod_player: ^0.2.2
   youtube_player_flutter: ^8.1.2
 
   video_thumbnail: ^0.5.3
