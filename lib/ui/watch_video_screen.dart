@@ -20,22 +20,23 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   final BackendService _backend = BackendService();
   final yt.YoutubeExplode _yt = yt.YoutubeExplode();
   
+  late yt.Video _currentVideo;
   late YoutubePlayerController _youtubeController;
-  
   final ScrollController _relatedScrollController = ScrollController();
   
   bool _isLoadingExtraction = false;
-  
   List<yt.Video> _relatedVideos = [];
   yt.VideoSearchList? _relatedSearchPage;
   bool _isLoadingRelated = true;
   bool _isLoadingMoreRelated = false;
+  bool _isPlayerReady = false;
 
   @override
   void initState() {
     super.initState();
+    _currentVideo = widget.video;
     
-    // تهيئة مشغل يوتيوب الرسمي الذكي (يمنع مشاكل 403)
+    // تهيئة مشغل يوتيوب الرسمي الاحترافي بكامل المزايا
     _youtubeController = YoutubePlayerController(
       initialVideoId: widget.video.id.value,
       flags: const YoutubePlayerFlags(
@@ -43,8 +44,10 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
         mute: false,
         enableCaption: false,
         forceHD: true,
+        useHybridComposition: true,
+        showLiveFullscreenButton: true,
       ),
-    );
+    )..addListener(_onPlayerStateChange);
 
     _fetchRelatedVideos();
 
@@ -55,15 +58,21 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     });
   }
 
+  void _onPlayerStateChange() {
+    if (_isPlayerReady && mounted && !_youtubeController.value.isFullScreen) {
+      // Rebuild if needed for UI state synchronization
+    }
+  }
+
   Future<void> _fetchRelatedVideos() async {
     try {
-      var results = await _yt.search.search(widget.video.author);
-      var filteredList = results.whereType<yt.Video>().where((v) => v.id.value != widget.video.id.value).toList();
+      var results = await _yt.search.search(_currentVideo.author);
+      var filteredList = results.whereType<yt.Video>().where((v) => v.id.value != _currentVideo.id.value).toList();
       
       if (filteredList.isEmpty) {
-        String shortTitle = widget.video.title.split(' ').take(3).join(' ');
+        String shortTitle = _currentVideo.title.split(' ').take(3).join(' ');
         results = await _yt.search.search(shortTitle);
-        filteredList = results.whereType<yt.Video>().where((v) => v.id.value != widget.video.id.value).toList();
+        filteredList = results.whereType<yt.Video>().where((v) => v.id.value != _currentVideo.id.value).toList();
       }
 
       if (mounted) {
@@ -73,7 +82,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
           _isLoadingRelated = false;
         });
       }
-    } catch(e) {
+    } catch (e) {
       if (mounted) setState(() => _isLoadingRelated = false);
     }
   }
@@ -98,6 +107,18 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     }
   }
 
+  void _changeVideo(yt.Video newVideo) {
+    if (_currentVideo.id.value == newVideo.id.value) return;
+    
+    _youtubeController.load(newVideo.id.value);
+    setState(() {
+      _currentVideo = newVideo;
+      _isLoadingRelated = true;
+      _relatedVideos.clear();
+    });
+    _fetchRelatedVideos();
+  }
+
   List<Map<String, dynamic>> _processFormats(List<Map<String, dynamic>> formats) {
     if (formats.isEmpty) return [];
     var uniqueFormats = <String, Map<String, dynamic>>{};
@@ -117,13 +138,12 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   Future<void> _handleExtraction() async {
     setState(() => _isLoadingExtraction = true);
     
-    // إيقاف المشغل مؤقتاً لتوفير موارد الشبكة أثناء التحميل
     if (_youtubeController.value.isPlaying) {
       _youtubeController.pause();
     }
 
     try {
-      final result = await _backend.extractMediaLinks(widget.video.url);
+      final result = await _backend.extractMediaLinks(_currentVideo.url);
       
       final String videoTitle = result['title'] as String;
       final String highestAudioUrl = result['highestAudioUrl'] as String;
@@ -167,6 +187,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
 
   @override
   void dispose() {
+    _youtubeController.removeListener(_onPlayerStateChange);
     _youtubeController.dispose();
     _relatedScrollController.dispose();
     _yt.close();
@@ -175,157 +196,185 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+    return YoutubePlayerBuilder(
+      player: YoutubePlayer(
+        controller: _youtubeController,
+        showVideoProgressIndicator: true,
+        progressIndicatorColor: AppColors.cyan,
+        progressColors: const ProgressBarColors(
+          playedColor: AppColors.cyan,
+          handleColor: AppColors.magenta,
+          bufferedColor: Colors.white24,
+          backgroundColor: Colors.black26,
         ),
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // تم استبدال المشغل القديم بالمشغل الرسمي
-          SizedBox(
-            width: double.infinity,
-            child: YoutubePlayer(
-              controller: _youtubeController,
-              showVideoProgressIndicator: true,
-              progressIndicatorColor: AppColors.cyan,
-              progressColors: const ProgressBarColors(
-                playedColor: AppColors.cyan,
-                handleColor: AppColors.magenta,
+        topActions: <Widget>[
+          const SizedBox(width: 8.0),
+          Expanded(
+            child: Text(
+              _currentVideo.title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14.0,
+                fontWeight: FontWeight.bold,
               ),
-              onReady: () {
-                debugPrint('Player is ready.');
-              },
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
+        ],
+        onReady: () {
+          setState(() {
+            _isPlayerReady = true;
+          });
+        },
+      ),
+      builder: (context, player) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Text(
+              _currentVideo.title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // مشغل اليوتيوب الرسمي متكامل مع وضع ملء الشاشة
+              player,
               
-          Expanded(
-            child: Container(
-              color: AppColors.background,
-              child: ListView.builder(
-                controller: _relatedScrollController,
-                physics: const BouncingScrollPhysics(),
-                itemCount: _relatedVideos.length + 2, 
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return Padding(
-                      padding: const EdgeInsets.all(20.0), 
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start, 
-                        children: [
-                          Text(
-                            widget.video.title, 
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)
-                          ), 
-                          const SizedBox(height: 10), 
-                          Row(
+              Expanded(
+                child: Container(
+                  color: AppColors.background,
+                  child: ListView.builder(
+                    controller: _relatedScrollController,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _relatedVideos.length + 2,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.person_outline, size: 16, color: AppColors.textMuted),
-                              const SizedBox(width: 5),
-                              Text(widget.video.author, style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                              Text(
+                                _currentVideo.title,
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  const Icon(Icons.person_outline, size: 16, color: AppColors.textMuted),
+                                  const SizedBox(width: 5),
+                                  Text(_currentVideo.author, style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                                ],
+                              ),
+                              const SizedBox(height: 25),
+                              
+                              Container(
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  gradient: AppColors.primaryGradient,
+                                  borderRadius: BorderRadius.circular(15),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.cyan.withOpacity(0.3),
+                                      blurRadius: 15,
+                                      offset: const Offset(0, 5),
+                                    )
+                                  ],
+                                ),
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    shadowColor: Colors.transparent,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                  ),
+                                  onPressed: _isLoadingExtraction ? null : _handleExtraction,
+                                  icon: _isLoadingExtraction
+                                      ? const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                        )
+                                      : const Icon(Icons.download_rounded, color: Colors.white, size: 26),
+                                  label: Text(
+                                    _isLoadingExtraction ? 'جاري الفحص...' : _backend.t('download_btn'),
+                                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 25), 
-                          
-                          Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              gradient: AppColors.primaryGradient,
-                              borderRadius: BorderRadius.circular(15),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.cyan.withOpacity(0.3),
-                                  blurRadius: 15,
-                                  spreadRadius: 2,
-                                )
-                              ],
-                            ),
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent, 
-                                shadowColor: Colors.transparent,
-                                padding: const EdgeInsets.symmetric(vertical: 15),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
-                              ), 
-                              onPressed: _isLoadingExtraction ? null : _handleExtraction, 
-                              icon: _isLoadingExtraction 
-                                  ? const SizedBox.shrink() 
-                                  : const Icon(Icons.download_rounded, color: Colors.white, size: 24), 
-                              label: _isLoadingExtraction 
-                                  ? const SizedBox(
-                                      height: 20, 
-                                      width: 20, 
-                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                                    ) 
-                                  : const Text('تحميل الجودات', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))
+                        );
+                      }
+                      
+                      if (index == 1) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.auto_awesome_rounded, color: AppColors.cyan, size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                _backend.t('related'),
+                                style: const TextStyle(color: AppColors.cyan, fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      final v = _relatedVideos[index - 2];
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withOpacity(0.05)),
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(8),
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              v.thumbnails.lowResUrl,
+                              width: 90,
+                              height: 60,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(width: 90, height: 60, color: AppColors.surfaceLight),
                             ),
                           ),
-                          
-                          const SizedBox(height: 30),
-                          const Divider(color: AppColors.surfaceLight),
-                          const SizedBox(height: 15),
-                          const Text('فيديوهات ذات صلة', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.cyan)),
-                          const SizedBox(height: 15),
-                          
-                          if (_isLoadingRelated)
-                            const Center(child: CircularProgressIndicator(color: AppColors.cyan))
-                          else if (_relatedVideos.isEmpty)
-                            const Center(child: Text('لا توجد فيديوهات ذات صلة.', style: TextStyle(color: AppColors.textMuted)))
-                        ]
-                      )
-                    );
-                  }
-                  
-                  if (index == _relatedVideos.length + 1) {
-                    return _isLoadingMoreRelated 
-                        ? const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: AppColors.cyan))) 
-                        : const SizedBox.shrink();
-                  }
-                  
-                  final v = _relatedVideos[index - 1];
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(10),
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(8), 
-                        child: Image.network(v.thumbnails.lowResUrl, width: 100, height: 60, fit: BoxFit.cover)
-                      ),
-                      title: Text(
-                        v.title, 
-                        maxLines: 2, 
-                        overflow: TextOverflow.ellipsis, 
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold)
-                      ),
-                      subtitle: Padding(
-                        padding: const EdgeInsets.only(top: 5), 
-                        child: Text(v.author, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
-                      ),
-                      onTap: () {
-                        // إيقاف المشغل الحالي قبل الانتقال للفيديو الجديد
-                        if (_youtubeController.value.isPlaying) {
-                           _youtubeController.pause();
-                        }
-                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => WatchVideoScreen(video: v)));
-                      },
-                    ),
-                  );
-                },
+                          title: Text(
+                            v.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 5),
+                            child: Text(v.author, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                          ),
+                          onTap: () => _changeVideo(v),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
-            ),
-          )
-        ],
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -360,7 +409,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
         child: Container(
           height: MediaQuery.of(context).size.height * 0.75,
           decoration: BoxDecoration(
-            color: AppColors.surface.withOpacity(0.8),
+            color: AppColors.surface.withOpacity(0.9),
             border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
           ),
           child: DefaultTabController(
@@ -379,8 +428,8 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                 const Padding(
                   padding: EdgeInsets.all(15),
                   child: Text(
-                    'اختر الجودة المطلوبة', 
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
+                    'اختر الجودة المطلوبة',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
                 const TabBar(
@@ -416,7 +465,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                           padding: const EdgeInsets.symmetric(vertical: 15),
                         ),
                         onPressed: () {
-                          Navigator.pop(context); 
+                          Navigator.pop(context);
                           
                           try {
                             AdService().showInterstitialAd();
@@ -435,8 +484,8 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                           );
                         },
                         child: const Text(
-                          'بدء التنزيل', 
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                          'بدء التنزيل',
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -458,6 +507,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
       itemBuilder: (context, index) {
         final format = formats[index];
         final isSelected = _selectedFormat == format;
+
         return InkWell(
           onTap: () => setState(() => _selectedFormat = format),
           child: Container(
@@ -474,16 +524,16 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      format['quality_name'], 
+                      format['quality_name'],
                       style: TextStyle(
-                        color: isSelected ? AppColors.cyan : AppColors.textPrimary, 
-                        fontWeight: FontWeight.bold
-                      )
+                        color: isSelected ? AppColors.cyan : AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'MB ${format['size']}', 
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 12)
+                      'MB ${format['size']}',
+                      style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
                     ),
                   ],
                 ),
@@ -505,8 +555,8 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    format['ext'].toString().toUpperCase(), 
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)
+                    format['ext'].toString().toUpperCase(),
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                   ),
                 ),
               ],

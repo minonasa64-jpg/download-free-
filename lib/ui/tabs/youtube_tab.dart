@@ -36,8 +36,28 @@ class _YoutubeTabState extends State<YoutubeTab> {
       }
     });
 
-    // مراقبة الكتابة لجلب الاقتراحات
     _searchController.addListener(_onSearchChanged);
+    _loadInitialFeed();
+  }
+
+  Future<void> _loadInitialFeed() async {
+    setState(() {
+      _isSearching = true;
+    });
+    try {
+      final results = await _yt.search.search('trending');
+      final list = results.whereType<yt.Video>().toList();
+      if (mounted) {
+        setState(() {
+          _currentSearchPage = results;
+          _searchResults = list;
+          _hasSearchedOnce = true;
+          _isSearching = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isSearching = false);
+    }
   }
 
   void _onSearchChanged() async {
@@ -70,7 +90,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
       _searchController.text = suggestionQuery;
     }
 
-    FocusScope.of(context).unfocus(); 
+    FocusScope.of(context).unfocus();
     
     setState(() {
       _isSearching = true;
@@ -82,10 +102,12 @@ class _YoutubeTabState extends State<YoutubeTab> {
 
     try {
       final results = await _yt.search.search(query);
+      final list = results.whereType<yt.Video>().toList();
+      
       if (mounted) {
         setState(() {
           _currentSearchPage = results;
-          _searchResults = results.whereType<yt.Video>().toList();
+          _searchResults = list;
           _isSearching = false;
         });
       }
@@ -95,37 +117,38 @@ class _YoutubeTabState extends State<YoutubeTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_backend.t('search_error')),
-            backgroundColor: Colors.redAccent.withOpacity(0.8),
-            behavior: SnackBarBehavior.floating,
-          )
+            backgroundColor: AppColors.orange,
+          ),
         );
       }
     }
   }
 
   Future<void> _loadMore() async {
-    if (_isLoadingMore) return; 
-    if (_currentSearchPage?.nextPage != null) {
-      setState(() => _isLoadingMore = true);
-      try {
-        final next = await _currentSearchPage!.nextPage();
-        if (next != null) {
+    if (_isLoadingMore || _isSearching || _currentSearchPage == null) return;
+    
+    setState(() => _isLoadingMore = true);
+    
+    try {
+      final nextPage = await _currentSearchPage!.nextPage();
+      if (nextPage != null) {
+        final newVideos = nextPage.whereType<yt.Video>().toList();
+        if (mounted) {
           setState(() {
-            _currentSearchPage = next;
-            _searchResults.addAll(next.whereType<yt.Video>());
+            _currentSearchPage = nextPage;
+            _searchResults.addAll(newVideos);
           });
         }
-      } catch (e) {
-        debugPrint('Error loading more: $e');
-      } finally {
-        if (mounted) setState(() => _isLoadingMore = false);
       }
+    } catch (e) {
+      debugPrint('Error loading more: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _scrollController.dispose();
     _yt.close();
@@ -135,63 +158,101 @@ class _YoutubeTabState extends State<YoutubeTab> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(
+      child: Stack(
         children: [
-          _buildSearchBar(),
-          // قسم الاقتراحات الذكية
-          if (_showSuggestions && _searchSuggestions.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceLight.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(15),
+          Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: _buildBodyContent(),
               ),
-              child: ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _searchSuggestions.length > 5 ? 5 : _searchSuggestions.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    leading: const Icon(Icons.search, color: AppColors.textMuted, size: 20),
-                    title: Text(_searchSuggestions[index], style: const TextStyle(color: AppColors.textPrimary)),
-                    onTap: () => _performSearch(_searchSuggestions[index]),
-                  );
-                },
+            ],
+          ),
+          
+          if (_showSuggestions && _searchSuggestions.isNotEmpty)
+            Positioned(
+              top: 80,
+              left: 20,
+              right: 20,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(15),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    constraints: const BoxConstraints(maxHeight: 250),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface.withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.5),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        )
+                      ],
+                    ),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      padding: EdgeInsets.zero,
+                      itemCount: _searchSuggestions.length,
+                      itemBuilder: (context, index) {
+                        final suggestion = _searchSuggestions[index];
+                        return ListTile(
+                          leading: const Icon(Icons.history, color: AppColors.textMuted, size: 20),
+                          title: Text(suggestion, style: const TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+                          onTap: () => _performSearch(suggestion),
+                        );
+                      },
+                    ),
+                  ),
+                ),
               ),
             ),
-          Expanded(child: _buildBodyContent()),
         ],
       ),
     );
   }
 
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 15, 20, 10),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
-            height: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: AppColors.surfaceLight.withOpacity(0.5),
+              color: AppColors.surfaceLight.withOpacity(0.6),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.05)),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
             ),
             child: Row(
               children: [
+                const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
                     controller: _searchController,
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+                    style: const TextStyle(color: AppColors.textPrimary),
                     textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => _performSearch(),
+                    onSubmitted: (value) => _performSearch(),
                     decoration: InputDecoration(
                       hintText: _backend.t('search_hint'),
-                      hintStyle: const TextStyle(color: AppColors.textMuted),
+                      hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
                       border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, color: AppColors.textMuted, size: 20),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _showSuggestions = false;
+                                  _searchSuggestions.clear();
+                                });
+                              },
+                            )
+                          : null,
                     ),
                   ),
                 ),
@@ -224,45 +285,30 @@ class _YoutubeTabState extends State<YoutubeTab> {
   }
 
   Widget _buildBodyContent() {
-    if (_isSearching) {
+    if (_isSearching && _searchResults.isEmpty) {
       return ListView.builder(
-        padding: const EdgeInsets.only(bottom: 100, top: 10), 
+        padding: const EdgeInsets.only(bottom: 100, top: 10),
         itemCount: 4,
         itemBuilder: (context, index) => _buildSkeletonCard(),
       );
     }
     
-    if (!_hasSearchedOnce && _searchResults.isEmpty) {
+    if (_hasSearchedOnce && _searchResults.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(25),
-              decoration: BoxDecoration(
-                color: AppColors.cyan.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.play_circle_outline, size: 80, color: AppColors.cyan),
-            ),
-            const SizedBox(height: 20),
-            Text(_backend.t('discover'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-            const SizedBox(height: 10),
-            Text(_backend.t('start_search'), textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary, height: 1.5)),
+            const Icon(Icons.search_off_rounded, color: AppColors.textMuted, size: 60),
+            const SizedBox(height: 15),
+            Text(_backend.t('no_results'), style: const TextStyle(color: AppColors.textMuted, fontSize: 16)),
           ],
         ),
       );
     }
 
-    if (_hasSearchedOnce && _searchResults.isEmpty) {
-      return Center(
-        child: Text(_backend.t('no_results'), style: const TextStyle(color: AppColors.textMuted, fontSize: 16)),
-      );
-    }
-
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.only(bottom: 100, top: 10), 
+      padding: const EdgeInsets.only(bottom: 100, top: 10),
       itemCount: _searchResults.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == _searchResults.length) {
@@ -279,12 +325,13 @@ class _YoutubeTabState extends State<YoutubeTab> {
 
   Widget _buildVideoCard(yt.Video video) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 5))
+          BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 5))
         ],
       ),
       child: Material(
@@ -292,7 +339,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          splashColor: AppColors.cyan.withOpacity(0.2), 
+          splashColor: AppColors.cyan.withOpacity(0.2),
           highlightColor: AppColors.cyan.withOpacity(0.1),
           onTap: () {
             Navigator.push(context, MaterialPageRoute(builder: (context) => WatchVideoScreen(video: video)));
@@ -315,6 +362,18 @@ class _YoutubeTabState extends State<YoutubeTab> {
                         child: const Icon(Icons.broken_image, color: AppColors.textMuted),
                       ),
                     ),
+                    Positioned.fill(
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.5),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 36),
+                        ),
+                      ),
+                    ),
                     Positioned(
                       bottom: 10,
                       right: 10,
@@ -324,7 +383,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
                           filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            color: Colors.black.withOpacity(0.6),
+                            color: Colors.black.withOpacity(0.7),
                             child: Text(
                               _formatDuration(video.duration),
                               style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
@@ -358,6 +417,21 @@ class _YoutubeTabState extends State<YoutubeTab> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.cyan.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.download_rounded, color: AppColors.cyan, size: 14),
+                              SizedBox(width: 4),
+                              Text('تحميل', style: TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold)),
+                            ],
                           ),
                         ),
                       ],

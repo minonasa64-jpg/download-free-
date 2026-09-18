@@ -1,8 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
+import '../vault_screen.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -13,74 +13,189 @@ class SettingsTab extends StatefulWidget {
 
 class _SettingsTabState extends State<SettingsTab> {
   final BackendService _backend = BackendService();
-  
-  bool _downloadViaMobile = true;
-  bool _wifiOnly = false;
-  String _downloadPath = '/storage/emulated/0/Download';
-  int _maxTasks = 4;
-  String _speedLimit = 'غير محدود';
-  
-  bool _progressNotif = true;
+
+  String _downloadPath = 'مسار Boykta العام';
   bool _completeNotif = true;
-  
+  bool _wifiOnly = false;
+
   @override
   void initState() {
     super.initState();
-    _loadAllSettings();
+    _loadSettings();
   }
 
-  Future<void> _loadAllSettings() async {
-    final dlSettings = await _backend.getDownloadSettings();
-    final notifSettings = await _backend.getNotificationSettings();
-    
+  Future<void> _loadSettings() async {
+    final dl = await _backend.getDownloadSettings();
+    final notif = await _backend.getNotificationSettings();
     if (mounted) {
       setState(() {
-        _downloadViaMobile = dlSettings['downloadMobile'];
-        _wifiOnly = dlSettings['wifi_only'] ?? false;
-        _downloadPath = dlSettings['download_path'];
-        _maxTasks = dlSettings['max_tasks'];
-        _speedLimit = dlSettings['speed_limit'];
-        _progressNotif = notifSettings['n_prog']!;
-        _completeNotif = notifSettings['n_comp']!;
+        _downloadPath = dl['download_path'] ?? 'مسار Boykta العام';
+        _wifiOnly = dl['wifi_only'] ?? false;
+        _completeNotif = notif['n_comp'] ?? true;
       });
     }
   }
 
-  Future<void> _updateNotification(String key, bool value) async {
-    await _backend.updateNotificationSetting(key, value);
-    setState(() {
-      if (key == 'n_prog') _progressNotif = value;
-      if (key == 'n_comp') _completeNotif = value;
-    });
-  }
-
   Future<void> _updateDownload(String key, dynamic value) async {
     await _backend.updateDownloadSetting(key, value);
-    setState(() {
-      if (key == 'downloadMobile') _downloadViaMobile = value;
-      if (key == 'max_tasks') _maxTasks = value;
-      if (key == 'speed_limit') _speedLimit = value;
-      if (key == 'download_path') _downloadPath = value;
-    });
+    _loadSettings();
+  }
+
+  Future<void> _updateNotification(String key, bool value) async {
+    await _backend.updateNotificationSetting(key, value);
+    _loadSettings();
+  }
+
+  void _openVault() async {
+    final hasPin = await _backend.isVaultPinSet();
+    if (!mounted) return;
+    if (!hasPin) {
+      _showSetVaultPinDialog();
+    } else {
+      _showEnterVaultPinDialog();
+    }
+  }
+
+  void _showSetVaultPinDialog() {
+    final pinCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.shield_rounded, color: AppColors.cyan, size: 24),
+            const SizedBox(width: 8),
+            Text(_backend.t('set_pin'), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_backend.t('vault_desc'), style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: pinCtrl,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white, letterSpacing: 8, fontSize: 20),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: '••••',
+                hintStyle: const TextStyle(color: Colors.white38, letterSpacing: 8),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
+            onPressed: () async {
+              if (pinCtrl.text.trim().length == 4) {
+                await _backend.setVaultPin(pinCtrl.text.trim());
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(_backend.t('pin_set_success')), backgroundColor: AppColors.cyan.withOpacity(0.9)),
+                  );
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const VaultScreen()));
+                }
+              }
+            },
+            child: const Text('حفظ والدخول', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEnterVaultPinDialog() {
+    final pinCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.lock_rounded, color: AppColors.cyan, size: 24),
+            const SizedBox(width: 8),
+            Text(_backend.t('enter_pin'), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: pinCtrl,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white, letterSpacing: 8, fontSize: 20),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: '••••',
+                hintStyle: const TextStyle(color: Colors.white38, letterSpacing: 8),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
+            onPressed: () async {
+              final isCorrect = await _backend.verifyVaultPin(pinCtrl.text.trim());
+              if (isCorrect) {
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const VaultScreen()));
+                }
+              } else {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(_backend.t('wrong_pin')), backgroundColor: AppColors.orange),
+                  );
+                }
+              }
+            },
+            child: const Text('دخول', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // تحديد الألوان بناءً على السمة الحالية
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppColors.surfaceLight.withOpacity(0.4) : Colors.black.withOpacity(0.04);
     final textColor = isDark ? AppColors.textPrimary : Colors.black87;
     final subtitleColor = isDark ? AppColors.textMuted : Colors.black54;
-    final surfaceColor = isDark ? AppColors.surfaceLight.withOpacity(0.4) : Colors.white.withOpacity(0.7);
 
     return SafeArea(
       child: ListView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 120, top: 10), 
+        padding: const EdgeInsets.only(bottom: 120, top: 15),
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
             child: Text(
-              '${_backend.t('settings')} ⚙️',
+              _backend.t('settings'),
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -88,18 +203,25 @@ class _SettingsTabState extends State<SettingsTab> {
               ),
             ),
           ),
+          const SizedBox(height: 10),
 
-          _buildSectionHeader(_backend.t('dl_settings')),
+          // قسم الخزنة والخصوصية
+          _buildSectionHeader('الخصوصية والأمان'),
           _buildGlassTile(
             context,
-            icon: Icons.folder_rounded,
-            title: _backend.t('downloaded'),
-            subtitle: _downloadPath,
+            icon: Icons.shield_rounded,
+            title: _backend.t('vault'),
+            subtitle: _backend.t('vault_desc'),
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
-            onTap: () => _showStoragePathDialog(context),
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
+            onTap: _openVault,
           ),
+
+          const SizedBox(height: 15),
+          _buildSectionHeader(_backend.t('dl_settings')),
+          
           _buildGlassTile(
             context,
             icon: Icons.wifi_rounded,
@@ -111,58 +233,62 @@ class _SettingsTabState extends State<SettingsTab> {
             trailing: Switch(
               value: _wifiOnly,
               activeColor: AppColors.cyan,
-              onChanged: (val) {
-                _updateDownload('wifi_only', val);
-                setState(() => _wifiOnly = val);
-              },
+              onChanged: (val) => _updateDownload('wifi_only', val),
             ),
           ),
+          
+          _buildGlassTile(
+            context,
+            icon: Icons.folder_open_rounded,
+            title: 'مسار التنزيل',
+            subtitle: _downloadPath,
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            onTap: () => _showStoragePathDialog(context),
+          ),
+
           _buildGlassTile(
             context,
             icon: Icons.replay_circle_filled_rounded,
             title: _backend.t('auto_retry_active'),
-            subtitle: 'إعادة المحاولة التلقائية واستئناف التحميل',
+            subtitle: 'استئناف التحميل تلقائياً عند انقطاع الاتصال',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.cyan.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text('نشط ⚡', style: TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold)),
-            ),
+            trailing: const Icon(Icons.check_circle_rounded, color: AppColors.cyan, size: 20),
           ),
 
           const SizedBox(height: 15),
-
           _buildSectionHeader(_backend.t('general')),
+          
           _buildGlassTile(
             context,
-            icon: Icons.dark_mode_rounded,
+            icon: Icons.palette_outlined,
             title: _backend.t('theme'),
-            subtitle: _backend.themeNotifier.value == ThemeMode.dark ? 'Dark Mode' : 'Light Mode',
+            subtitle: _backend.themeNotifier.value == ThemeMode.dark ? 'داكن' : 'فاتح',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
             onTap: () => _showThemeDialog(context),
           ),
+          
           _buildGlassTile(
             context,
             icon: Icons.language_rounded,
             title: _backend.t('language'),
-            subtitle: _backend.langNotifier.value == 'ar' ? 'العربية' : (_backend.langNotifier.value == 'en' ? 'English' : 'Français'),
+            subtitle: _backend.langNotifier.value.toUpperCase(),
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
             onTap: () => _showLanguageDialog(context),
           ),
+          
           _buildGlassTile(
             context,
             icon: Icons.notifications_active_rounded,
             title: _backend.t('notif'),
-            subtitle: '',
+            subtitle: 'إشعار عند اكتمال التنزيل',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -174,13 +300,13 @@ class _SettingsTabState extends State<SettingsTab> {
           ),
 
           const SizedBox(height: 15),
-
           _buildSectionHeader(_backend.t('more_tools')),
+          
           _buildGlassTile(
             context,
             icon: Icons.info_outline_rounded,
             title: _backend.t('about'),
-            subtitle: '1.0.0',
+            subtitle: 'Boykta Pro v1.2.0',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -356,16 +482,18 @@ class _SettingsTabState extends State<SettingsTab> {
   void _showAboutDialog(BuildContext context) {
     showAboutDialog(
       context: context,
-      applicationName: 'Boykta',
-      applicationVersion: '1.0.0',
+      applicationName: 'Boykta Pro',
+      applicationVersion: '1.2.0',
       applicationIcon: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(15)),
         child: const Icon(Icons.download, color: Colors.white, size: 30),
       ),
-      children: [
-        const SizedBox(height: 10),
-        const Text('تطبيق Boykta هو أداة احترافية لتحميل الفيديوهات والمقاطع الصوتية بسرعة وكفاءة عالية.'),
+      children: const [
+        SizedBox(height: 10),
+        Text('تطبيق Boykta Pro هو أداة احترافية ومتكاملة لتحميل الفيديوهات والمقاطع الصوتية بأعلى جودة.'),
+        SizedBox(height: 6),
+        Text('الميزات: مشغل يوتيوب متقدم، استخراج MP3، خزنة آمنة برمز PIN، استئناف تلقائي للتحميل.'),
       ],
     );
   }

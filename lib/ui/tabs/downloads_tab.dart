@@ -36,21 +36,24 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
     _tabController = TabController(length: 2, vsync: this);
     _initAudioPlayer();
     _loadFiles();
-    
     _backend.activeDownloads.addListener(_onActiveDownloadsChanged);
   }
 
   void _initAudioPlayer() {
     _audioPlayer = AudioPlayer();
+    
     _audioPlayer.onPlayerStateChanged.listen((state) {
       if (mounted) setState(() => _isPlaying = state == PlayerState.playing);
     });
+
     _audioPlayer.onDurationChanged.listen((d) {
       if (mounted) setState(() => _duration = d);
     });
+
     _audioPlayer.onPositionChanged.listen((p) {
       if (mounted) setState(() => _position = p);
     });
+
     _audioPlayer.onPlayerComplete.listen((_) {
       if (mounted) {
         setState(() {
@@ -69,11 +72,11 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
 
   bool _isAudioFile(String path) {
     final p = path.toLowerCase();
-    return p.endsWith('.mp3') || 
-           p.endsWith('.m4a') || 
-           p.endsWith('.opus') || 
-           p.endsWith('.wav') || 
-           p.endsWith('.aac') || 
+    return p.endsWith('.mp3') ||
+           p.endsWith('.m4a') ||
+           p.endsWith('.opus') ||
+           p.endsWith('.wav') ||
+           p.endsWith('.aac') ||
            p.endsWith('.ogg');
   }
 
@@ -106,7 +109,6 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
   void _openVault() async {
     final hasPin = await _backend.isVaultPinSet();
     if (!mounted) return;
-
     if (!hasPin) {
       _showSetVaultPinDialog();
     } else {
@@ -258,9 +260,9 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
             Text(_backend.t('move_to_vault'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ],
         ),
-        content: Text(
+        content: const Text(
           'هل تريد نقل هذا الملف إلى الخزنة الآمنة المحمية برمز PIN؟',
-          style: const TextStyle(color: Colors.white70),
+          style: TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
@@ -305,8 +307,9 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // الهيدر الرئيسي
               Padding(
-                padding: const EdgeInsets.fromLTRB(25, 25, 25, 10),
+                padding: const EdgeInsets.fromLTRB(20, 15, 20, 10),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -314,33 +317,82 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                       _backend.t('downloads'), 
                       style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary)
                     ),
-                    InkWell(
-                      onTap: _openVault,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: AppColors.cyan.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.cyan.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.shield_rounded, size: 16, color: AppColors.cyan),
-                            const SizedBox(width: 6),
-                            Text(
-                              _backend.t('vault'),
-                              style: const TextStyle(color: AppColors.cyan, fontSize: 13, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                      ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh_rounded, color: AppColors.cyan),
+                      onPressed: _loadFiles,
+                      tooltip: 'تحديث',
                     ),
                   ],
                 ),
               ),
+
+              // كرت الخزنة الآمنة المميز والواضح
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                child: InkWell(
+                  onTap: _openVault,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.cyan.withOpacity(0.18),
+                          AppColors.magenta.withOpacity(0.12),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.cyan.withOpacity(0.35)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.cyan.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.shield_rounded, color: AppColors.cyan, size: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _backend.t('vault'),
+                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _backend.t('vault_desc'),
+                                style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.cyan,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.lock_rounded, size: 14, color: Colors.black),
+                              SizedBox(width: 4),
+                              Text('دخول', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               
+              // قائمة التنزيلات الجارية حالياً
               ValueListenableBuilder<List<DownloadTask>>(
                 valueListenable: _backend.activeDownloads,
                 builder: (context, tasks, child) {
@@ -378,58 +430,93 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                '${(t.progress * 100).toInt()}%', 
-                                style: const TextStyle(color: AppColors.cyan, fontSize: 12, fontWeight: FontWeight.bold)
+                                '${(t.progress * 100).toStringAsFixed(1)}%', 
+                                style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 12)
                               ),
                               Text(
                                 '${t.downloaded} MB / ${t.total} MB', 
-                                style: const TextStyle(color: AppColors.textMuted, fontSize: 11)
+                                style: const TextStyle(color: AppColors.textMuted, fontSize: 12)
                               ),
-                            ]
+                            ],
                           )
-                        ]
-                      )
-                    )).toList(),
-                  );
-                }
-              ),
-
-              TabBar(
-                controller: _tabController,
-                indicatorColor: AppColors.cyan,
-                labelColor: AppColors.cyan,
-                unselectedLabelColor: AppColors.textMuted,
-                tabs: [
-                  Tab(icon: const Icon(Icons.video_library), text: _backend.t('video')),
-                  Tab(icon: const Icon(Icons.library_music), text: _backend.t('audio')),
-                ],
-              ),
-              Expanded(
-                child: _isLoading 
-                    ? const Center(child: CircularProgressIndicator(color: AppColors.cyan))
-                    : TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildFilesList(_videoFiles, isAudio: false),
-                          _buildFilesList(_audioFiles, isAudio: true),
                         ],
                       ),
+                    )).toList(),
+                  );
+                },
               ),
+
+              // تبويبات الفيديو والصوت
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLight.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  indicator: BoxDecoration(
+                    color: AppColors.cyan,
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  labelColor: Colors.black,
+                  unselectedLabelColor: AppColors.textMuted,
+                  labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                  tabs: [
+                    Tab(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.video_library, size: 18),
+                          const SizedBox(width: 8),
+                          Text('${_backend.t('video')} (${_videoFiles.length})'),
+                        ],
+                      ),
+                    ),
+                    Tab(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.library_music, size: 18),
+                          const SizedBox(width: 8),
+                          Text('${_backend.t('audio')} (${_audioFiles.length})'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              Expanded(
+                child: _isLoading 
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.cyan))
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildFilesList(_videoFiles, isAudio: false),
+                        _buildFilesList(_audioFiles, isAudio: true),
+                      ],
+                    ),
+              )
             ],
           ),
-          
+
+          // مشغل الصوت المصغر
           if (_currentAudio != null)
             Positioned(
-              left: 0, right: 0, bottom: 0,
+              left: 15,
+              right: 15,
+              bottom: 100, 
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+                borderRadius: BorderRadius.circular(20),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceLight.withOpacity(0.85),
-                      border: Border(top: BorderSide(color: AppColors.magenta.withOpacity(0.5))),
+                      color: AppColors.surface.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.cyan.withOpacity(0.3)),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -437,14 +524,14 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                 color: AppColors.magenta.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(10),
+                                shape: BoxShape.circle
                               ),
-                              child: const Icon(Icons.music_note, color: AppColors.magenta, size: 25),
+                              child: const Icon(Icons.music_note, color: AppColors.magenta, size: 20),
                             ),
-                            const SizedBox(width: 15),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 _currentAudio!.path.split('/').last, 
@@ -457,12 +544,12 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                               icon: Icon(
                                 _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, 
                                 color: AppColors.cyan, 
-                                size: 40
+                                size: 36
                               ),
                               onPressed: () => _playAudio(_currentAudio!),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 28),
+                              icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 24),
                               onPressed: () {
                                 _audioPlayer.stop();
                                 setState(() => _currentAudio = null);
@@ -534,7 +621,7 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
     } catch (_) {}
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(15),
         child: BackdropFilter(
@@ -551,14 +638,14 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
             child: Row(
               children: [
                 SizedBox(
-                  width: 85,
-                  height: 65,
+                  width: 75,
+                  height: 55,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: _buildThumbnail(file, isAudio, isCurrentlyPlaying),
                   ),
                 ),
-                const SizedBox(width: 15),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -573,65 +660,121 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                           fontSize: 13
                         )
                       ),
-                      if (sizeStr.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          sizeStr,
-                          style: const TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          if (sizeStr.isNotEmpty)
+                            Text(
+                              sizeStr,
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isAudio ? AppColors.magenta.withOpacity(0.2) : AppColors.cyan.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              isAudio ? 'صوت' : 'فيديو',
+                              style: TextStyle(
+                                color: isAudio ? AppColors.magenta : AppColors.cyan,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ],
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+                
+                // زر التشغيل السريع
+                IconButton(
+                  icon: Icon(
+                    isAudio 
+                      ? (isCurrentlyPlaying && _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill) 
+                      : Icons.play_circle_fill, 
+                    color: isAudio && isCurrentlyPlaying ? AppColors.magenta : AppColors.cyan, 
+                    size: 32
+                  ),
+                  onPressed: () {
+                    if (file.existsSync()) {
+                      if (isAudio) {
+                        _playAudio(file);
+                      } else {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => LocalVideoPlayerScreen(file: file)));
+                      }
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_backend.t('file_not_found'))));
+                      _loadFiles();
+                    }
+                  },
+                ),
+
+                // قائمة الخيارات الإضافية (تحويل MP3، قفل بالخزنة، مشاركة، حذف) بدون أي Overflow
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert_rounded, color: Colors.white70, size: 22),
+                  color: AppColors.surface,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  onSelected: (val) {
+                    if (val == 'convert') {
+                      _convertVideo(file);
+                    } else if (val == 'vault') {
+                      _lockFileInVault(file);
+                    } else if (val == 'share') {
+                      Share.shareXFiles([XFile(file.path)], text: fileName);
+                    } else if (val == 'delete') {
+                      _deleteFile(file.path, file, isAudio);
+                    }
+                  },
+                  itemBuilder: (context) => [
                     if (!isAudio)
-                      IconButton(
-                        icon: const Icon(Icons.audiotrack_rounded, color: AppColors.magenta, size: 22),
-                        tooltip: _backend.t('convert_to_mp3'),
-                        onPressed: () => _convertVideo(file),
+                      PopupMenuItem(
+                        value: 'convert',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.audiotrack_rounded, color: AppColors.magenta, size: 20),
+                            const SizedBox(width: 10),
+                            Text(_backend.t('convert_to_mp3'), style: const TextStyle(color: Colors.white, fontSize: 13)),
+                          ],
+                        ),
                       ),
-                    IconButton(
-                      icon: const Icon(Icons.lock_outline_rounded, color: AppColors.cyan, size: 21),
-                      tooltip: _backend.t('move_to_vault'),
-                      onPressed: () => _lockFileInVault(file),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.share_rounded, color: Colors.white70, size: 20),
-                      tooltip: _backend.t('share'),
-                      onPressed: () {
-                        Share.shareXFiles([XFile(file.path)], text: fileName);
-                      },
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        isAudio 
-                          ? (isCurrentlyPlaying && _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill) 
-                          : Icons.play_circle_fill, 
-                        color: isAudio && isCurrentlyPlaying ? AppColors.magenta : AppColors.cyan, 
-                        size: 34
+                    PopupMenuItem(
+                      value: 'vault',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.shield_rounded, color: AppColors.cyan, size: 20),
+                          const SizedBox(width: 10),
+                          Text(_backend.t('move_to_vault'), style: const TextStyle(color: Colors.white, fontSize: 13)),
+                        ],
                       ),
-                      onPressed: () {
-                        if (file.existsSync()) {
-                          if (isAudio) {
-                            _playAudio(file);
-                          } else {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => LocalVideoPlayerScreen(file: file)));
-                          }
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_backend.t('file_not_found'))));
-                          _loadFiles();
-                        }
-                      },
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded, color: AppColors.orange, size: 22),
-                      onPressed: () => _deleteFile(file.path, file, isAudio),
+                    PopupMenuItem(
+                      value: 'share',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.share_rounded, color: Colors.white70, size: 20),
+                          const SizedBox(width: 10),
+                          Text(_backend.t('share'), style: const TextStyle(color: Colors.white, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(height: 1),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: const Row(
+                        children: [
+                          Icon(Icons.delete_outline_rounded, color: AppColors.orange, size: 20),
+                          SizedBox(width: 10),
+                          Text('حذف', style: TextStyle(color: AppColors.orange, fontSize: 13)),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -648,44 +791,80 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
       return Container(
         color: AppColors.magenta.withOpacity(0.2), 
         child: Icon(
-          isPlaying ? Icons.equalizer_rounded : Icons.music_note, 
+          isPlaying ? Icons.graphic_eq_rounded : Icons.music_note_rounded, 
           color: AppColors.magenta, 
-          size: 35
+          size: 30
         )
       );
-    } else {
-      return FutureBuilder<Uint8List?>(
-        future: VideoThumbnail.thumbnailData(
-          video: file.path,
-          imageFormat: ImageFormat.JPEG,
-          maxWidth: 128,
-          quality: 25,
-        ).catchError((e) { return null; }),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Container(color: Colors.black26, child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.cyan)));
-          }
-          if (snapshot.hasData && snapshot.data != null) {
-            return Image.memory(snapshot.data!, fit: BoxFit.cover);
-          }
-          return Container(color: AppColors.surfaceLight, child: const Icon(Icons.videocam, color: AppColors.textMuted, size: 30));
-        },
-      );
     }
+    
+    return FutureBuilder<Uint8List?>(
+      future: VideoThumbnail.thumbnailData(
+        video: file.path,
+        imageFormat: ImageFormat.JPEG,
+        maxWidth: 150,
+        quality: 50,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
+          return Image.memory(
+            snapshot.data!,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(
+              color: AppColors.surfaceLight,
+              child: const Icon(Icons.videocam, color: AppColors.cyan, size: 30),
+            ),
+          );
+        }
+        return Container(
+          color: AppColors.surfaceLight,
+          child: const Icon(Icons.videocam, color: AppColors.cyan, size: 30),
+        );
+      },
+    );
   }
 
   Future<void> _deleteFile(String path, File file, bool isAudio) async {
-    if (_currentAudio?.path == path) {
-      _audioPlayer.stop();
-      setState(() => _currentAudio = null);
-    }
-    setState(() {
-      if (isAudio) _audioFiles.remove(file); else _videoFiles.remove(file);
-    });
-    try {
-      await _backend.deleteFile(path);
-    } catch (e) {
-      _loadFiles(); 
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('تأكيد الحذف', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text('هل أنت متأكد من رغبتك في حذف هذا الملف نهائياً؟', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.orange),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        if (file.existsSync()) {
+          file.deleteSync();
+        }
+        setState(() {
+          if (isAudio) {
+            _audioFiles.removeWhere((f) => f.path == path);
+            if (_currentAudio?.path == path) {
+              _audioPlayer.stop();
+              _currentAudio = null;
+            }
+          } else {
+            _videoFiles.removeWhere((f) => f.path == path);
+          }
+        });
+      } catch (e) {
+        debugPrint('Delete error: $e');
+      }
     }
   }
 
@@ -721,9 +900,28 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(isAudio ? Icons.library_music_outlined : Icons.video_library_outlined, size: 80, color: AppColors.textMuted.withOpacity(0.5)),
-          const SizedBox(height: 20),
-          Text(isAudio ? _backend.t('no_audio') : _backend.t('no_video'), style: const TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isAudio ? AppColors.magenta.withOpacity(0.1) : AppColors.cyan.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isAudio ? Icons.music_off_rounded : Icons.videocam_off_rounded, 
+              size: 60, 
+              color: isAudio ? AppColors.magenta : AppColors.cyan
+            ),
+          ),
+          const SizedBox(height: 15),
+          Text(
+            isAudio ? _backend.t('no_audio') : _backend.t('no_video'), 
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 16)
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'حمّل مقاطع جديدة من تبويب يوتيوب أو الروابط لتظهر هنا',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          ),
         ],
       ),
     );

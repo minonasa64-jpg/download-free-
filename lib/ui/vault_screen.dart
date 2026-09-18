@@ -1,8 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:share_plus/share_plus.dart';
 import '../core/app_colors.dart';
@@ -28,18 +26,21 @@ class _VaultScreenState extends State<VaultScreen> {
   @override
   void initState() {
     super.initState();
-    _initAudio();
-    _loadVaultFiles();
-  }
-
-  void _initAudio() {
     _audioPlayer = AudioPlayer();
     _audioPlayer.onPlayerStateChanged.listen((state) {
       if (mounted) setState(() => _isPlaying = state == PlayerState.playing);
     });
-    _audioPlayer.onPlayerComplete.listen((_) {
-      if (mounted) setState(() => _isPlaying = false);
-    });
+    _loadVaultFiles();
+  }
+
+  bool _isAudioFile(String path) {
+    final p = path.toLowerCase();
+    return p.endsWith('.mp3') ||
+        p.endsWith('.m4a') ||
+        p.endsWith('.opus') ||
+        p.endsWith('.wav') ||
+        p.endsWith('.aac') ||
+        p.endsWith('.ogg');
   }
 
   Future<void> _loadVaultFiles() async {
@@ -51,11 +52,6 @@ class _VaultScreenState extends State<VaultScreen> {
         _isLoading = false;
       });
     }
-  }
-
-  bool _isAudioFile(String path) {
-    final p = path.toLowerCase();
-    return p.endsWith('.mp3') || p.endsWith('.m4a') || p.endsWith('.wav') || p.endsWith('.aac');
   }
 
   void _playAudio(File file) async {
@@ -92,8 +88,8 @@ class _VaultScreenState extends State<VaultScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('حذف نهائي', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: const Text('هل أنت متأكد من حذف هذا الملف نهائياً من الخزنة؟', style: TextStyle(color: Colors.white70)),
+        title: const Text('تأكيد الحذف من الخزنة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text('هل أنت متأكد من حذف هذا الملف نهائياً؟', style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -110,54 +106,44 @@ class _VaultScreenState extends State<VaultScreen> {
 
     if (confirmed == true) {
       await _backend.deleteVaultFile(file.path);
-      if (_currentAudio?.path == file.path) {
-        _audioPlayer.stop();
-        _currentAudio = null;
+      if (mounted) {
+        _loadVaultFiles();
       }
-      _loadVaultFiles();
     }
   }
 
   void _showChangePinDialog() {
-    final oldPinController = TextEditingController();
-    final newPinController = TextEditingController();
-
+    final pinCtrl = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(_backend.t('set_pin'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Row(
+          children: [
+            const Icon(Icons.password_rounded, color: AppColors.cyan, size: 24),
+            const SizedBox(width: 8),
+            Text(_backend.t('set_pin'), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Text('أدخل رمز PIN جديد مكون من 4 أرقام:', style: TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 16),
             TextField(
-              controller: oldPinController,
+              controller: pinCtrl,
               keyboardType: TextInputType.number,
               maxLength: 4,
               obscureText: true,
-              style: const TextStyle(color: Colors.white, letterSpacing: 8, fontSize: 18),
+              style: const TextStyle(color: Colors.white, letterSpacing: 8, fontSize: 20),
+              textAlign: TextAlign.center,
               decoration: InputDecoration(
-                hintText: 'الرمز الحالي',
-                hintStyle: const TextStyle(color: Colors.white38, letterSpacing: 0, fontSize: 14),
+                hintText: '••••',
+                hintStyle: const TextStyle(color: Colors.white38, letterSpacing: 8),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: newPinController,
-              keyboardType: TextInputType.number,
-              maxLength: 4,
-              obscureText: true,
-              style: const TextStyle(color: Colors.white, letterSpacing: 8, fontSize: 18),
-              decoration: InputDecoration(
-                hintText: 'الرمز الجديد (4 أرقام)',
-                hintStyle: const TextStyle(color: Colors.white38, letterSpacing: 0, fontSize: 14),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
               ),
             ),
           ],
@@ -170,24 +156,17 @@ class _VaultScreenState extends State<VaultScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
             onPressed: () async {
-              final isCorrect = await _backend.verifyVaultPin(oldPinController.text);
-              if (isCorrect && newPinController.text.length == 4) {
-                await _backend.setVaultPin(newPinController.text);
-                if (context.mounted) {
+              if (pinCtrl.text.trim().length == 4) {
+                await _backend.setVaultPin(pinCtrl.text.trim());
+                if (mounted) {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(_backend.t('pin_set_success'))),
-                  );
-                }
-              } else {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(_backend.t('wrong_pin')), backgroundColor: AppColors.orange),
+                    SnackBar(content: Text(_backend.t('pin_set_success')), backgroundColor: AppColors.cyan.withOpacity(0.9)),
                   );
                 }
               }
             },
-            child: const Text('حفظ', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            child: const Text('تحديث الرمز', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -205,11 +184,15 @@ class _VaultScreenState extends State<VaultScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Row(
           children: [
-            const Icon(Icons.shield_rounded, color: AppColors.cyan, size: 24),
+            const Icon(Icons.shield_rounded, color: AppColors.cyan, size: 22),
             const SizedBox(width: 8),
             Text(
               _backend.t('vault'),
@@ -262,7 +245,6 @@ class _VaultScreenState extends State<VaultScreen> {
                       final isAudio = _isAudioFile(file.path);
                       final fileName = file.path.split('/').last;
                       final isPlaying = _currentAudio?.path == file.path && _isPlaying;
-
                       String sizeStr = '';
                       try {
                         if (file.existsSync()) {
@@ -349,18 +331,52 @@ class _VaultScreenState extends State<VaultScreen> {
                                       }
                                     },
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.lock_open_rounded, color: AppColors.cyan, size: 22),
-                                    tooltip: _backend.t('restore_from_vault'),
-                                    onPressed: () => _restoreFile(file),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.share_rounded, color: Colors.white70, size: 19),
-                                    onPressed: () => Share.shareXFiles([XFile(file.path)], text: fileName),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.orange, size: 21),
-                                    onPressed: () => _deleteFile(file),
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(Icons.more_vert_rounded, color: Colors.white70, size: 22),
+                                    color: AppColors.surface,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                    onSelected: (val) {
+                                      if (val == 'restore') {
+                                        _restoreFile(file);
+                                      } else if (val == 'share') {
+                                        Share.shareXFiles([XFile(file.path)], text: fileName);
+                                      } else if (val == 'delete') {
+                                        _deleteFile(file);
+                                      }
+                                    },
+                                    itemBuilder: (ctx) => [
+                                      PopupMenuItem(
+                                        value: 'restore',
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.lock_open_rounded, color: AppColors.cyan, size: 20),
+                                            const SizedBox(width: 10),
+                                            Text(_backend.t('restore_from_vault'), style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'share',
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.share_rounded, color: Colors.white70, size: 20),
+                                            const SizedBox(width: 10),
+                                            Text(_backend.t('share'), style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuDivider(height: 1),
+                                      PopupMenuItem(
+                                        value: 'delete',
+                                        child: const Row(
+                                          children: [
+                                            Icon(Icons.delete_outline_rounded, color: AppColors.orange, size: 20),
+                                            SizedBox(width: 10),
+                                            Text('حذف', style: TextStyle(color: AppColors.orange, fontSize: 13)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
