@@ -5,6 +5,7 @@ import '../core/app_colors.dart';
 import '../services/backend_service.dart';
 import '../services/ad_service.dart';
 import 'tabs/youtube_tab.dart';
+import 'tabs/browser_tab.dart';
 import 'tabs/links_tab.dart';
 import 'tabs/downloads_tab.dart';
 import 'tabs/settings_tab.dart';
@@ -19,12 +20,12 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   final BackendService _backend = BackendService();
   int _currentIndex = 0;
-
   BannerAd? _bannerAd;
   bool _isBannerLoaded = false;
 
   final List<Widget> _tabs = const [
     YoutubeTab(),
+    BrowserTab(),
     LinksTab(),
     DownloadsTab(),
     SettingsTab(),
@@ -79,31 +80,32 @@ class _MainNavigationState extends State<MainNavigation> {
               margin: const EdgeInsets.only(bottom: 5),
               child: AdWidget(ad: _bannerAd!),
             ),
-          
+
           // شريط التنقل الزجاجي
           ValueListenableBuilder<String>(
             valueListenable: _backend.langNotifier,
             builder: (context, lang, child) {
               return Container(
-                margin: const EdgeInsets.only(left: 15, right: 15, bottom: 20),
+                margin: const EdgeInsets.only(left: 12, right: 12, bottom: 18),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(25),
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                     child: Container(
-                      height: 70,
+                      height: 68,
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceLight.withOpacity(0.5),
+                        color: AppColors.surfaceLight.withOpacity(0.55),
                         borderRadius: BorderRadius.circular(25),
-                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                        border: Border.all(color: Colors.white.withOpacity(0.06)),
                       ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           _buildNavItem(Icons.play_circle_fill, _backend.t('youtube'), 0),
-                          _buildNavItem(Icons.link_rounded, _backend.t('link'), 1),
-                          _buildNavItem(Icons.download_rounded, _backend.t('downloads'), 2),
-                          _buildNavItem(Icons.settings_rounded, _backend.t('settings'), 3),
+                          _buildNavItem(Icons.explore_rounded, _backend.t('browser'), 1),
+                          _buildNavItem(Icons.link_rounded, _backend.t('link'), 2),
+                          _buildNavItem(Icons.download_rounded, _backend.t('downloads'), 3),
+                          _buildNavItem(Icons.settings_rounded, _backend.t('settings'), 4),
                         ],
                       ),
                     ),
@@ -125,10 +127,10 @@ class _MainNavigationState extends State<MainNavigation> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.cyan.withOpacity(0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -136,15 +138,15 @@ class _MainNavigationState extends State<MainNavigation> {
             Icon(
               icon,
               color: isSelected ? AppColors.cyan : AppColors.textMuted,
-              size: isSelected ? 26 : 24,
+              size: isSelected ? 24 : 22,
             ),
             if (isSelected) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
                 label,
                 style: const TextStyle(
                   color: AppColors.cyan,
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.bold,
                 ),
               ),

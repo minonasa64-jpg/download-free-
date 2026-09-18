@@ -2,7 +2,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
+import '../../services/biometric_service.dart';
 import '../vault_screen.dart';
+import '../calculator_vault_screen.dart';
+import '../web_share_screen.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -17,6 +20,8 @@ class _SettingsTabState extends State<SettingsTab> {
   String _downloadPath = 'مسار Boykta العام';
   bool _completeNotif = true;
   bool _wifiOnly = false;
+  bool _calculatorDisguise = false;
+  bool _biometricEnabled = false;
 
   @override
   void initState() {
@@ -34,6 +39,14 @@ class _SettingsTabState extends State<SettingsTab> {
         _completeNotif = notif['n_comp'] ?? true;
       });
     }
+    final disguise = await _backend.isCalculatorDisguiseEnabled();
+    if (mounted) {
+      final bioEnabled = await BiometricService().isBiometricEnabled();
+      setState(() {
+        _calculatorDisguise = disguise;
+        _biometricEnabled = bioEnabled;
+      });
+    }
   }
 
   Future<void> _updateDownload(String key, dynamic value) async {
@@ -47,6 +60,14 @@ class _SettingsTabState extends State<SettingsTab> {
   }
 
   void _openVault() async {
+    if (_calculatorDisguise) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CalculatorVaultScreen()),
+      );
+      return;
+    }
+
     final hasPin = await _backend.isVaultPinSet();
     if (!mounted) return;
     if (!hasPin) {
@@ -218,6 +239,72 @@ class _SettingsTabState extends State<SettingsTab> {
             trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
             onTap: _openVault,
           ),
+          _buildGlassTile(
+            context,
+            icon: Icons.fingerprint_rounded,
+            title: 'فتح الخزنة بالبصمة (Biometrics)',
+            subtitle: 'استخدام بصمة الإصبع أو الوجه لفتح الخزنة بسرعة وأمان',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: Switch(
+              value: _biometricEnabled,
+              activeColor: AppColors.cyan,
+              onChanged: (val) async {
+                if (val) {
+                  final supported = await BiometricService().isBiometricSupported();
+                  if (!supported) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('جهازك لا يدعم المصادقة البيومترية أو لم يتم تعيين بصمة بعد'),
+                          backgroundColor: AppColors.orange,
+                        ),
+                      );
+                    }
+                    return;
+                  }
+                  final auth = await BiometricService().authenticate(reason: 'تأكيد البصمة لتفعيلها للخزنة');
+                  if (!auth) return;
+                }
+                await BiometricService().setBiometricEnabled(val);
+                setState(() => _biometricEnabled = val);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(val ? 'تم تفعيل فتح الخزنة بالبصمة 👆' : 'تم تعطيل البصمة للخزنة'),
+                      backgroundColor: AppColors.cyan,
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+          _buildGlassTile(
+            context,
+            icon: Icons.calculate_outlined,
+            title: 'تمويه الخزنة كآلة حاسبة',
+            subtitle: 'إظهار آلة حاسبة حقيقية تفتح الخزنة تلقائياً عند كتابة رمز PIN والضغط على =',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: Switch(
+              value: _calculatorDisguise,
+              activeColor: AppColors.cyan,
+              onChanged: (val) async {
+                await _backend.setCalculatorDisguise(val);
+                setState(() => _calculatorDisguise = val);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(val ? 'تم تفعيل تمويه الآلة الحاسبة 🧮' : 'تم إلغاء تفعيل تمويه الخزنة'),
+                      backgroundColor: AppColors.cyan,
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
 
           const SizedBox(height: 15),
           _buildSectionHeader(_backend.t('dl_settings')),
@@ -299,6 +386,21 @@ class _SettingsTabState extends State<SettingsTab> {
             ),
           ),
 
+          const SizedBox(height: 15),
+          _buildSectionHeader('أدوات ومشاركة سريعة'),
+          _buildGlassTile(
+            context,
+            icon: Icons.wifi_tethering_rounded,
+            title: 'خادم المشاركة عبر الـ Wi-Fi',
+            subtitle: 'مشاركة الملفات وتنزيلها مباشرة إلى الكمبيوتر بدون كابل عبر المتصفح',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const WebShareScreen()));
+            },
+          ),
           const SizedBox(height: 15),
           _buildSectionHeader(_backend.t('more_tools')),
           

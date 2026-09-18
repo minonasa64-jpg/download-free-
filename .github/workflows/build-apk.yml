@@ -10,7 +10,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -28,9 +27,9 @@ jobs:
           channel: 'stable'
 
       - name: Create Flutter Android Project
-        run: flutter create --no-pub --project-name pro_downloader --platforms=android .
+        run: flutter create --no-pub --project-name pro_downloader --org com.boykta --platforms=android .
 
-      - name: Safely Inject Manifest Data
+      - name: Safely Inject Manifest and PiP Data
         run: |
           python3 -c "
           import xml.etree.ElementTree as ET
@@ -40,7 +39,18 @@ jobs:
           tree = ET.parse(path)
           root = tree.getroot()
           
-          perms = ['android.permission.INTERNET', 'android.permission.WRITE_EXTERNAL_STORAGE', 'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.READ_MEDIA_VIDEO', 'android.permission.READ_MEDIA_AUDIO', 'android.permission.MANAGE_EXTERNAL_STORAGE', 'com.google.android.gms.permission.AD_ID', 'android.permission.POST_NOTIFICATIONS']
+          perms = [
+              'android.permission.INTERNET',
+              'android.permission.WRITE_EXTERNAL_STORAGE',
+              'android.permission.READ_EXTERNAL_STORAGE',
+              'android.permission.READ_MEDIA_VIDEO',
+              'android.permission.READ_MEDIA_AUDIO',
+              'android.permission.MANAGE_EXTERNAL_STORAGE',
+              'com.google.android.gms.permission.AD_ID',
+              'android.permission.POST_NOTIFICATIONS',
+              'android.permission.USE_BIOMETRIC',
+              'android.permission.USE_FINGERPRINT'
+          ]
           for p in perms:
               e = ET.Element('uses-permission')
               e.set('{http://schemas.android.com/apk/res/android}name', p)
@@ -54,9 +64,55 @@ jobs:
               ad.set('{http://schemas.android.com/apk/res/android}name', 'com.google.android.gms.ads.APPLICATION_ID')
               ad.set('{http://schemas.android.com/apk/res/android}value', 'ca-app-pub-3940256099942544~3347511713')
               app.append(ad)
+
+              for act in app.findall('activity'):
+                  act.set('{http://schemas.android.com/apk/res/android}supportsPictureInPicture', 'true')
+                  act.set('{http://schemas.android.com/apk/res/android}configChanges', 'orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode')
               
           tree.write(path, encoding='utf-8', xml_declaration=True)
           "
+
+      - name: Setup FlutterFragmentActivity and PiP Channel
+        run: |
+          find android/app/src/main -name "MainActivity.kt" | while read file; do
+            cat << 'EOF' > "$file"
+          package com.boykta.app
+
+          import android.app.PictureInPictureParams
+          import android.os.Build
+          import android.util.Rational
+          import io.flutter.embedding.android.FlutterFragmentActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+
+          class MainActivity: FlutterFragmentActivity() {
+              private val CHANNEL = "com.boykta.app/pip"
+
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+                      if (call.method == "enterPip") {
+                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                              try {
+                                  val params = PictureInPictureParams.Builder()
+                                      .setAspectRatio(Rational(16, 9))
+                                      .build()
+                                  enterPictureInPictureMode(params)
+                                  result.success(true)
+                              } catch (e: Exception) {
+                                  result.error("PIP_ERROR", e.message, null)
+                              }
+                          } else {
+                              result.error("NOT_SUPPORTED", "PiP requires Android Oreo (API 26) or higher", null)
+                          }
+                      } else {
+                          result.notImplemented()
+                      }
+                  }
+              }
+          }
+          EOF
+          done
 
       - name: Apply FFmpeg Resolution Strategy
         run: |

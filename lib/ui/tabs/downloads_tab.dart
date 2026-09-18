@@ -8,7 +8,10 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
 import '../local_video_player_screen.dart'; 
-import '../vault_screen.dart'; 
+import '../vault_screen.dart';
+import '../audio_trimmer_screen.dart';
+import '../calculator_vault_screen.dart';
+import '../web_share_screen.dart'; 
 
 class DownloadsTab extends StatefulWidget {
   const DownloadsTab({super.key});
@@ -107,6 +110,27 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
   }
 
   void _openVault() async {
+    final isDisguise = await _backend.isCalculatorDisguiseEnabled();
+    if (isDisguise && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CalculatorVaultScreen()),
+      ).then((_) => _loadFiles());
+      return;
+    }
+
+    final bioService = BiometricService();
+    if (await bioService.isBiometricEnabled() && await bioService.isBiometricSupported()) {
+      final authenticated = await bioService.authenticate();
+      if (authenticated && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const VaultScreen()),
+        ).then((_) => _loadFiles());
+        return;
+      }
+    }
+
     final hasPin = await _backend.isVaultPinSet();
     if (!mounted) return;
     if (!hasPin) {
@@ -317,10 +341,25 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                       _backend.t('downloads'), 
                       style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary)
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh_rounded, color: AppColors.cyan),
-                      onPressed: _loadFiles,
-                      tooltip: 'تحديث',
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.wifi_tethering_rounded, color: AppColors.cyan),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const WebShareScreen()),
+                            );
+                          },
+                          tooltip: 'مشاركة عبر الـ Wi-Fi للكمبيوتر',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.refresh_rounded, color: AppColors.cyan),
+                          onPressed: _loadFiles,
+                          tooltip: 'تحديث',
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -725,6 +764,11 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                   onSelected: (val) {
                     if (val == 'convert') {
                       _convertVideo(file);
+                    } else if (val == 'trim') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => AudioTrimmerScreen(file: file)),
+                      ).then((_) => _loadFiles());
                     } else if (val == 'vault') {
                       _lockFileInVault(file);
                     } else if (val == 'share') {
@@ -745,6 +789,16 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                           ],
                         ),
                       ),
+                    PopupMenuItem(
+                      value: 'trim',
+                      child: const Row(
+                        children: [
+                          Icon(Icons.content_cut_rounded, color: AppColors.magenta, size: 20),
+                          SizedBox(width: 10),
+                          Text('قص وتعديل الصوت (صانع النغمات)', style: TextStyle(color: Colors.white, fontSize: 13)),
+                        ],
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 'vault',
                       child: Row(

@@ -34,6 +34,8 @@ dependencies:
 
   flutter_local_notifications: ^17.1.2
   google_mobile_ads: 4.0.0
+  local_auth: ^2.2.0
+  webview_flutter: ^4.7.0
 
 dev_dependencies:
   flutter_test:

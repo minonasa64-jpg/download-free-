@@ -19,9 +19,15 @@ class _LinksTabState extends State<LinksTab> {
 
   bool _isAnalyzing = false;
   bool _hasResult = false;
+  bool _isPlaylist = false;
+
   Map<String, dynamic>? _mediaData;
+  Map<String, dynamic>? _playlistData;
   Map<String, dynamic>? _selectedFormat;
   String? _detectedClipboardUrl;
+
+  // تحديد عناصر قائمة التشغيل
+  final Set<int> _selectedPlaylistIndices = {};
 
   @override
   void initState() {
@@ -44,7 +50,7 @@ class _LinksTabState extends State<LinksTab> {
       }
     } catch (_) {}
   }
-  
+
   Future<void> _pasteFromClipboard() async {
     final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
     if (clipboardData != null && clipboardData.text != null) {
@@ -64,46 +70,200 @@ class _LinksTabState extends State<LinksTab> {
       return;
     }
 
-    FocusScope.of(context).unfocus(); 
-    
+    FocusScope.of(context).unfocus();
+
     setState(() {
       _isAnalyzing = true;
       _hasResult = false;
+      _isPlaylist = false;
       _selectedFormat = null;
+      _selectedPlaylistIndices.clear();
     });
 
     try {
-      final result = await _backend.extractMediaLinks(url);
-      
-      final List videoList = result['video'] ?? [];
-      final List audioList = result['audio'] ?? [];
+      // فحص إذا كان الرابط قائمة تشغيل
+      if (_backend.isPlaylistUrl(url)) {
+        final playlist = await _backend.extractPlaylist(url);
+        final List videos = playlist['videos'] ?? [];
+        if (mounted) {
+          if (videos.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('قائمة التشغيل فارغة أو غير متاحة')),
+            );
+            setState(() => _isAnalyzing = false);
+          } else {
+            setState(() {
+              _playlistData = playlist;
+              _isPlaylist = true;
+              _hasResult = true;
+              _isAnalyzing = false;
+              // تحديد جميع الفيديوهات افتراضياً
+              _selectedPlaylistIndices.addAll(List.generate(videos.length, (i) => i));
+            });
+          }
+        }
+      } else {
+        // فيديو فردي عادي
+        final result = await _backend.extractMediaLinks(url);
+        final List videoList = result['video'] ?? [];
+        final List audioList = result['audio'] ?? [];
 
-      if (mounted) {
-        if (videoList.isEmpty && audioList.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(_backend.t('file_not_found'))),
-          );
-          setState(() {
-            _isAnalyzing = false;
-          });
-        } else {
-          setState(() {
-            _mediaData = result;
-            _hasResult = true;
-            _isAnalyzing = false;
-          });
+        if (mounted) {
+          if (videoList.isEmpty && audioList.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_backend.t('file_not_found'))),
+            );
+            setState(() => _isAnalyzing = false);
+          } else {
+            setState(() {
+              _mediaData = result;
+              _isPlaylist = false;
+              _hasResult = true;
+              _isAnalyzing = false;
+            });
+          }
         }
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isAnalyzing = false;
-        });
+        setState(() => _isAnalyzing = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
         );
       }
     }
+  }
+
+  void _showSchedulePicker() {
+    if (_selectedFormat == null || _mediaData == null) return;
+    final title = _mediaData?['title'] ?? 'فيديو بدون عنوان';
+    final highestAudioUrl = _mediaData?['highestAudioUrl'] ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                ),
+                const SizedBox(height: 18),
+                const Row(
+                  children: [
+                    Icon(Icons.schedule_rounded, color: AppColors.cyan, size: 22),
+                    SizedBox(width: 8),
+                    Text(
+                      'جدولة وقت التنزيل',
+                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _buildScheduleTile(
+                  title: 'بعد 30 دقيقة',
+                  subtitle: 'مثالي للانتظار حتى الاتصال بالـ Wi-Fi',
+                  minutes: 30,
+                  titleVal: title,
+                  audioUrl: highestAudioUrl,
+                ),
+                _buildScheduleTile(
+                  title: 'بعد 1 ساعة',
+                  subtitle: 'بدء التنزيل تلقائياً بعد ساعة',
+                  minutes: 60,
+                  titleVal: title,
+                  audioUrl: highestAudioUrl,
+                ),
+                _buildScheduleTile(
+                  title: 'بعد ساعتين (2 ساعات)',
+                  subtitle: 'تنزيل في وقت لاحق',
+                  minutes: 120,
+                  titleVal: title,
+                  audioUrl: highestAudioUrl,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildScheduleTile({
+    required String title,
+    required String subtitle,
+    required int minutes,
+    required String titleVal,
+    required String audioUrl,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(10)),
+        child: const Icon(Icons.timer_outlined, color: AppColors.cyan, size: 20),
+      ),
+      title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+      subtitle: Text(subtitle, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+      onTap: () {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تمت جدولة تنزيل: $titleVal بعد $minutes دقيقة ⏱️'),
+            backgroundColor: AppColors.cyan,
+          ),
+        );
+
+        Future.delayed(Duration(minutes: minutes), () {
+          if (mounted) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => DownloadProgressDialog(
+                selectedUrl: _selectedFormat!['url'],
+                title: titleVal,
+                ext: _selectedFormat!['ext'],
+                needsMerge: _selectedFormat!['needs_merge'],
+                highestAudioUrl: audioUrl,
+              ),
+            );
+          }
+        });
+      },
+    );
+  }
+
+  void _downloadBatch(bool isAudio) {
+    if (_playlistData == null) return;
+    final List allVideos = _playlistData!['videos'] ?? [];
+    final selectedItems = _selectedPlaylistIndices
+        .map((idx) => Map<String, dynamic>.from(allVideos[idx]))
+        .toList();
+
+    if (selectedItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى تحديد مقطع واحد على الأقل للتحميل')),
+      );
+      return;
+    }
+
+    AdService().showInterstitialAd();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => BatchDownloadProgressDialog(
+        items: selectedItems,
+        isAudio: isAudio,
+      ),
+    );
   }
 
   @override
@@ -117,7 +277,7 @@ class _LinksTabState extends State<LinksTab> {
     return SafeArea(
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 120), 
+        padding: const EdgeInsets.only(bottom: 120),
         child: Column(
           children: [
             const SizedBox(height: 30),
@@ -146,7 +306,7 @@ class _LinksTabState extends State<LinksTab> {
               child: _isAnalyzing
                   ? _buildLoadingState()
                   : _hasResult
-                      ? _buildResultCard()
+                      ? (_isPlaylist ? _buildPlaylistCard() : _buildSingleResultCard())
                       : const SizedBox.shrink(),
             ),
           ],
@@ -296,9 +456,9 @@ class _LinksTabState extends State<LinksTab> {
   Widget _buildQuickPlatforms() {
     final platforms = [
       {'name': 'YouTube', 'icon': Icons.smart_display_rounded, 'color': Colors.redAccent},
-      {'name': 'TikTok', 'icon': Icons.music_note_rounded, 'color': AppColors.cyan},
-      {'name': 'Instagram', 'icon': Icons.camera_alt_rounded, 'color': AppColors.magenta},
-      {'name': 'Facebook', 'icon': Icons.facebook_rounded, 'color': Colors.blueAccent},
+      {'name': 'قوائم تشغيل', 'icon': Icons.playlist_play_rounded, 'color': AppColors.cyan},
+      {'name': 'TikTok', 'icon': Icons.music_note_rounded, 'color': AppColors.magenta},
+      {'name': 'Instagram', 'icon': Icons.camera_alt_rounded, 'color': Colors.pinkAccent},
     ];
 
     return Row(
@@ -344,17 +504,212 @@ class _LinksTabState extends State<LinksTab> {
     );
   }
 
-  Widget _buildResultCard() {
+  // كرت قائمة التشغيل والتحميل الدفعي
+  Widget _buildPlaylistCard() {
+    final title = _playlistData?['title'] ?? 'قائمة تشغيل';
+    final author = _playlistData?['author'] ?? 'قناة يوتيوب';
+    final thumbnail = _playlistData?['thumbnail'] ?? '';
+    final List videos = _playlistData?['videos'] ?? [];
+
+    final isAllSelected = _selectedPlaylistIndices.length == videos.length;
+
+    return Container(
+      key: const ValueKey('playlist_result'),
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.cyan.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 10),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (thumbnail.isNotEmpty)
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              child: Image.network(
+                thumbnail,
+                width: double.infinity,
+                height: 160,
+                fit: BoxFit.cover,
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(15),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.cyan.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('قائمة تشغيل يوتيوب', style: TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${videos.length} مقطع',
+                      style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  author,
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: AppColors.surfaceLight, height: 1),
+
+          // شريط تحديد الكل
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'المحدد: ${_selectedPlaylistIndices.length} من ${videos.length}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      if (isAllSelected) {
+                        _selectedPlaylistIndices.clear();
+                      } else {
+                        _selectedPlaylistIndices.clear();
+                        _selectedPlaylistIndices.addAll(List.generate(videos.length, (i) => i));
+                      }
+                    });
+                  },
+                  icon: Icon(isAllSelected ? Icons.deselect : Icons.select_all, size: 16, color: AppColors.cyan),
+                  label: Text(
+                    isAllSelected ? 'إلغاء التحديد' : 'تحديد الكل',
+                    style: const TextStyle(color: AppColors.cyan, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // قائمة الفيديوهات داخل قائمة التشغيل
+          SizedBox(
+            height: 240,
+            child: ListView.builder(
+              physics: const BouncingScrollPhysics(),
+              itemCount: videos.length,
+              itemBuilder: (ctx, i) {
+                final v = videos[i];
+                final isSelected = _selectedPlaylistIndices.contains(i);
+                return CheckboxListTile(
+                  value: isSelected,
+                  activeColor: AppColors.cyan,
+                  checkColor: Colors.black,
+                  dense: true,
+                  title: Text(
+                    '${i + 1}. ${v['title']}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.white60,
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${v['duration'] ?? ''} • ${v['author'] ?? ''}',
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      if (val == true) {
+                        _selectedPlaylistIndices.add(i);
+                      } else {
+                        _selectedPlaylistIndices.remove(i);
+                      }
+                    });
+                  },
+                );
+              },
+            ),
+          ),
+
+          // أزرار التحميل الدفعي
+          Padding(
+            padding: const EdgeInsets.all(15),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.magenta,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => _downloadBatch(true),
+                    icon: const Icon(Icons.music_note, color: Colors.white, size: 18),
+                    label: const Text(
+                      'تحميل الكل MP3',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.cyan,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => _downloadBatch(false),
+                    icon: const Icon(Icons.movie, color: Colors.black, size: 18),
+                    label: const Text(
+                      'تحميل الكل MP4',
+                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // كرت الفيديو المفرد مع تبويبات (فيديو / صوت / ترجمات)
+  Widget _buildSingleResultCard() {
     final title = _mediaData?['title'] ?? 'فيديو بدون عنوان';
     final thumbnail = _mediaData?['thumbnail'] ?? 'https://via.placeholder.com/400x225/12121A/00D9FF?text=Video';
     final highestAudioUrl = _mediaData?['highestAudioUrl'] ?? '';
-    
-    // فلترة وتجنب التكرار الذكي
+
     final videoList = _processFormats(List<Map<String, dynamic>>.from(_mediaData?['video'] ?? []));
     final audioList = _processFormats(List<Map<String, dynamic>>.from(_mediaData?['audio'] ?? []));
+    final subtitlesList = List<Map<String, dynamic>>.from(_mediaData?['subtitles'] ?? []);
 
     return Container(
-      key: const ValueKey('result'),
+      key: const ValueKey('single_result'),
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -395,7 +750,7 @@ class _LinksTabState extends State<LinksTab> {
           ),
           const Divider(color: AppColors.surfaceLight, height: 1),
           DefaultTabController(
-            length: 2,
+            length: 3,
             child: Column(
               children: [
                 TabBar(
@@ -405,14 +760,16 @@ class _LinksTabState extends State<LinksTab> {
                   tabs: [
                     Tab(icon: const Icon(Icons.video_library), text: _backend.t('video')),
                     Tab(icon: const Icon(Icons.library_music), text: _backend.t('audio')),
+                    Tab(icon: const Icon(Icons.subtitles_rounded), text: _backend.t('subtitles')),
                   ],
                 ),
                 SizedBox(
-                  height: 220, 
+                  height: 220,
                   child: TabBarView(
                     children: [
                       _buildFormatList(videoList, Icons.play_circle_outline),
                       _buildFormatList(audioList, Icons.music_note),
+                      _buildSubtitlesList(subtitlesList, title),
                     ],
                   ),
                 ),
@@ -422,53 +779,73 @@ class _LinksTabState extends State<LinksTab> {
           if (_selectedFormat != null)
             Padding(
               padding: const EdgeInsets.all(15),
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.blue.withOpacity(0.4),
-                      blurRadius: 12,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                  ),
-                  onPressed: () {
-                    AdService().showInterstitialAd();
-                    
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (context) => DownloadProgressDialog(
-                        selectedUrl: _selectedFormat!['url'],
-                        title: title,
-                        ext: _selectedFormat!['ext'],
-                        needsMerge: _selectedFormat!['needs_merge'],
-                        highestAudioUrl: highestAudioUrl,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: AppColors.primaryGradient,
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.blue.withOpacity(0.4),
+                            blurRadius: 12,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.download, color: Colors.white),
-                  label: const Text(
-                    '⬇️ تحميل الآن',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        onPressed: () {
+                          AdService().showInterstitialAd();
+
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => DownloadProgressDialog(
+                              selectedUrl: _selectedFormat!['url'],
+                              title: title,
+                              ext: _selectedFormat!['ext'],
+                              needsMerge: _selectedFormat!['needs_merge'],
+                              highestAudioUrl: highestAudioUrl,
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.download, color: Colors.white),
+                        label: const Text(
+                          '⬇️ تحميل الآن',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  // زر جدولة التحميل
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.schedule_rounded, color: AppColors.cyan, size: 24),
+                      onPressed: _showSchedulePicker,
+                      tooltip: 'جدولة التنزيل',
+                      padding: const EdgeInsets.all(14),
+                    ),
+                  ),
+                ],
               ),
             ),
         ],
@@ -476,19 +853,112 @@ class _LinksTabState extends State<LinksTab> {
     );
   }
 
-  // دالة ذكية لإزالة الجودات المكررة وترتيبها
+  // قائمة الترجمات المتاحة
+  Widget _buildSubtitlesList(List<Map<String, dynamic>> subtitles, String videoTitle) {
+    if (subtitles.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.subtitles_off_rounded, color: AppColors.textMuted, size: 36),
+            SizedBox(height: 8),
+            Text('لا توجد ملفات ترجمة متوفرة لهذا المقطع', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      itemCount: subtitles.length,
+      itemBuilder: (ctx, idx) {
+        final sub = subtitles[idx];
+        final name = sub['name'] ?? 'لغة غير معروفة';
+        final code = sub['code'] ?? '';
+        final isAuto = sub['isAuto'] ?? false;
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.closed_caption_rounded, color: AppColors.cyan, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    Text(
+                      '${code.toString().toUpperCase()} ${isAuto ? '• ترجمة تلقائية' : '• ترجمة رسمية'}',
+                      style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.cyan.withOpacity(0.2),
+                  foregroundColor: AppColors.cyan,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () async {
+                  try {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('جاري تحميل ملف الترجمة SRT...')),
+                    );
+                    final path = await _backend.downloadSubtitleTrack(
+                      track: sub['track'],
+                      videoTitle: videoTitle,
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('تم تحميل ملف الترجمة بنجاح: ${path.split('/').last} 📄'),
+                          backgroundColor: AppColors.cyan,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('فشل تحميل الترجمة: $e'), backgroundColor: AppColors.orange),
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.download_rounded, size: 16),
+                label: const Text('SRT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   List<Map<String, dynamic>> _processFormats(List<Map<String, dynamic>> formats) {
     if (formats.isEmpty) return [];
     var uniqueFormats = <String, Map<String, dynamic>>{};
     for (var f in formats) {
-      uniqueFormats[f['quality_name']] = f; 
+      uniqueFormats[f['quality_name']] = f;
     }
     var sortedList = uniqueFormats.values.toList();
-    
+
     sortedList.sort((a, b) {
       double sizeA = double.tryParse(a['size'].toString()) ?? 0.0;
       double sizeB = double.tryParse(b['size'].toString()) ?? 0.0;
-      return sizeB.compareTo(sizeA); // الأكبر أولاً
+      return sizeB.compareTo(sizeA);
     });
     return sortedList;
   }
@@ -499,7 +969,7 @@ class _LinksTabState extends State<LinksTab> {
         child: Text('هذه الصيغة غير متوفرة', style: TextStyle(color: AppColors.textMuted)),
       );
     }
-    
+
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -507,7 +977,7 @@ class _LinksTabState extends State<LinksTab> {
       itemBuilder: (context, index) {
         final format = formats[index];
         final isSelected = _selectedFormat == format;
-        
+
         return InkWell(
           onTap: () {
             setState(() {
