@@ -89,12 +89,18 @@ jobs:
           import io.flutter.embedding.android.FlutterFragmentActivity
           import io.flutter.embedding.engine.FlutterEngine
           import io.flutter.plugin.common.MethodChannel
+          import io.flutter.plugins.GeneratedPluginRegistrant
 
           class MainActivity: FlutterFragmentActivity() {
               private val CHANNEL = "com.boykta.app/pip"
 
               override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
                   super.configureFlutterEngine(flutterEngine)
+                  try {
+                      GeneratedPluginRegistrant.registerWith(flutterEngine)
+                  } catch (e: Exception) {
+                      android.util.Log.e("MainActivity", "Plugin registration error: ${e.message}")
+                  }
                   MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
                       if (call.method == "enterPip") {
                           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -119,7 +125,7 @@ jobs:
           EOF
           done
 
-      - name: Apply FFmpeg Resolution Strategy
+      - name: Apply FFmpeg Resolution Strategy and Build Fixes
         run: |
           cat << 'EOF' >> android/build.gradle
           allprojects {
@@ -141,11 +147,27 @@ jobs:
             sed -i -E 's/minSdkVersion\s+flutter\.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle || true
             sed -i -E 's/minSdk\s*=\s*[0-9]+/minSdk = 24/g' android/app/build.gradle || true
             sed -i -E 's/minSdk\s*=\s*flutter\.minSdkVersion/minSdk = 24/g' android/app/build.gradle || true
+            sed -i -E 's/minifyEnabled\s+true/minifyEnabled false/g' android/app/build.gradle || true
+            sed -i -E 's/shrinkResources\s+true/shrinkResources false/g' android/app/build.gradle || true
           fi
           if [ -f "android/app/build.gradle.kts" ]; then
             sed -i -E 's/minSdk\s*=\s*[0-9]+/minSdk = 24/g' android/app/build.gradle.kts || true
             sed -i -E 's/minSdk\s*=\s*flutter\.minSdkVersion/minSdk = 24/g' android/app/build.gradle.kts || true
           fi
+          cat << 'EOF' >> android/app/proguard-rules.pro
+          -keep class io.flutter.app.** { *; }
+          -keep class io.flutter.plugin.**  { *; }
+          -keep class io.flutter.util.**  { *; }
+          -keep class io.flutter.view.**  { *; }
+          -keep class io.flutter.**  { *; }
+          -keep class io.flutter.plugins.**  { *; }
+          -dontwarn io.flutter.embedding.**
+          -keep class io.flutter.plugins.GeneratedPluginRegistrant { *; }
+          -keep class com.arthenica.ffmpegkit.** { *; }
+          -dontwarn com.arthenica.ffmpegkit.**
+          -keep class * implements io.flutter.embedding.engine.plugins.FlutterPlugin { *; }
+          -keep class * implements io.flutter.plugin.common.PluginRegistry$PluginRegistrantCallback { *; }
+          EOF
 
       - name: Install Dependencies
         run: flutter pub get

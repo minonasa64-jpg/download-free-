@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
-import 'package:pod_player/pod_player.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../core/app_colors.dart';
 import '../services/backend_service.dart';
 import '../services/ad_service.dart';
@@ -21,7 +21,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   final yt.YoutubeExplode _yt = yt.YoutubeExplode();
   
   late yt.Video _currentVideo;
-  late final PodPlayerController _podController;
+  late final YoutubePlayerController _ytController;
   final ScrollController _relatedScrollController = ScrollController();
 
   bool _isLoadingExtraction = false;
@@ -35,15 +35,18 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     super.initState();
     _currentVideo = widget.video;
     
-    // تهيئة مشغل الفيديوهات المتقدم pod_player لدعم يوتيوب فائق السرعة
-    _podController = PodPlayerController(
-      playVideoFrom: PlayVideoFrom.youtube('https://youtu.be/${widget.video.id.value}'),
-      podPlayerConfig: const PodPlayerConfig(
+    // تهيئة مشغل يوتيوب الرسمي فائق السرعة والموثوقية بدون تقطيع أو أخطاء تشفير
+    _ytController = YoutubePlayerController(
+      initialVideoId: widget.video.id.value,
+      flags: const YoutubePlayerFlags(
         autoPlay: true,
-        isLooping: false,
-        videoQualityPriority: [720, 1080, 480, 360],
+        mute: false,
+        enableCaption: false,
+        isLive: false,
+        forceHD: true,
+        loop: false,
       ),
-    )..initialise();
+    );
 
     _fetchRelatedVideos();
 
@@ -100,9 +103,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   void _changeVideo(yt.Video newVideo) {
     if (_currentVideo.id.value == newVideo.id.value) return;
     
-    _podController.changeVideo(
-      playVideoFrom: PlayVideoFrom.youtube('https://youtu.be/${newVideo.id.value}'),
-    );
+    _ytController.load(newVideo.id.value);
     setState(() {
       _currentVideo = newVideo;
       _isLoadingRelated = true;
@@ -140,7 +141,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
 
   Future<void> _handleExtraction() async {
     setState(() => _isLoadingExtraction = true);
-    _podController.pause();
+    _ytController.pause();
 
     try {
       final result = await _backend.extractMediaLinks(_currentVideo.url);
@@ -190,7 +191,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
 
   @override
   void dispose() {
-    _podController.dispose();
+    _ytController.dispose();
     _relatedScrollController.dispose();
     _yt.close();
     super.dispose();
@@ -198,157 +199,166 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+    return YoutubePlayerBuilder(
+      player: YoutubePlayer(
+        controller: _ytController,
+        showVideoProgressIndicator: true,
+        progressIndicatorColor: AppColors.cyan,
+        progressColors: const ProgressBarColors(
+          playedColor: AppColors.cyan,
+          handleColor: AppColors.cyan,
+          bufferedColor: Colors.white24,
+          backgroundColor: Colors.black26,
         ),
-        title: Text(
-          _currentVideo.title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        onReady: () {},
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // مشغل الفيديوهات المتقدم pod_player
-          PodVideoPlayer(
-            controller: _podController,
-            videoThumbnail: DecorationImage(
-              image: NetworkImage(_currentVideo.thumbnails.highResUrl),
-              fit: BoxFit.cover,
+      builder: (context, player) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Text(
+              _currentVideo.title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          
-          Expanded(
-            child: Container(
-              color: AppColors.background,
-              child: ListView.builder(
-                    controller: _relatedScrollController,
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: _relatedVideos.length + 2,
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return Padding(
-                          padding: const EdgeInsets.all(20.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _currentVideo.title,
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              player,
+              
+              Expanded(
+                child: Container(
+                  color: AppColors.background,
+                  child: ListView.builder(
+                        controller: _relatedScrollController,
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: _relatedVideos.length + 2,
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.person_outline, size: 16, color: AppColors.textMuted),
-                                  const SizedBox(width: 5),
-                                  Text(_currentVideo.author, style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                                  Text(
+                                    _currentVideo.title,
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.person_outline, size: 16, color: AppColors.textMuted),
+                                      const SizedBox(width: 5),
+                                      Text(_currentVideo.author, style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 25),
+                                  
+                                  Container(
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      gradient: AppColors.primaryGradient,
+                                      borderRadius: BorderRadius.circular(15),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.cyan.withOpacity(0.3),
+                                          blurRadius: 15,
+                                          offset: const Offset(0, 5),
+                                        )
+                                      ],
+                                    ),
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.transparent,
+                                        shadowColor: Colors.transparent,
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                      ),
+                                      onPressed: _isLoadingExtraction ? null : _handleExtraction,
+                                      icon: _isLoadingExtraction
+                                          ? const SizedBox(
+                                              width: 24,
+                                              height: 24,
+                                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                            )
+                                          : const Icon(Icons.download_rounded, color: Colors.white, size: 26),
+                                      label: Text(
+                                        _isLoadingExtraction ? 'جاري الفحص...' : _backend.t('download_btn'),
+                                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
-                              const SizedBox(height: 25),
-                              
-                              Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  gradient: AppColors.primaryGradient,
-                                  borderRadius: BorderRadius.circular(15),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.cyan.withOpacity(0.3),
-                                      blurRadius: 15,
-                                      offset: const Offset(0, 5),
-                                    )
-                                  ],
-                                ),
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    shadowColor: Colors.transparent,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                            );
+                          }
+                          
+                          if (index == 1) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.auto_awesome_rounded, color: AppColors.cyan, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _backend.t('related'),
+                                    style: const TextStyle(color: AppColors.cyan, fontSize: 16, fontWeight: FontWeight.bold),
                                   ),
-                                  onPressed: _isLoadingExtraction ? null : _handleExtraction,
-                                  icon: _isLoadingExtraction
-                                      ? const SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                        )
-                                      : const Icon(Icons.download_rounded, color: Colors.white, size: 26),
-                                  label: Text(
-                                    _isLoadingExtraction ? 'جاري الفحص...' : _backend.t('download_btn'),
-                                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
+                                ],
                               ),
-                            ],
-                          ),
-                        );
-                      }
-                      
-                      if (index == 1) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.auto_awesome_rounded, color: AppColors.cyan, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                _backend.t('related'),
-                                style: const TextStyle(color: AppColors.cyan, fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
+                            );
+                          }
 
-                      final v = _relatedVideos[index - 2];
-                      return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white.withOpacity(0.05)),
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(8),
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              v.thumbnails.lowResUrl,
-                              width: 90,
-                              height: 60,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(width: 90, height: 60, color: AppColors.surfaceLight),
+                          final v = _relatedVideos[index - 2];
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white.withOpacity(0.05)),
                             ),
-                          ),
-                          title: Text(
-                            v.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 5),
-                            child: Text(v.author, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
-                          ),
-                          onTap: () => _changeVideo(v),
-                        ),
-                      );
-                    },
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.all(8),
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  v.thumbnails.lowResUrl,
+                                  width: 90,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(width: 90, height: 60, color: AppColors.surfaceLight),
+                                ),
+                              ),
+                              title: Text(
+                                v.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 5),
+                                child: Text(v.author, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                              ),
+                              onTap: () => _changeVideo(v),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-        );
+            );
+      },
+    );
   }
 }
 

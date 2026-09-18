@@ -402,10 +402,13 @@ class BackendService {
           return dir;
         }
       } catch (_) {}
-      final docDir = await getApplicationDocumentsDirectory();
-      final dir = Directory('${docDir.path}/Boykta_Temp');
-      if (!await dir.exists()) await dir.create(recursive: true);
-      return dir;
+      try {
+        final docDir = await getApplicationDocumentsDirectory();
+        final dir = Directory('${docDir.path}/Boykta_Temp');
+        if (!await dir.exists()) await dir.create(recursive: true);
+        return dir;
+      } catch (_) {}
+      return Directory.systemTemp;
     }
   }
 
@@ -428,10 +431,13 @@ class BackendService {
             return dir;
           }
         } catch (_) {}
-        final docDir = await getApplicationDocumentsDirectory();
-        final dir = Directory('${docDir.path}/Boykta');
-        if (!await dir.exists()) await dir.create(recursive: true);
-        return dir;
+        try {
+          final docDir = await getApplicationDocumentsDirectory();
+          final dir = Directory('${docDir.path}/Boykta');
+          if (!await dir.exists()) await dir.create(recursive: true);
+          return dir;
+        } catch (_) {}
+        return Directory.systemTemp;
       }
     }
   }
@@ -448,7 +454,11 @@ class BackendService {
     required Function(String) onStatusChanged,
     required Function(int, int) onReceiveProgress,
   }) async {
-    await _requestPermissions();
+    try {
+      await _requestPermissions();
+    } catch (e) {
+      debugPrint('تم تجاهل استثناء الصلاحيات: $e');
+    }
 
     final cleanTitle = title.replaceAll(RegExp(r'[^\w\s]+'), '').trim();
     
@@ -584,10 +594,24 @@ class BackendService {
             try { File(tempVideoPath).deleteSync(); } catch (_) {}
             try { File(tempAudioPath).deleteSync(); } catch (_) {}
           } else {
-            throw Exception('فشل الدمج محلياً.');
+            final vFile = File(tempVideoPath);
+            if (await vFile.exists()) {
+              await vFile.copy(finalOutputPath);
+              try { vFile.deleteSync(); } catch (_) {}
+              try { File(tempAudioPath).deleteSync(); } catch (_) {}
+            } else {
+              throw Exception('فشل الدمج محلياً.');
+            }
           }
         } catch (ffmpegError) {
-          throw Exception('خطأ في أداة الدمج (قد لا تكون مدعومة على هذا الجهاز).');
+          final vFile = File(tempVideoPath);
+          if (await vFile.exists()) {
+            await vFile.copy(finalOutputPath);
+            try { vFile.deleteSync(); } catch (_) {}
+            try { File(tempAudioPath).deleteSync(); } catch (_) {}
+          } else {
+            throw Exception('خطأ في أداة الدمج: $ffmpegError');
+          }
         }
       }
 
