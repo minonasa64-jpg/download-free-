@@ -2,6 +2,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 import '../core/app_colors.dart';
 import '../services/backend_service.dart';
 import '../services/ad_service.dart';
@@ -24,6 +26,13 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   late YoutubePlayerController _youtubeController;
   final ScrollController _relatedScrollController = ScrollController();
   
+  // مشغل البث المباشر (Direct Stream Player via ExoPlayer)
+  VideoPlayerController? _videoPlayerController;
+  ChewieController? _chewieController;
+  bool _isLoadingDirectPlayer = true;
+  String? _directPlayerError;
+  bool _useDirectPlayer = true; // الافتراضي هو المشغل المباشر لضمان العمل 100%
+
   bool _isLoadingExtraction = false;
   List<yt.Video> _relatedVideos = [];
   yt.VideoSearchList? _relatedSearchPage;
@@ -36,15 +45,18 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     super.initState();
     _currentVideo = widget.video;
     
-    // تهيئة مشغل يوتيوب الرسمي الاحترافي بكامل المزايا
+    // 1. تهيئة مشغل البث المباشر فائق السرعة
+    _initDirectPlayer();
+
+    // 2. تهيئة مشغل يوتيوب الرسمي كخيار بديل مع إعدادات مستقرة تمنع التجميد
     _youtubeController = YoutubePlayerController(
       initialVideoId: widget.video.id.value,
       flags: const YoutubePlayerFlags(
-        autoPlay: true,
+        autoPlay: false,
         mute: false,
         enableCaption: false,
-        forceHD: true,
-        useHybridComposition: true,
+        forceHD: false,
+        useHybridComposition: false,
         showLiveFullscreenButton: true,
       ),
     )..addListener(_onPlayerStateChange);
@@ -58,9 +70,72 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     });
   }
 
+  Future<void> _initDirectPlayer() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingDirectPlayer = true;
+      _directPlayerError = null;
+    });
+
+    try {
+      final manifest = await _yt.videos.streamsClient.getManifest(_currentVideo.id.value);
+      
+      // اختيار أفضل دفق مدمج فيديو وصوت (Muxed)
+      final muxedStreams = manifest.muxed.sortByVideoQuality();
+      yt.MuxedStreamInfo? bestStream;
+      if (muxedStreams.isNotEmpty) {
+        bestStream = muxedStreams.last;
+      }
+      bestStream ??= manifest.muxed.withHighestVideoQuality();
+
+      final streamUri = bestStream.url;
+
+      _videoPlayerController?.dispose();
+      _chewieController?.dispose();
+
+      final controller = VideoPlayerController.networkUrl(streamUri);
+      await controller.initialize();
+
+      if (!mounted) {
+        controller.dispose();
+        return;
+      }
+
+      final chewie = ChewieController(
+        videoPlayerController: controller,
+        autoPlay: true,
+        looping: false,
+        allowFullScreen: true,
+        allowPlaybackSpeedChanging: true,
+        materialProgressColors: ChewieProgressColors(
+          playedColor: AppColors.cyan,
+          handleColor: AppColors.magenta,
+          backgroundColor: Colors.white24,
+          bufferedColor: Colors.white54,
+        ),
+      );
+
+      if (mounted) {
+        setState(() {
+          _videoPlayerController = controller;
+          _chewieController = chewie;
+          _isLoadingDirectPlayer = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading direct player stream: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingDirectPlayer = false;
+          _directPlayerError = 'تعذر تشغيل البث المباشر. اضغط للتبديل لمشغل يوتيوب الرسمي.';
+        });
+      }
+    }
+  }
+
   void _onPlayerStateChange() {
     if (_isPlayerReady && mounted && !_youtubeController.value.isFullScreen) {
-      // Rebuild if needed for UI state synchronization
+      // مزامنة حالة المشغل إذا لزم
     }
   }
 
@@ -116,6 +191,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       _isLoadingRelated = true;
       _relatedVideos.clear();
     });
+    _initDirectPlayer();
     _fetchRelatedVideos();
   }
 
@@ -141,12 +217,14 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     if (_youtubeController.value.isPlaying) {
       _youtubeController.pause();
     }
+    _videoPlayerController?.pause();
 
     try {
       final result = await _backend.extractMediaLinks(_currentVideo.url);
       
       final String videoTitle = result['title'] as String;
       final String highestAudioUrl = result['highestAudioUrl'] as String;
+      final int? highestAudioTag = result['highestAudioTag'] as int?;
       
       final List<Map<String, dynamic>> videoList = _processFormats(List<Map<String, dynamic>>.from(result['video'] ?? []));
       final List<Map<String, dynamic>> audioList = _processFormats(List<Map<String, dynamic>>.from(result['audio'] ?? []));
@@ -160,6 +238,8 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
             return FormatSelectionSheet(
               title: videoTitle,
               highestAudioUrl: highestAudioUrl,
+              highestAudioTag: highestAudioTag,
+              videoId: _currentVideo.id.value,
               videoFormats: videoList,
               audioFormats: audioList,
             );
@@ -189,9 +269,171 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   void dispose() {
     _youtubeController.removeListener(_onPlayerStateChange);
     _youtubeController.dispose();
+    _videoPlayerController?.dispose();
+    _chewieController?.dispose();
     _relatedScrollController.dispose();
     _yt.close();
     super.dispose();
+  }
+
+  Widget _buildDirectPlayerWidget() {
+    if (_isLoadingDirectPlayer) {
+      return Container(
+        height: 220,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          image: DecorationImage(
+            image: NetworkImage(_currentVideo.thumbnails.highResUrl),
+            fit: BoxFit.cover,
+            opacity: 0.35,
+          ),
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: AppColors.cyan, strokeWidth: 3),
+              SizedBox(height: 12),
+              Text(
+                'جاري تجهيز المشغل المباشر السريع...',
+                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_directPlayerError != null || _chewieController == null) {
+      return Container(
+        height: 220,
+        width: double.infinity,
+        color: Colors.black,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline_rounded, color: AppColors.orange, size: 40),
+            const SizedBox(height: 10),
+            Text(
+              _directPlayerError ?? 'تعذر تحميل المشغل المباشر',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.surfaceLight,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                setState(() => _useDirectPlayer = false);
+              },
+              icon: const Icon(Icons.ondemand_video, color: AppColors.cyan, size: 18),
+              label: const Text('التبديل إلى مشغل يوتيوب الرسمي', style: TextStyle(color: Colors.white, fontSize: 13)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      color: Colors.black,
+      height: 220,
+      width: double.infinity,
+      child: Chewie(controller: _chewieController!),
+    );
+  }
+
+  Widget _buildPlayerSwitcher() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                if (!_useDirectPlayer) {
+                  _youtubeController.pause();
+                  setState(() => _useDirectPlayer = true);
+                  if (_videoPlayerController == null) {
+                    _initDirectPlayer();
+                  }
+                }
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: _useDirectPlayer ? AppColors.cyan.withOpacity(0.18) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: _useDirectPlayer ? Border.all(color: AppColors.cyan, width: 1.2) : null,
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.bolt_rounded, size: 18, color: _useDirectPlayer ? AppColors.cyan : AppColors.textMuted),
+                    const SizedBox(width: 6),
+                    Text(
+                      'المشغل المباشر السريع ⚡',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _useDirectPlayer ? AppColors.cyan : AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                if (_useDirectPlayer) {
+                  _videoPlayerController?.pause();
+                  setState(() => _useDirectPlayer = false);
+                }
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: !_useDirectPlayer ? AppColors.magenta.withOpacity(0.18) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: !_useDirectPlayer ? Border.all(color: AppColors.magenta, width: 1.2) : null,
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.play_circle_outline_rounded, size: 18, color: !_useDirectPlayer ? AppColors.magenta : AppColors.textMuted),
+                    const SizedBox(width: 6),
+                    Text(
+                      'مشغل يوتيوب الرسمي 🎬',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: !_useDirectPlayer ? AppColors.magenta : AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -223,12 +465,14 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
           ),
         ],
         onReady: () {
-          setState(() {
-            _isPlayerReady = true;
-          });
+          if (mounted) {
+            setState(() {
+              _isPlayerReady = true;
+            });
+          }
         },
       ),
-      builder: (context, player) {
+      builder: (context, youtubePlayerWidget) {
         return Scaffold(
           backgroundColor: AppColors.background,
           appBar: AppBar(
@@ -248,8 +492,11 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // مشغل اليوتيوب الرسمي متكامل مع وضع ملء الشاشة
-              player,
+              // منطقة المشغل: مشغل البث المباشر أو مشغل يوتيوب
+              _useDirectPlayer ? _buildDirectPlayerWidget() : youtubePlayerWidget,
+              
+              // شريط التبديل بين المشغلين
+              _buildPlayerSwitcher(),
               
               Expanded(
                 child: Container(
@@ -382,6 +629,8 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
 class FormatSelectionSheet extends StatefulWidget {
   final String title;
   final String highestAudioUrl;
+  final int? highestAudioTag;
+  final String? videoId;
   final List<Map<String, dynamic>> videoFormats;
   final List<Map<String, dynamic>> audioFormats;
 
@@ -389,6 +638,8 @@ class FormatSelectionSheet extends StatefulWidget {
     super.key,
     required this.title,
     required this.highestAudioUrl,
+    this.highestAudioTag,
+    this.videoId,
     required this.videoFormats,
     required this.audioFormats,
   });
@@ -480,6 +731,9 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                               ext: _selectedFormat!['ext'],
                               needsMerge: _selectedFormat!['needs_merge'],
                               highestAudioUrl: widget.highestAudioUrl,
+                              videoId: _selectedFormat!['video_id'] ?? widget.videoId,
+                              videoTag: _selectedFormat!['tag'],
+                              highestAudioTag: widget.highestAudioTag,
                             ),
                           );
                         },

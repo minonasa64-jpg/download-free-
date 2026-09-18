@@ -181,6 +181,8 @@ class _BrowserTabState extends State<BrowserTab> {
   void _showFormatsModal(Map<String, dynamic> mediaData) {
     final title = mediaData['title'] ?? 'فيديو من المتصفح';
     final highestAudioUrl = mediaData['highestAudioUrl'] ?? '';
+    final int? highestAudioTag = mediaData['highestAudioTag'];
+    final String? videoId = mediaData['id'];
     final videos = List<Map<String, dynamic>>.from(mediaData['video'] ?? []);
     final audios = List<Map<String, dynamic>>.from(mediaData['audio'] ?? []);
 
@@ -225,13 +227,13 @@ class _BrowserTabState extends State<BrowserTab> {
                         if (videos.isNotEmpty) ...[
                           const Text('🎬 جودات الفيديو (MP4):', style: TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 8),
-                          ...videos.map((v) => _buildFormatTile(v, title, highestAudioUrl, false)),
+                          ...videos.map((v) => _buildFormatTile(v, title, highestAudioUrl, highestAudioTag, videoId, false)),
                         ],
                         const SizedBox(height: 15),
                         if (audios.isNotEmpty) ...[
                           const Text('🎵 مقطع صوتي (MP3):', style: TextStyle(color: AppColors.magenta, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 8),
-                          ...audios.map((a) => _buildFormatTile(a, title, highestAudioUrl, true)),
+                          ...audios.map((a) => _buildFormatTile(a, title, highestAudioUrl, highestAudioTag, videoId, true)),
                         ],
                       ],
                     ),
@@ -245,7 +247,7 @@ class _BrowserTabState extends State<BrowserTab> {
     );
   }
 
-  Widget _buildFormatTile(Map<String, dynamic> format, String title, String audioUrl, bool isAudio) {
+  Widget _buildFormatTile(Map<String, dynamic> format, String title, String audioUrl, int? audioTag, String? videoId, bool isAudio) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -293,6 +295,9 @@ class _BrowserTabState extends State<BrowserTab> {
                   ext: format['ext'],
                   needsMerge: format['needs_merge'] ?? false,
                   highestAudioUrl: audioUrl,
+                  videoId: format['video_id'] ?? videoId,
+                  videoTag: format['tag'],
+                  highestAudioTag: audioTag,
                 ),
               );
             },

@@ -232,6 +232,9 @@ class _LinksTabState extends State<LinksTab> {
                 ext: _selectedFormat!['ext'],
                 needsMerge: _selectedFormat!['needs_merge'],
                 highestAudioUrl: audioUrl,
+                videoId: _selectedFormat!['video_id'] ?? _mediaData?['id'],
+                videoTag: _selectedFormat!['tag'],
+                highestAudioTag: _mediaData?['highestAudioTag'],
               ),
             );
           }
@@ -815,6 +818,9 @@ class _LinksTabState extends State<LinksTab> {
                               ext: _selectedFormat!['ext'],
                               needsMerge: _selectedFormat!['needs_merge'],
                               highestAudioUrl: highestAudioUrl,
+                              videoId: _selectedFormat!['video_id'] ?? _mediaData?['id'],
+                              videoTag: _selectedFormat!['tag'],
+                              highestAudioTag: _mediaData?['highestAudioTag'],
                             ),
                           );
                         },

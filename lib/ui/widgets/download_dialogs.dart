@@ -9,6 +9,9 @@ class DownloadProgressDialog extends StatefulWidget {
   final String ext;
   final bool needsMerge;
   final String highestAudioUrl;
+  final String? videoId;
+  final int? videoTag;
+  final int? highestAudioTag;
 
   const DownloadProgressDialog({
     super.key,
@@ -17,6 +20,9 @@ class DownloadProgressDialog extends StatefulWidget {
     required this.ext,
     required this.needsMerge,
     required this.highestAudioUrl,
+    this.videoId,
+    this.videoTag,
+    this.highestAudioTag,
   });
 
   @override
@@ -45,6 +51,9 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
         ext: widget.ext,
         needsMerge: widget.needsMerge,
         highestAudioUrl: widget.highestAudioUrl,
+        videoId: widget.videoId,
+        videoTag: widget.videoTag,
+        highestAudioTag: widget.highestAudioTag,
         onStatusChanged: (status) {
           if (mounted) {
             setState(() {
@@ -230,13 +239,18 @@ class _BatchDownloadProgressDialogState extends State<BatchDownloadProgressDialo
         String ext = widget.isAudio ? 'mp3' : 'mp4';
         bool needsMerge = false;
         String highestAudioUrl = mediaData['highestAudioUrl'] ?? '';
+        int? highestAudioTag = mediaData['highestAudioTag'];
+        String? targetVideoId = mediaData['id'] ?? item['id'];
+        int? targetTag;
 
         if (widget.isAudio) {
           final audios = List<Map<String, dynamic>>.from(mediaData['audio'] ?? []);
           if (audios.isNotEmpty) {
             selectedUrl = audios.first['url'];
+            targetTag = audios.first['tag'];
           } else {
             selectedUrl = highestAudioUrl;
+            targetTag = highestAudioTag;
           }
         } else {
           final videos = List<Map<String, dynamic>>.from(mediaData['video'] ?? []);
@@ -246,6 +260,7 @@ class _BatchDownloadProgressDialogState extends State<BatchDownloadProgressDialo
             orElse: () => videos.isNotEmpty ? videos.first : {'url': '', 'needs_merge': false},
           );
           selectedUrl = directVideo['url'] ?? '';
+          targetTag = directVideo['tag'];
           needsMerge = directVideo['needs_merge'] ?? false;
         }
 
@@ -266,6 +281,9 @@ class _BatchDownloadProgressDialogState extends State<BatchDownloadProgressDialo
           ext: ext,
           needsMerge: needsMerge,
           highestAudioUrl: highestAudioUrl,
+          videoId: targetVideoId,
+          videoTag: targetTag,
+          highestAudioTag: highestAudioTag,
           onStatusChanged: (status) {
             if (mounted) {
               setState(() => _currentStatus = '$status (${i + 1}/${widget.items.length})');

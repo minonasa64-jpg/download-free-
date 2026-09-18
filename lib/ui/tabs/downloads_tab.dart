@@ -7,6 +7,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
+import '../../services/biometric_service.dart';
 import '../local_video_player_screen.dart'; 
 import '../vault_screen.dart';
 import '../audio_trimmer_screen.dart';
