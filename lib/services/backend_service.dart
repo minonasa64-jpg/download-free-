@@ -620,6 +620,8 @@ class BackendService {
     String? videoId,
     int? streamTag,
   }) async {
+    final isMultiThread = await isMultiThreadDownloadEnabled();
+    final threadCount = await getDownloadThreads();
     String? targetVideoId = videoId;
     int? targetTag = streamTag;
 
@@ -675,9 +677,6 @@ class BackendService {
 
     // الطريقة الأولى الأساسية: فحص ما إذا كان الرابط يدعم التنزيل متعدد الخطوط (Multi-Threaded Turbo Download)
     // لتقسيم الملف إلى قنوات متزامنة لتسريع التنزيل بأقصى سرعة اتصال ممكنة
-    final isMultiThread = await isMultiThreadDownloadEnabled();
-    final threadCount = await getDownloadThreads();
-
     if (isMultiThread && selectedStream != null && selectedStream.size.totalBytes > 1024 * 1024) {
       final parallelOk = await _downloadParallelChunks(
         directUrl: selectedStream.url.toString(),
