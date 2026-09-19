@@ -841,8 +841,8 @@ class BackendService {
 
         // في حال انتهاء صلاحية الرابط (403 أو 410 أو 400)، نجدد الرابط فوراً ونستأنف
         if (response.statusCode == 403 || response.statusCode == 410 || response.statusCode == 400) {
-          await sink.flush();
-          await sink.close();
+          await sink?.flush();
+          await sink?.close();
           sink = null;
           if (targetVideoId != null) {
             debugPrint('انتهت صلاحية رابط الدفق (${response.statusCode})، جاري التجديد التلقائي...');
@@ -867,8 +867,8 @@ class BackendService {
 
         // إذا أعاد الخادم 200 وكان لدينا بايتات سابقة، الخادم لا يدعم النطاق، نعيد من البداية
         if (response.statusCode == 200 && downloadedBytes > 0) {
-          await sink.flush();
-          await sink.close();
+          await sink?.flush();
+          await sink?.close();
           sink = null;
           await partFile.writeAsBytes([], mode: FileMode.write);
           downloadedBytes = 0;
@@ -884,7 +884,7 @@ class BackendService {
 
         // قراءة التدفق المستلم وإضافته فوراً مع تحديث شريط التقدم
         await for (final chunk in response) {
-          sink.add(chunk);
+          sink?.add(chunk);
           downloadedBytes += chunk.length;
 
           final now = DateTime.now().millisecondsSinceEpoch;
@@ -894,8 +894,8 @@ class BackendService {
           }
         }
 
-        await sink.flush();
-        await sink.close();
+        await sink?.flush();
+        await sink?.close();
         sink = null;
 
         downloadedBytes = await partFile.length();
