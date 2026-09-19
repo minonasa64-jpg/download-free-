@@ -17,6 +17,9 @@ class DownloadTask {
   double progress;
   String downloaded;
   String total;
+  String status;
+  String speed;
+  bool isFailed;
 
   DownloadTask({
     required this.id,
@@ -25,6 +28,9 @@ class DownloadTask {
     this.progress = 0.0,
     this.downloaded = "0.0",
     this.total = "0.0",
+    this.status = "جاري التحميل...",
+    this.speed = "",
+    this.isFailed = false,
   });
 }
 
@@ -416,6 +422,16 @@ class BackendService {
 
   Future<Directory> _getDownloadsDir() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final customPath = prefs.getString('download_path');
+      if (customPath != null && customPath.isNotEmpty && customPath != 'مسار Boykta العام') {
+        final dir = Directory(customPath);
+        if (!await dir.exists()) await dir.create(recursive: true);
+        return dir;
+      }
+    } catch (_) {}
+
+    try {
       Directory moviesDir = Directory('/storage/emulated/0/Movies/Boykta');
       if (!await moviesDir.exists()) await moviesDir.create(recursive: true);
       return moviesDir;
@@ -481,50 +497,80 @@ class BackendService {
     String finalOutputPath = '${downloadsDir.path}/$cleanTitle.$ext';
 
     int notifId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
-    DownloadTask task = DownloadTask(id: notifId, title: cleanTitle, isAudio: ext == 'mp3');
+    DownloadTask task = DownloadTask(
+      id: notifId,
+      title: cleanTitle,
+      isAudio: ext == 'mp3',
+      status: 'جاري بدء التحميل...',
+    );
     
     List<DownloadTask> currentList = List.from(activeDownloads.value);
     currentList.add(task);
     activeDownloads.value = currentList;
     int lastUpdate = 0;
+    int lastBytes = 0;
+    int lastSpeedTime = DateTime.now().millisecondsSinceEpoch;
+    String currentSpeed = '';
 
-    void updateProgress(int received, int total) {
-      if (total != -1) {
-        final progress = received / total;
-        final downloadedStr = (received / (1024 * 1024)).toStringAsFixed(1);
-        final totalStr = (total / (1024 * 1024)).toStringAsFixed(1);
-        
-        task.progress = progress;
-        task.downloaded = downloadedStr;
-        task.total = totalStr;
+    void updateProgress(int received, int total, {String? status}) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (total > 0) {
+        task.progress = (received / total).clamp(0.0, 1.0);
+        task.downloaded = (received / (1024 * 1024)).toStringAsFixed(1);
+        task.total = (total / (1024 * 1024)).toStringAsFixed(1);
+      } else {
+        task.progress = 0.0;
+        task.downloaded = (received / (1024 * 1024)).toStringAsFixed(1);
+        task.total = "--";
+      }
 
-        int now = DateTime.now().millisecondsSinceEpoch;
-        if (now - lastUpdate > 1000) {
-          lastUpdate = now;
-          activeDownloads.value = List.from(activeDownloads.value);
-          
-          try {
-            _notificationsPlugin.show(
-              notifId,
-              '${t('downloading_now')} $cleanTitle',
-              '$downloadedStr MB / $totalStr MB',
-              NotificationDetails(
-                android: AndroidNotificationDetails(
-                  'download_channel',
-                  'تنزيلات Boykta',
-                  importance: Importance.low,
-                  priority: Priority.low,
-                  showProgress: true,
-                  maxProgress: 100,
-                  progress: (progress * 100).toInt(),
-                  ongoing: true,
-                  onlyAlertOnce: true,
-                ),
-              ),
-            );
-          } catch (e) {
-            // تجاهل
+      if (status != null && status.isNotEmpty) {
+        task.status = status;
+      }
+
+      if (now - lastSpeedTime >= 400) {
+        final timeDiff = (now - lastSpeedTime) / 1000.0;
+        final bytesDiff = received - lastBytes;
+        if (timeDiff > 0 && bytesDiff >= 0) {
+          final speedBytes = bytesDiff / timeDiff;
+          if (speedBytes > 1024 * 1024) {
+            currentSpeed = '${(speedBytes / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+          } else {
+            currentSpeed = '${(speedBytes / 1024).toStringAsFixed(0)} KB/s';
           }
+        }
+        lastBytes = received;
+        lastSpeedTime = now;
+        task.speed = currentSpeed;
+      }
+
+      if (now - lastUpdate > 300 || (total > 0 && received >= total)) {
+        lastUpdate = now;
+        activeDownloads.value = List.from(activeDownloads.value);
+        
+        try {
+          _notificationsPlugin.show(
+            notifId,
+            '${t('downloading_now')} $cleanTitle',
+            total > 0 
+                ? '${task.downloaded} MB / ${task.total} MB (${(task.progress * 100).toStringAsFixed(0)}%)'
+                : '${task.downloaded} MB',
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                'download_channel',
+                'تنزيلات Boykta',
+                importance: Importance.low,
+                priority: Priority.low,
+                showProgress: total > 0,
+                maxProgress: 100,
+                progress: (task.progress * 100).toInt(),
+                ongoing: true,
+                onlyAlertOnce: true,
+              ),
+            ),
+          );
+        } catch (e) {
+          // تجاهل
         }
       }
       onReceiveProgress(received, total);
@@ -532,18 +578,25 @@ class BackendService {
 
     try {
       if (!needsMerge) {
-        onStatusChanged('جاري تحميل الملف...');
+        final statusMsg = ext == 'mp3' ? 'جاري تحميل الصوت...' : 'جاري تحميل الفيديو...';
+        onStatusChanged(statusMsg);
+        task.status = statusMsg;
+        activeDownloads.value = List.from(activeDownloads.value);
+
         if (ext == 'mp3') {
-          // تنزيل ملف الصوت بأمان ثم تحويله أو نسخه كـ MP3
           String tempAudioPath = '${tempDir.path}/${cleanTitle}_raw.m4a';
           await _downloadFile(
             url: selectedUrl,
             savePath: tempAudioPath,
-            onReceiveProgress: updateProgress,
+            onReceiveProgress: (r, t) => updateProgress(r, t, status: 'جاري تحميل الصوت...'),
             videoId: videoId,
             streamTag: videoTag,
           );
           onStatusChanged('جاري معالجة وتجهيز ملف MP3...');
+          task.status = 'جاري تحويل وتجهيز MP3...';
+          task.progress = 0.95;
+          activeDownloads.value = List.from(activeDownloads.value);
+
           try {
             var session = await FFmpegKit.execute('-y -i "$tempAudioPath" -vn -c:a libmp3lame -b:a 192k "$finalOutputPath"');
             var returnCode = await session.getReturnCode();
@@ -567,7 +620,7 @@ class BackendService {
           await _downloadFile(
             url: selectedUrl,
             savePath: finalOutputPath,
-            onReceiveProgress: updateProgress,
+            onReceiveProgress: (r, t) => updateProgress(r, t, status: 'جاري تحميل الفيديو...'),
             videoId: videoId,
             streamTag: videoTag,
           );
@@ -577,30 +630,48 @@ class BackendService {
         String tempAudioPath = '${tempDir.path}/${cleanTitle}_audio.m4a';
 
         onStatusChanged('جاري تحميل الفيديو عالي الجودة...');
+        task.status = 'جاري تحميل الفيديو...';
+        activeDownloads.value = List.from(activeDownloads.value);
+
         await _downloadFile(
           url: selectedUrl,
           savePath: tempVideoPath,
-          onReceiveProgress: updateProgress,
+          onReceiveProgress: (r, t) {
+            final effectiveTotal = t > 0 ? (t * 1.18).toInt() : -1;
+            updateProgress(r, effectiveTotal, status: 'جاري تحميل الفيديو...');
+          },
           videoId: videoId,
           streamTag: videoTag,
         );
 
         onStatusChanged('جاري تحميل الصوت الأصلي للدمج...');
+        task.status = 'جاري تحميل الصوت للدمج...';
+        activeDownloads.value = List.from(activeDownloads.value);
+
+        final videoSize = await File(tempVideoPath).length();
+
         await _downloadFile(
           url: highestAudioUrl,
           savePath: tempAudioPath,
-          onReceiveProgress: (r, t) {},
+          onReceiveProgress: (r, t) {
+            final combinedTotal = t > 0 ? (videoSize + t) : -1;
+            final combinedReceived = videoSize + r;
+            updateProgress(combinedReceived, combinedTotal, status: 'جاري تحميل الصوت الأصلي...');
+          },
           videoId: videoId,
           streamTag: highestAudioTag,
         );
 
-        onStatusChanged('جاري المعالجة والدمج (قد يستغرق بعض الوقت)...');
+        onStatusChanged('جاري الدمج النهائي بجودة فائقة...');
+        task.status = 'جاري دمج الفيديو مع الصوت (FFmpeg)...';
+        task.progress = 0.96;
+        activeDownloads.value = List.from(activeDownloads.value);
+
         String command = '-y -i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a aac -strict experimental "$finalOutputPath"';
         
         try {
           var session = await FFmpegKit.execute(command);
           var returnCode = await session.getReturnCode();
-
           if (ReturnCode.isSuccess(returnCode)) {
             onStatusChanged('تم الدمج بنجاح!');
             try { File(tempVideoPath).deleteSync(); } catch (_) {}
@@ -627,29 +698,48 @@ class BackendService {
         }
       }
 
+      task.progress = 1.0;
+      task.status = '🎉 مكتمل بنجاح';
+      activeDownloads.value = List.from(activeDownloads.value);
+      await Future.delayed(const Duration(milliseconds: 600));
+
       activeDownloads.value = activeDownloads.value.where((t) => t.id != notifId).toList();
       try {
         _notificationsPlugin.cancel(notifId);
-        _notificationsPlugin.show(
-          notifId + 1,
-          '🎉 ${t('completed')}',
-          cleanTitle,
-          const NotificationDetails(
-            android: AndroidNotificationDetails('download_channel', 'تنزيلات Boykta', importance: Importance.high, priority: Priority.high),
-          ),
-        );
+        final prefs = await SharedPreferences.getInstance();
+        final notifEnabled = prefs.getBool('n_comp') ?? true;
+        if (notifEnabled) {
+          _notificationsPlugin.show(
+            notifId + 1,
+            '🎉 ${t('completed')}',
+            cleanTitle,
+            const NotificationDetails(
+              android: AndroidNotificationDetails(
+                'download_channel',
+                'تنزيلات Boykta',
+                importance: Importance.high,
+                priority: Priority.high,
+              ),
+            ),
+          );
+        }
       } catch (e) {
         // تجاهل
       }
       return finalOutputPath;
     } catch (e) {
-      activeDownloads.value = activeDownloads.value.where((t) => t.id != notifId).toList();
+      task.isFailed = true;
+      task.status = 'تعذر التحميل: $e';
+      activeDownloads.value = List.from(activeDownloads.value);
+      Future.delayed(const Duration(seconds: 4), () {
+        activeDownloads.value = activeDownloads.value.where((t) => t.id != notifId).toList();
+      });
       try { _notificationsPlugin.cancel(notifId); } catch (_) {}
       throw Exception('حدث خطأ: $e');
     }
   }
 
-  /// جلب رابط تشغيل مباشر عالي الجودة لتشغيله في مشغل الفيديو البديل (Chewie / Native Video Player)
+    /// جلب رابط تشغيل مباشر عالي الجودة لتشغيله في مشغل الفيديو البديل (Chewie / Native Video Player)
   Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
     try {
       StreamManifest? manifest = _streamManifestCache[videoId];
@@ -879,16 +969,7 @@ class BackendService {
           HttpClient? client;
 
           try {
-            Uri requestUri = Uri.parse(currentStreamUrl);
-            final bool isYouTube = requestUri.host.contains("googlevideo.com") ||
-                                   requestUri.host.contains("youtube.com");
-
-            if (isYouTube) {
-              final qp = Map<String, String>.from(requestUri.queryParameters);
-              qp["range"] = "$downloadedBytes-$endByte";
-              requestUri = requestUri.replace(queryParameters: qp);
-            }
-
+            final requestUri = Uri.parse(currentStreamUrl);
             client = HttpClient();
             client.connectionTimeout = const Duration(seconds: 25);
             client.idleTimeout = const Duration(seconds: 30);
@@ -1061,7 +1142,40 @@ class BackendService {
 
   Future<void> setDownloadThreads(int count) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('download_threads', 16);
+    await prefs.setInt('download_threads', count);
+  }
+
+  Future<double> clearTempCache() async {
+    double freedMb = 0.0;
+    try {
+      final tempDir = await _getTempDir();
+      if (await tempDir.exists()) {
+        final entities = tempDir.listSync(recursive: false);
+        for (final entity in entities) {
+          if (entity is File) {
+            try {
+              final len = entity.lengthSync();
+              freedMb += (len / (1024 * 1024));
+              entity.deleteSync();
+            } catch (_) {}
+          }
+        }
+      }
+      final downloadsDir = await _getDownloadsDir();
+      if (await downloadsDir.exists()) {
+        final files = downloadsDir.listSync(recursive: false);
+        for (final file in files) {
+          if (file is File && file.path.endsWith('.part')) {
+            try {
+              final len = file.lengthSync();
+              freedMb += (len / (1024 * 1024));
+              file.deleteSync();
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
+    return freedMb;
   }
 
   Future<bool> _downloadParallelChunks({

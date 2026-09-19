@@ -169,7 +169,7 @@ class AdService {
       valueListenable: isInitializedNotifier,
       builder: (context, initialized, _) {
         if (!initialized) {
-          return const SizedBox(height: 50);
+          return const SizedBox.shrink();
         }
         return _SmartUnityBanner(
           onLoaded: onLoaded,
@@ -198,39 +198,46 @@ class _SmartUnityBannerState extends State<_SmartUnityBanner> {
   @override
   Widget build(BuildContext context) {
     if (_hasFailedCompletely) {
-      return const SizedBox(height: 50);
+      return const SizedBox.shrink();
     }
-
-    return UnityBannerAd(
-      key: ValueKey(_currentPlacement),
-      placementId: _currentPlacement,
-      onLoad: (placementId) {
-        debugPrint("Unity Banner Loaded successfully on: $placementId");
-        if (widget.onLoaded != null) widget.onLoaded!();
-      },
-      onFailed: (placementId, error, message) {
-        debugPrint("Unity Banner Failed on $placementId ($error: $message)");
-        if (_currentPlacement == AdService.primaryBannerPlacementId) {
-          debugPrint("Unity Banner: Switching to fallback placement: ${AdService.fallbackBannerPlacementId}");
-          if (mounted) {
-            setState(() {
-              _currentPlacement = AdService.fallbackBannerPlacementId;
-            });
-          }
-        } else {
-          debugPrint("Unity Banner: All placements failed.");
-          if (mounted) {
-            setState(() {
-              _hasFailedCompletely = true;
-            });
-          }
-          if (widget.onFailed != null) {
-            widget.onFailed!(placementId, error, message);
-          }
-        }
-      },
-      onClick: (placementId) => debugPrint("Unity Banner Clicked: $placementId"),
-      onShown: (placementId) => debugPrint("Unity Banner Shown: $placementId"),
+    return Center(
+      child: SizedBox(
+        width: 320,
+        height: 50,
+        child: ClipRect(
+          child: UnityBannerAd(
+            key: ValueKey(_currentPlacement),
+            placementId: _currentPlacement,
+            onLoad: (placementId) {
+              debugPrint("Unity Banner Loaded successfully on: $placementId");
+              if (widget.onLoaded != null) widget.onLoaded!();
+            },
+            onFailed: (placementId, error, message) {
+              debugPrint("Unity Banner Failed on $placementId ($error: $message)");
+              if (_currentPlacement == AdService.primaryBannerPlacementId) {
+                debugPrint("Unity Banner: Switching to fallback placement: ${AdService.fallbackBannerPlacementId}");
+                if (mounted) {
+                  setState(() {
+                    _currentPlacement = AdService.fallbackBannerPlacementId;
+                  });
+                }
+              } else {
+                debugPrint("Unity Banner: All placements failed.");
+                if (mounted) {
+                  setState(() {
+                    _hasFailedCompletely = true;
+                  });
+                }
+                if (widget.onFailed != null) {
+                  widget.onFailed!(placementId, error, message);
+                }
+              }
+            },
+            onClick: (placementId) => debugPrint("Unity Banner Clicked: $placementId"),
+            onShown: (placementId) => debugPrint("Unity Banner Shown: $placementId"),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -16,7 +16,6 @@ class SettingsTab extends StatefulWidget {
 
 class _SettingsTabState extends State<SettingsTab> {
   final BackendService _backend = BackendService();
-
   String _downloadPath = 'مسار Boykta العام';
   bool _completeNotif = true;
   bool _wifiOnly = false;
@@ -24,6 +23,7 @@ class _SettingsTabState extends State<SettingsTab> {
   bool _biometricEnabled = false;
   bool _multiThreadDownload = true;
   int _downloadThreads = 8;
+  bool _hasVaultPin = false;
 
   @override
   void initState() {
@@ -36,6 +36,10 @@ class _SettingsTabState extends State<SettingsTab> {
     final notif = await _backend.getNotificationSettings();
     final mt = await _backend.isMultiThreadDownloadEnabled();
     final th = await _backend.getDownloadThreads();
+    final disguise = await _backend.isCalculatorDisguiseEnabled();
+    final bioEnabled = await BiometricService().isBiometricEnabled();
+    final hasPin = await _backend.isVaultPinSet();
+
     if (mounted) {
       setState(() {
         _downloadPath = dl['download_path'] ?? 'مسار Boykta العام';
@@ -43,14 +47,9 @@ class _SettingsTabState extends State<SettingsTab> {
         _completeNotif = notif['n_comp'] ?? true;
         _multiThreadDownload = mt;
         _downloadThreads = th;
-      });
-    }
-    final disguise = await _backend.isCalculatorDisguiseEnabled();
-    if (mounted) {
-      final bioEnabled = await BiometricService().isBiometricEnabled();
-      setState(() {
         _calculatorDisguise = disguise;
         _biometricEnabled = bioEnabled;
+        _hasVaultPin = hasPin;
       });
     }
   }
@@ -83,7 +82,7 @@ class _SettingsTabState extends State<SettingsTab> {
     }
   }
 
-  void _showSetVaultPinDialog() {
+  void _showSetVaultPinDialog({bool isChanging = false}) {
     final pinCtrl = TextEditingController();
     showDialog(
       context: context,
@@ -94,13 +93,19 @@ class _SettingsTabState extends State<SettingsTab> {
           children: [
             const Icon(Icons.shield_rounded, color: AppColors.cyan, size: 24),
             const SizedBox(width: 8),
-            Text(_backend.t('set_pin'), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+            Text(
+              isChanging ? 'تغيير رمز PIN' : _backend.t('set_pin'),
+              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_backend.t('vault_desc'), style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            Text(
+              isChanging ? 'أدخل رمز PIN جديداً مكوناً من 4 أرقام' : _backend.t('vault_desc'),
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: pinCtrl,
@@ -131,14 +136,20 @@ class _SettingsTabState extends State<SettingsTab> {
                 await _backend.setVaultPin(pinCtrl.text.trim());
                 if (mounted) {
                   Navigator.pop(ctx);
+                  setState(() => _hasVaultPin = true);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(_backend.t('pin_set_success')), backgroundColor: AppColors.cyan.withOpacity(0.9)),
+                    SnackBar(
+                      content: Text(isChanging ? 'تم تحديث رمز PIN بنجاح 🔒' : _backend.t('pin_set_success')),
+                      backgroundColor: AppColors.cyan.withOpacity(0.9),
+                    ),
                   );
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const VaultScreen()));
+                  if (!isChanging) {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const VaultScreen()));
+                  }
                 }
               }
             },
-            child: const Text('حفظ والدخول', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            child: const Text('حفظ', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -217,7 +228,7 @@ class _SettingsTabState extends State<SettingsTab> {
 
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.only(bottom: 120, top: 15),
+        padding: const EdgeInsets.only(bottom: 160, top: 15),
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
@@ -245,6 +256,18 @@ class _SettingsTabState extends State<SettingsTab> {
             trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
             onTap: _openVault,
           ),
+          if (_hasVaultPin)
+            _buildGlassTile(
+              context,
+              icon: Icons.password_rounded,
+              title: 'تغيير رمز PIN للخزنة',
+              subtitle: 'تعيين رمز حماية سري جديد للخزنة',
+              textColor: textColor,
+              subtitleColor: subtitleColor,
+              surfaceColor: surfaceColor,
+              trailing: const Icon(Icons.edit_rounded, color: AppColors.cyan, size: 18),
+              onTap: () => _showSetVaultPinDialog(isChanging: true),
+            ),
           _buildGlassTile(
             context,
             icon: Icons.fingerprint_rounded,
@@ -311,10 +334,49 @@ class _SettingsTabState extends State<SettingsTab> {
               },
             ),
           ),
-
           const SizedBox(height: 15),
+
+          // قسم إعدادات التنزيل والسرعة
           _buildSectionHeader(_backend.t('dl_settings')),
-          
+          _buildGlassTile(
+            context,
+            icon: Icons.bolt_rounded,
+            title: 'التحميل المتسارع (Turbo Multi-Threading)',
+            subtitle: 'تنزيل الملفات عبر عدة اتصالات متزامنة لمضاعفة سرعة التحميل',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: Switch(
+              value: _multiThreadDownload,
+              activeColor: AppColors.cyan,
+              onChanged: (val) async {
+                await _backend.setMultiThreadDownloadEnabled(val);
+                setState(() => _multiThreadDownload = val);
+              },
+            ),
+          ),
+          _buildGlassTile(
+            context,
+            icon: Icons.alt_route_rounded,
+            title: 'عدد مسارات التنزيل المتزامنة',
+            subtitle: '$_downloadThreads مسارات متزامنة للتحميل فائق السرعة',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
+            onTap: () => _showThreadsCountDialog(context),
+          ),
+          _buildGlassTile(
+            context,
+            icon: Icons.folder_open_rounded,
+            title: 'مسار حفظ التنزيلات',
+            subtitle: _downloadPath,
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
+            onTap: () => _showStoragePathDialog(context),
+          ),
           _buildGlassTile(
             context,
             icon: Icons.wifi_rounded,
@@ -329,18 +391,6 @@ class _SettingsTabState extends State<SettingsTab> {
               onChanged: (val) => _updateDownload('wifi_only', val),
             ),
           ),
-          
-          _buildGlassTile(
-            context,
-            icon: Icons.folder_open_rounded,
-            title: 'مسار التنزيل',
-            subtitle: _downloadPath,
-            textColor: textColor,
-            subtitleColor: subtitleColor,
-            surfaceColor: surfaceColor,
-            onTap: () => _showStoragePathDialog(context),
-          ),
-
           _buildGlassTile(
             context,
             icon: Icons.replay_circle_filled_rounded,
@@ -351,32 +401,32 @@ class _SettingsTabState extends State<SettingsTab> {
             surfaceColor: surfaceColor,
             trailing: const Icon(Icons.check_circle_rounded, color: AppColors.cyan, size: 20),
           ),
-
           const SizedBox(height: 15),
+
+          // قسم الإشعارات والمظهر
           _buildSectionHeader(_backend.t('general')),
-          
           _buildGlassTile(
             context,
             icon: Icons.palette_outlined,
             title: _backend.t('theme'),
-            subtitle: _backend.themeNotifier.value == ThemeMode.dark ? 'داكن' : 'فاتح',
+            subtitle: _backend.themeNotifier.value == ThemeMode.dark ? 'داكن (Dark Mode)' : 'فاتح (Light Mode)',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
             onTap: () => _showThemeDialog(context),
           ),
-          
           _buildGlassTile(
             context,
             icon: Icons.language_rounded,
             title: _backend.t('language'),
-            subtitle: _backend.langNotifier.value.toUpperCase(),
+            subtitle: _backend.langNotifier.value == 'ar' ? 'العربية' : (_backend.langNotifier.value == 'fr' ? 'Français' : 'English'),
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
             onTap: () => _showLanguageDialog(context),
           ),
-          
           _buildGlassTile(
             context,
             icon: Icons.notifications_active_rounded,
@@ -391,9 +441,21 @@ class _SettingsTabState extends State<SettingsTab> {
               onChanged: (val) => _updateNotification('n_comp', val),
             ),
           ),
-
           const SizedBox(height: 15),
-          _buildSectionHeader('أدوات ومشاركة سريعة'),
+
+          // قسم الصيانة والأدوات
+          _buildSectionHeader('الصيانة والأدوات'),
+          _buildGlassTile(
+            context,
+            icon: Icons.cleaning_services_rounded,
+            title: 'تنظيف الملفات المؤقتة والكاش',
+            subtitle: 'حذف أجزاء التنزيل غير المكتملة (.part) وتحرير مساحة التخزين',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: const Icon(Icons.delete_sweep_rounded, color: AppColors.cyan, size: 20),
+            onTap: _clearCache,
+          ),
           _buildGlassTile(
             context,
             icon: Icons.wifi_tethering_rounded,
@@ -408,13 +470,13 @@ class _SettingsTabState extends State<SettingsTab> {
             },
           ),
           const SizedBox(height: 15),
+
           _buildSectionHeader(_backend.t('more_tools')),
-          
           _buildGlassTile(
             context,
             icon: Icons.info_outline_rounded,
             title: _backend.t('about'),
-            subtitle: 'Boykta Pro v1.2.0',
+            subtitle: 'Boykta Pro v1.2.0 (إصدار متكامل فائق السرعة)',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -483,33 +545,143 @@ class _SettingsTabState extends State<SettingsTab> {
     );
   }
 
-  void _showStoragePathDialog(BuildContext context) {
-    final TextEditingController pathController = TextEditingController(text: _downloadPath);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+  void _clearCache() async {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: CircularProgressIndicator(color: AppColors.cyan),
+      ),
+    );
+
+    final freedMb = await _backend.clearTempCache();
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            freedMb > 0
+                ? 'تم تنظيف التخزين المؤقت وتحرير ${freedMb.toStringAsFixed(1)} MB بنجاح! 🧹'
+                : 'التخزين المؤقت نظيف بالفعل، لا توجد ملفات معلقة ✨',
+          ),
+          backgroundColor: AppColors.cyan,
+        ),
+      );
+    }
+  }
+
+  void _showThreadsCountDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? AppColors.surface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('تغيير مسار التنزيل', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-        content: TextField(
-          controller: pathController,
-          style: TextStyle(color: isDark ? Colors.white : Colors.black),
-          decoration: const InputDecoration(focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.cyan))),
+        title: Text('عدد مسارات التنزيل المتزامنة', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildThreadOption(ctx, count: 4, label: '4 مسارات (عادي - موفر للبيانات)', isDark: isDark),
+            _buildThreadOption(ctx, count: 8, label: '8 مسارات (سريع - الخيار المستحسن)', isDark: isDark),
+            _buildThreadOption(ctx, count: 16, label: '16 مسار (توربو أقصى سرعة خارقة)', isDark: isDark),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThreadOption(BuildContext ctx, {required int count, required String label, required bool isDark}) {
+    final isSelected = _downloadThreads == count;
+    return ListTile(
+      title: Text(label, style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
+      onTap: () async {
+        await _backend.setDownloadThreads(count);
+        setState(() => _downloadThreads = count);
+        if (mounted) Navigator.pop(ctx);
+      },
+    );
+  }
+
+  void _showStoragePathDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pathController = TextEditingController(text: _downloadPath);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.surface : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('مسار حفظ التنزيلات', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildPathOption(
+                ctx,
+                title: 'مجلد Boykta الافتراضي للفيديوهات',
+                path: '/storage/emulated/0/Movies/Boykta',
+                isDark: isDark,
+              ),
+              _buildPathOption(
+                ctx,
+                title: 'مجلد التنزيلات العام Download',
+                path: '/storage/emulated/0/Download/Boykta',
+                isDark: isDark,
+              ),
+              _buildPathOption(
+                ctx,
+                title: 'مجلد الموسيقى والصوتيات Music',
+                path: '/storage/emulated/0/Music/Boykta',
+                isDark: isDark,
+              ),
+              const Divider(height: 20),
+              Text('أو أدخل مساراً مخصصاً:', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: pathController,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: '/storage/emulated/0/...',
+                  filled: true,
+                  fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
             onPressed: () {
-              _updateDownload('download_path', pathController.text);
-              Navigator.pop(context);
+              final newPath = pathController.text.trim();
+              if (newPath.isNotEmpty) {
+                _updateDownload('download_path', newPath);
+              }
+              Navigator.pop(ctx);
             },
-            child: const Text('حفظ', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            child: const Text('تطبيق', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPathOption(BuildContext ctx, {required String title, required String path, required bool isDark}) {
+    final isSelected = _downloadPath == path;
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: Text(title, style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      subtitle: Text(path, style: const TextStyle(color: AppColors.cyan, fontSize: 11)),
+      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan, size: 18) : null,
+      onTap: () {
+        _updateDownload('download_path', path);
+        Navigator.pop(ctx);
+      },
     );
   }
 
@@ -520,13 +692,13 @@ class _SettingsTabState extends State<SettingsTab> {
       builder: (context) => AlertDialog(
         backgroundColor: isDark ? AppColors.surface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(_backend.t('theme'), style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+        title: Text(_backend.t('theme'), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               title: Text('داكن (Dark Mode)', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-              trailing: _backend.themeNotifier.value == ThemeMode.dark ? const Icon(Icons.check, color: AppColors.cyan) : null,
+              trailing: _backend.themeNotifier.value == ThemeMode.dark ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
               onTap: () async {
                 await _backend.changeTheme('dark');
                 if (mounted) Navigator.pop(context);
@@ -534,7 +706,7 @@ class _SettingsTabState extends State<SettingsTab> {
             ),
             ListTile(
               title: Text('فاتح (Light Mode)', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-              trailing: _backend.themeNotifier.value == ThemeMode.light ? const Icon(Icons.check, color: AppColors.cyan) : null,
+              trailing: _backend.themeNotifier.value == ThemeMode.light ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
               onTap: () async {
                 await _backend.changeTheme('light');
                 if (mounted) Navigator.pop(context);
@@ -553,13 +725,13 @@ class _SettingsTabState extends State<SettingsTab> {
       builder: (context) => AlertDialog(
         backgroundColor: isDark ? AppColors.surface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(_backend.t('language'), style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+        title: Text(_backend.t('language'), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               title: Text('العربية', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-              trailing: _backend.langNotifier.value == 'ar' ? const Icon(Icons.check, color: AppColors.cyan) : null,
+              trailing: _backend.langNotifier.value == 'ar' ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
               onTap: () async {
                 await _backend.changeLanguage('ar');
                 if (mounted) Navigator.pop(context);
@@ -567,7 +739,7 @@ class _SettingsTabState extends State<SettingsTab> {
             ),
             ListTile(
               title: Text('English', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-              trailing: _backend.langNotifier.value == 'en' ? const Icon(Icons.check, color: AppColors.cyan) : null,
+              trailing: _backend.langNotifier.value == 'en' ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
               onTap: () async {
                 await _backend.changeLanguage('en');
                 if (mounted) Navigator.pop(context);
@@ -575,7 +747,7 @@ class _SettingsTabState extends State<SettingsTab> {
             ),
             ListTile(
               title: Text('Français', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-              trailing: _backend.langNotifier.value == 'fr' ? const Icon(Icons.check, color: AppColors.cyan) : null,
+              trailing: _backend.langNotifier.value == 'fr' ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
               onTap: () async {
                 await _backend.changeLanguage('fr');
                 if (mounted) Navigator.pop(context);
@@ -588,21 +760,46 @@ class _SettingsTabState extends State<SettingsTab> {
   }
 
   void _showAboutDialog(BuildContext context) {
-    showAboutDialog(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
       context: context,
-      applicationName: 'Boykta Pro',
-      applicationVersion: '1.2.0',
-      applicationIcon: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(15)),
-        child: const Icon(Icons.download, color: Colors.white, size: 30),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.surface : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.cyan.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.download_rounded, color: AppColors.cyan, size: 24),
+            ),
+            const SizedBox(width: 10),
+            Text('Boykta Pro', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('الإصدار 1.2.0', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(
+              'تطبيق تنزيل ومشاهدة الوسائط بأعلى جودة مع دعم التوربو المتعدد، دمج الصوت والصورة بدون فقد، الخزنة المشفرة، والمشاركة عبر الشبكة المحلية.',
+              style: TextStyle(color: isDark ? Colors.white60 : Colors.black54, fontSize: 13, height: 1.5),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إغلاق', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
-      children: const [
-        SizedBox(height: 10),
-        Text('تطبيق Boykta Pro هو أداة احترافية ومتكاملة لتحميل الفيديوهات والمقاطع الصوتية بأعلى جودة.'),
-        SizedBox(height: 6),
-        Text('الميزات: مشغل يوتيوب متقدم، استخراج MP3، خزنة آمنة برمز PIN، استئناف تلقائي للتحميل.'),
-      ],
     );
   }
 }

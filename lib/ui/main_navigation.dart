@@ -52,17 +52,23 @@ class _MainNavigationState extends State<MainNavigation> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // شريط إعلانات Unity Ads (Banner Strip)
-              Container(
-                alignment: Alignment.center,
-                height: 50,
-                margin: const EdgeInsets.only(bottom: 6),
-                child: AdService().buildBannerWidget(
-                  onLoaded: () {
-                    if (mounted && !_isBannerLoaded) {
-                      setState(() => _isBannerLoaded = true);
-                    }
-                  },
-                ),
+              ValueListenableBuilder<bool>(
+                valueListenable: AdService().isInitializedNotifier,
+                builder: (context, isInit, _) {
+                  if (!isInit) return const SizedBox.shrink();
+                  return Container(
+                    alignment: Alignment.center,
+                    height: 50,
+                    margin: const EdgeInsets.only(bottom: 6),
+                    child: AdService().buildBannerWidget(
+                      onLoaded: () {
+                        if (mounted && !_isBannerLoaded) {
+                          setState(() => _isBannerLoaded = true);
+                        }
+                      },
+                    ),
+                  );
+                },
               ),
 
               // شريط التنقل الزجاجي

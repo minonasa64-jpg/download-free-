@@ -287,7 +287,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
   Widget _buildBodyContent() {
     if (_isSearching && _searchResults.isEmpty) {
       return ListView.builder(
-        padding: const EdgeInsets.only(bottom: 100, top: 10),
+        padding: const EdgeInsets.only(bottom: 155, top: 10),
         itemCount: 4,
         itemBuilder: (context, index) => _buildSkeletonCard(),
       );
@@ -308,7 +308,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.only(bottom: 100, top: 10),
+      padding: const EdgeInsets.only(bottom: 155, top: 10),
       itemCount: _searchResults.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == _searchResults.length) {

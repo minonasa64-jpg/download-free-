@@ -438,54 +438,132 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                 builder: (context, tasks, child) {
                   if (tasks.isEmpty) return const SizedBox.shrink();
                   return Column(
-                    children: tasks.map((t) => Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
-                      padding: const EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceLight.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(color: AppColors.cyan.withOpacity(0.3))
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${_backend.t('downloading_now')} ${t.title}', 
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13), 
-                            maxLines: 1, 
-                            overflow: TextOverflow.ellipsis
+                    children: tasks.map((t) {
+                      final bool isFailed = t.isFailed;
+                      final double prog = t.progress;
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isFailed 
+                              ? Colors.red.withOpacity(0.12)
+                              : AppColors.surfaceLight.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isFailed ? Colors.redAccent : AppColors.cyan.withOpacity(0.5),
+                            width: 1.5,
                           ),
-                          const SizedBox(height: 10),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: LinearProgressIndicator(
-                              value: t.progress, 
-                              backgroundColor: Colors.white12, 
-                              color: AppColors.cyan, 
-                              minHeight: 8
+                          boxShadow: [
+                            BoxShadow(
+                              color: (isFailed ? Colors.red : AppColors.cyan).withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '${(t.progress * 100).toStringAsFixed(1)}%', 
-                                style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 12)
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: (isFailed ? Colors.red : AppColors.cyan).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    isFailed 
+                                        ? Icons.error_outline_rounded 
+                                        : (t.isAudio ? Icons.music_note_rounded : Icons.video_collection_rounded),
+                                    color: isFailed ? Colors.redAccent : AppColors.cyan,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        t.title,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        t.status,
+                                        style: TextStyle(
+                                          color: isFailed ? Colors.redAccent : AppColors.cyan,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (t.speed.isNotEmpty && !isFailed)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      t.speed,
+                                      style: const TextStyle(
+                                        color: Colors.greenAccent,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: LinearProgressIndicator(
+                                value: (prog > 0.0 && prog <= 1.0) ? prog : null,
+                                backgroundColor: Colors.white12,
+                                color: isFailed ? Colors.redAccent : AppColors.cyan,
+                                minHeight: 10,
                               ),
-                              Text(
-                                '${t.downloaded} MB / ${t.total} MB', 
-                                style: const TextStyle(color: AppColors.textMuted, fontSize: 12)
-                              ),
-                            ],
-                          )
-                        ],
-                      ),
-                    )).toList(),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  prog > 0 ? "${(prog * 100).toStringAsFixed(1)}%" : "جاري التجهيز...",
+                                  style: TextStyle(
+                                    color: isFailed ? Colors.redAccent : AppColors.cyan,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Text(
+                                  t.total != "--" && t.total != "0.0"
+                                      ? "${t.downloaded} MB / ${t.total} MB"
+                                      : "${t.downloaded} MB",
+                                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                   );
                 },
               ),
-
               // تبويبات الفيديو والصوت
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),

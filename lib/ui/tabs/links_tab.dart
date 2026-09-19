@@ -280,7 +280,7 @@ class _LinksTabState extends State<LinksTab> {
     return SafeArea(
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 120),
+        padding: const EdgeInsets.only(bottom: 155),
         child: Column(
           children: [
             const SizedBox(height: 30),
