@@ -193,67 +193,57 @@ class _SmartUnityBanner extends StatefulWidget {
 
 class _SmartUnityBannerState extends State<_SmartUnityBanner> {
   String _currentPlacement = AdService.primaryBannerPlacementId;
-  bool _isLoaded = false;
-  bool _hasFailedCompletely = false;
+  bool _isAdLoaded = false;
+  bool _hasFailed = false;
 
   @override
   Widget build(BuildContext context) {
-    if (_hasFailedCompletely) {
+    if (_hasFailed) {
       return const SizedBox.shrink();
     }
 
     return Center(
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
+      child: Container(
         width: 320,
-        height: _isLoaded ? 50 : 0,
-        decoration: BoxDecoration(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: UnityBannerAd(
-            key: ValueKey(_currentPlacement),
-            placementId: _currentPlacement,
-            onLoad: (placementId) {
-              debugPrint("Unity Banner Loaded successfully on: $placementId");
+        height: 50,
+        alignment: Alignment.center,
+        color: Colors.transparent,
+        child: UnityBannerAd(
+          key: ValueKey(_currentPlacement),
+          placementId: _currentPlacement,
+          onLoad: (placementId) {
+            debugPrint("Unity Banner Loaded: $placementId");
+            if (mounted && !_isAdLoaded) {
+              setState(() => _isAdLoaded = true);
+            }
+            if (widget.onLoaded != null) widget.onLoaded!();
+          },
+          onShown: (placementId) {
+            debugPrint("Unity Banner Shown: $placementId");
+            if (mounted && !_isAdLoaded) {
+              setState(() => _isAdLoaded = true);
+            }
+          },
+          onFailed: (placementId, error, message) {
+            debugPrint("Unity Banner Failed on $placementId: $error - $message");
+            if (_currentPlacement == AdService.primaryBannerPlacementId) {
+              debugPrint("Retrying banner with fallback: ${AdService.fallbackBannerPlacementId}");
               if (mounted) {
-                setState(() => _isLoaded = true);
+                setState(() {
+                  _currentPlacement = AdService.fallbackBannerPlacementId;
+                });
               }
-              if (widget.onLoaded != null) widget.onLoaded!();
-            },
-            onShown: (placementId) {
-              debugPrint("Unity Banner Shown on: $placementId");
-              if (mounted && !_isLoaded) {
-                setState(() => _isLoaded = true);
+            } else {
+              debugPrint("All banner placements failed.");
+              if (mounted) {
+                setState(() => _hasFailed = true);
               }
-            },
-            onFailed: (placementId, error, message) {
-              debugPrint("Unity Banner Failed on $placementId ($error: $message)");
-              if (_currentPlacement == AdService.primaryBannerPlacementId) {
-                debugPrint("Unity Banner: Switching to fallback placement: ${AdService.fallbackBannerPlacementId}");
-                if (mounted) {
-                  setState(() {
-                    _isLoaded = false;
-                    _currentPlacement = AdService.fallbackBannerPlacementId;
-                  });
-                }
-              } else {
-                debugPrint("Unity Banner: All placements failed.");
-                if (mounted) {
-                  setState(() {
-                    _isLoaded = false;
-                    _hasFailedCompletely = true;
-                  });
-                }
-                if (widget.onFailed != null) {
-                  widget.onFailed!(placementId, error, message);
-                }
+              if (widget.onFailed != null) {
+                widget.onFailed!(placementId, error, message);
               }
-            },
-            onClick: (placementId) => debugPrint("Unity Banner Clicked: $placementId"),
-          ),
+            }
+          },
+          onClick: (placementId) => debugPrint("Unity Banner Clicked: $placementId"),
         ),
       ),
     );

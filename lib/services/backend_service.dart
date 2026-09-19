@@ -643,6 +643,28 @@ class BackendService {
         String tempVideoPath = '${tempDir.path}/${cleanTitle}_video.mp4';
         String tempAudioPath = '${tempDir.path}/${cleanTitle}_audio.m4a';
 
+        // التأكد من توفر رابط وبيانات دفق الصوت الحقيقي
+        String finalAudioUrl = highestAudioUrl;
+        int? finalAudioTag = highestAudioTag;
+
+        if (finalAudioUrl.isEmpty || finalAudioTag == null) {
+          if (videoId != null && videoId.isNotEmpty) {
+            try {
+              StreamManifest? m = _streamManifestCache[videoId];
+              m ??= await _yt.videos.streamsClient.getManifest(videoId);
+              _streamManifestCache[videoId] = m;
+              if (m.audioOnly.isNotEmpty) {
+                final bestAudio = m.audioOnly.withHighestBitrate();
+                finalAudioUrl = bestAudio.url.toString();
+                finalAudioTag = bestAudio.tag;
+              }
+            } catch (e) {
+              debugPrint("تنبيه أثناء استخراج دفق الصوت: $e");
+            }
+          }
+        }
+
+        // 1. تنزيل دفق الفيديو
         onStatusChanged('جاري تحميل الفيديو عالي الجودة...');
         task.status = 'جاري تحميل الفيديو...';
         activeDownloads.value = List.from(activeDownloads.value);
@@ -658,14 +680,16 @@ class BackendService {
           streamTag: videoTag,
         );
 
+        final int videoSize = await File(tempVideoPath).length();
+        debugPrint("اكتمل تنزيل الفيديو بحجم: $videoSize بايت");
+
+        // 2. تنزيل دفق الصوت الأصلي المطابق
         onStatusChanged('جاري تحميل الصوت الأصلي للدمج...');
-        task.status = 'جاري تحميل الصوت للدمج...';
+        task.status = 'جاري تحميل الصوت الأصلي...';
         activeDownloads.value = List.from(activeDownloads.value);
 
-        final videoSize = await File(tempVideoPath).length();
-
         await _downloadFile(
-          url: highestAudioUrl,
+          url: finalAudioUrl,
           savePath: tempAudioPath,
           onReceiveProgress: (r, t) {
             final combinedTotal = t > 0 ? (videoSize + t) : -1;
@@ -673,45 +697,65 @@ class BackendService {
             updateProgress(combinedReceived, combinedTotal, status: 'جاري تحميل الصوت الأصلي...');
           },
           videoId: videoId,
-          streamTag: highestAudioTag,
+          streamTag: finalAudioTag,
         );
 
+        final int audioSize = await File(tempAudioPath).length();
+        debugPrint("اكتمل تنزيل الصوت بحجم: $audioSize بايت");
+
+        // 3. دمج الفيديو والصوت باستخدام FFmpeg بأعلى توافقية وجودة
         onStatusChanged('جاري الدمج النهائي بجودة فائقة...');
         task.status = 'جاري دمج الفيديو مع الصوت (FFmpeg)...';
         task.progress = 0.96;
         activeDownloads.value = List.from(activeDownloads.value);
 
-        String command = '-y -i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a aac -strict experimental "$finalOutputPath"';
-        
-        try {
-          var session = await FFmpegKit.execute(command);
-          var returnCode = await session.getReturnCode();
-          if (ReturnCode.isSuccess(returnCode)) {
-            onStatusChanged('تم الدمج بنجاح!');
-            try { File(tempVideoPath).deleteSync(); } catch (_) {}
-            try { File(tempAudioPath).deleteSync(); } catch (_) {}
-          } else {
-            final vFile = File(tempVideoPath);
-            if (await vFile.exists()) {
-              await vFile.copy(finalOutputPath);
-              try { vFile.deleteSync(); } catch (_) {}
-              try { File(tempAudioPath).deleteSync(); } catch (_) {}
-            } else {
-              throw Exception('فشل الدمج محلياً.');
+        bool mergeSuccess = false;
+        dynamic mergeError;
+
+        if (audioSize > 2048) {
+          final List<String> ffmpegCommands = [
+            '-y -i "$tempVideoPath" -i "$tempAudioPath" -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -movflags +faststart -shortest "$finalOutputPath"',
+            '-y -i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a copy -movflags +faststart -shortest "$finalOutputPath"',
+            '-y -i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a aac -strict experimental "$finalOutputPath"',
+          ];
+
+          for (final cmd in ffmpegCommands) {
+            try {
+              debugPrint("تنفيذ أمر FFmpeg: $cmd");
+              final session = await FFmpegKit.execute(cmd);
+              final returnCode = await session.getReturnCode();
+
+              if (ReturnCode.isSuccess(returnCode)) {
+                final outFile = File(finalOutputPath);
+                if (await outFile.exists() && await outFile.length() > (videoSize / 2)) {
+                  mergeSuccess = true;
+                  debugPrint("نجح الدمج بنجاح تام! الحجم النهائي: ${await outFile.length()} بايت");
+                  break;
+                }
+              }
+            } catch (e) {
+              mergeError = e;
+              debugPrint("فشل تنفيذ المحاولة: $e");
             }
           }
-        } catch (ffmpegError) {
+        }
+
+        if (mergeSuccess) {
+          onStatusChanged('تم الدمج بنجاح وبصوت كامل نقي!');
+          try { File(tempVideoPath).deleteSync(); } catch (_) {}
+          try { File(tempAudioPath).deleteSync(); } catch (_) {}
+        } else {
           final vFile = File(tempVideoPath);
           if (await vFile.exists()) {
+            debugPrint("تحذير: تم حفظ الفيديو بدون دمج بسبب: $mergeError");
             await vFile.copy(finalOutputPath);
             try { vFile.deleteSync(); } catch (_) {}
             try { File(tempAudioPath).deleteSync(); } catch (_) {}
           } else {
-            throw Exception('خطأ في أداة الدمج: $ffmpegError');
+            throw Exception('فشل الدمج واكتمال الملف ($mergeError)');
           }
         }
       }
-
       task.progress = 1.0;
       task.status = '🎉 مكتمل بنجاح';
       activeDownloads.value = List.from(activeDownloads.value);
@@ -845,7 +889,12 @@ class BackendService {
           }
         }
         if (selectedStream == null) {
-          if (manifest.muxed.isNotEmpty) {
+          // إذا كان الرابط المطلوب صوتياً (.m4a أو .mp3) نختار أفضل دفق صوتي
+          if (savePath.endsWith('.m4a') || savePath.endsWith('.mp3') || (url.contains('mime=audio') || url.contains('audio'))) {
+            if (manifest.audioOnly.isNotEmpty) {
+              selectedStream = manifest.audioOnly.withHighestBitrate();
+            }
+          } else if (manifest.muxed.isNotEmpty) {
             final muxedList = manifest.muxed.toList();
             muxedList.sort((a, b) => b.size.totalBytes.compareTo(a.size.totalBytes));
             selectedStream = muxedList.first;
