@@ -794,7 +794,7 @@ class BackendService {
     }
   }
 
-    Future<void> _downloadFile({
+      Future<void> _downloadFile({
     required String url,
     required String savePath,
     required Function(int, int) onReceiveProgress,
@@ -825,13 +825,13 @@ class BackendService {
       } catch (_) {}
     }
 
-    String currentStreamUrl = url;
     StreamInfo? selectedStream;
+    StreamManifest? manifest;
 
-    // استخراج دفق حديث وتأكيد الرابط إذا كان يوتيوب
+    // استخراج مانيفست يوتيوب وتحديد الدفق المختار
     if (targetVideoId != null && targetVideoId.isNotEmpty) {
       try {
-        StreamManifest? manifest = _streamManifestCache[targetVideoId];
+        manifest = _streamManifestCache[targetVideoId];
         if (manifest == null) {
           manifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
           _streamManifestCache[targetVideoId] = manifest;
@@ -853,154 +853,160 @@ class BackendService {
             selectedStream = manifest.streams.first;
           }
         }
-        if (selectedStream != null) {
-          currentStreamUrl = selectedStream.url.toString();
-          targetTag = selectedStream.tag;
-        }
       } catch (e) {
-        debugPrint("تنبيه أثناء فحص تدفقات يوتيوب: $e");
+        debugPrint("تنبيه أثناء فحص مانيفست يوتيوب: $e");
       }
     }
 
-    // ملف التنزيل المؤقت (.part) لحفظ التقدم ومنع فقد البيانات
     final partFile = File("$savePath.part");
     if (!await partFile.exists()) {
       await partFile.create(recursive: true);
     }
 
-    // تنكر المتصفح الكامل Chrome User-Agent للقضاء نهائياً على خطأ 403 Forbidden
-    const Map<String, String> stealthHeaders = {
-      'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Accept': '*/*',
-      'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
-      'Referer': 'https://www.youtube.com/',
-      'Origin': 'https://www.youtube.com',
-      'Sec-Fetch-Dest': 'video',
-      'Sec-Fetch-Mode': 'no-cors',
-      'Sec-Fetch-Site': 'cross-site',
-    };
-
-    int attempt = 0;
-    const int maxAttempts = 5;
-    bool success = false;
+    bool downloadSucceeded = false;
     dynamic lastError;
 
-    while (!success && attempt < maxAttempts) {
-      attempt++;
-      int existingBytes = await partFile.length();
-
+    // =========================================================================
+    // الطريقة الأولى: التدفق الأصلي المباشر عبر YoutubeExplode streamsClient
+    // هذه الطريقة تفك تشفير توقيع يوتيوب (Cipher / n-token) داخلياً وتتجاوز تماماً خطأ 403
+    // =========================================================================
+    if (selectedStream != null) {
+      IOSink? ytSink;
       try {
-        Map<String, String> requestHeaders = Map.from(stealthHeaders);
-        if (existingBytes > 0) {
-          requestHeaders['Range'] = 'bytes=$existingBytes-';
+        debugPrint("بدء التحميل المباشر عبر محرك الدفق الموثوق (itag: ${selectedStream.tag})...");
+        int existing = await partFile.length();
+        // إذا كان هناك تنزيل سابق جزئي، نفتح للكتابة في النهاية أو نبدأ من جديد
+        ytSink = partFile.openWrite(mode: FileMode.write);
+        final stream = _yt.videos.streamsClient.get(selectedStream);
+        int total = selectedStream.size.totalBytes;
+        int received = 0;
+        int lastProgressUpdate = 0;
+
+        await for (final chunk in stream) {
+          ytSink.add(chunk);
+          received += chunk.length;
+          final now = DateTime.now().millisecondsSinceEpoch;
+          if (now - lastProgressUpdate > 150 || (total > 0 && received >= total)) {
+            lastProgressUpdate = now;
+            onReceiveProgress(received, total > 0 ? total : -1);
+          }
         }
+        await ytSink.flush();
+        await ytSink.close();
+        ytSink = null;
 
-        // استخدام _dio.download مع تنكر المتصفح في الخلفية تماماً
-        await _dio.download(
-          currentStreamUrl,
-          partFile.path,
-          deleteOnError: false,
-          options: Options(
-            headers: requestHeaders,
-            responseType: ResponseType.stream,
-            validateStatus: (status) {
-              if (status == null) return false;
-              // 200 = كامل، 206 = نطاق جزئي (استئناف)، 416 = مكتمل بالفعل
-              return status == 200 || status == 206 || status == 416;
-            },
-          ),
-          onReceiveProgress: (received, total) {
-            final int actualReceived = existingBytes + received;
-            final int actualTotal = total > 0 ? (existingBytes + total) : -1;
-            onReceiveProgress(actualReceived, actualTotal);
-          },
-        );
-
-        final finalDownloaded = await partFile.length();
+        int finalDownloaded = await partFile.length();
         if (finalDownloaded > 0) {
-          success = true;
-          break;
-        } else {
-          throw Exception("الملف المحمل فارغ (0 بايت).");
+          downloadSucceeded = true;
+          debugPrint("اكتمل التحميل عبر محرك الدفق بنجاح: $finalDownloaded بايت");
         }
-      } catch (err) {
-        lastError = err;
-        debugPrint("محاولة تحميل Dio رقم $attempt فشلت: $err");
+      } catch (e) {
+        lastError = e;
+        debugPrint("تنبيه من محرك الدفق المباشر ($e). سيتم الانتقال لمحرك التنزيل المتنكر...");
+        try { await ytSink?.flush(); } catch (_) {}
+        try { await ytSink?.close(); } catch (_) {}
+        ytSink = null;
+      }
+    }
 
-        // تجديد رابط يوتيوب والمانيفست فوراً عند خطأ 403 Forbidden أو انتهاء الصلاحية
-        if (targetVideoId != null && targetVideoId.isNotEmpty) {
-          try {
-            debugPrint("تجديد الرابط الموقّع من يوتيوب لتجاوز 403...");
-            _streamManifestCache.remove(targetVideoId);
-            final freshManifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
-            _streamManifestCache[targetVideoId] = freshManifest;
+    // =========================================================================
+    // الطريقة الثانية: التحميل عبر Dio مع التنكر الكامل (User-Agent Chrome + Referer)
+    // تعمل في حال فشل الطريقة الأولى أو للروابط المباشرة غير التابعة لمكتبة يوتيوب
+    // =========================================================================
+    if (!downloadSucceeded) {
+      String currentDownloadUrl = selectedStream?.url.toString() ?? url;
+      int retryCount = 0;
+      const int maxRetries = 4;
 
-            StreamInfo? freshStream;
-            if (targetTag != null) {
-              for (final s in freshManifest.streams) {
-                if (s.tag == targetTag) {
-                  freshStream = s;
-                  break;
+      while (!downloadSucceeded && retryCount < maxRetries) {
+        retryCount++;
+        int existingBytes = await partFile.length();
+
+        try {
+          final Map<String, dynamic> dioHeaders = {
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
+            'Referer': 'https://www.youtube.com/',
+            'Origin': 'https://www.youtube.com',
+          };
+
+          if (existingBytes > 0) {
+            dioHeaders['Range'] = 'bytes=$existingBytes-';
+          }
+
+          debugPrint("محاولة تحميل Dio رقم $retryCount للرابط...");
+          await _dio.download(
+            currentDownloadUrl,
+            partFile.path,
+            deleteOnError: false,
+            options: Options(
+              headers: dioHeaders,
+              responseType: ResponseType.stream,
+              validateStatus: (status) {
+                if (status == null) return false;
+                return status == 200 || status == 206 || status == 416;
+              },
+            ),
+            onReceiveProgress: (received, total) {
+              final int actualReceived = existingBytes + received;
+              final int actualTotal = total > 0 ? (existingBytes + total) : -1;
+              onReceiveProgress(actualReceived, actualTotal);
+            },
+          );
+
+          int finalDownloaded = await partFile.length();
+          if (finalDownloaded > 0) {
+            downloadSucceeded = true;
+            break;
+          }
+        } catch (err) {
+          lastError = err;
+          debugPrint("خطأ Dio في المحاولة $retryCount: $err");
+
+          // تجديد الرابط الموقّع فوراً عند انتهاء صلاحيته
+          if (targetVideoId != null && targetVideoId.isNotEmpty) {
+            try {
+              _streamManifestCache.remove(targetVideoId);
+              final freshManifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
+              _streamManifestCache[targetVideoId] = freshManifest;
+              StreamInfo? freshStream;
+              if (targetTag != null) {
+                for (final s in freshManifest.streams) {
+                  if (s.tag == targetTag) {
+                    freshStream = s;
+                    break;
+                  }
                 }
               }
-            }
-            freshStream ??= freshManifest.muxed.isNotEmpty
-                ? freshManifest.muxed.first
-                : freshManifest.streams.first;
+              freshStream ??= freshManifest.muxed.isNotEmpty
+                  ? freshManifest.muxed.first
+                  : freshManifest.streams.first;
 
-            currentStreamUrl = freshStream.url.toString();
-          } catch (refreshErr) {
-            debugPrint("تعذر تجديد المانيفست: $refreshErr");
+              currentDownloadUrl = freshStream.url.toString();
+            } catch (_) {}
           }
-        }
 
-        // إذا كانت المشكلة في ملف .part معطوب، نعيد المحاولة من البداية
-        if (attempt >= 2) {
-          try {
-            if (await partFile.exists()) {
-              await partFile.delete();
-              await partFile.create(recursive: true);
-            }
-          } catch (_) {}
-        }
-
-        await Future.delayed(Duration(milliseconds: 600 * attempt));
-      }
-    }
-
-    if (!success) {
-      // تجربة أخيرة احتياطية عبر دفق YoutubeExplode إذا كان الدفق متاحاً
-      if (selectedStream != null) {
-        try {
-          debugPrint("محاولة احتياطية نهائية عبر دفق YoutubeExplode...");
-          if (await partFile.exists()) {
-            await partFile.delete();
+          if (retryCount >= 2) {
+            try {
+              if (await partFile.exists()) {
+                await partFile.delete();
+                await partFile.create(recursive: true);
+              }
+            } catch (_) {}
           }
-          final sink = partFile.openWrite(mode: FileMode.write);
-          final stream = _yt.videos.streamsClient.get(selectedStream);
-          int received = 0;
-          final int total = selectedStream.size.totalBytes;
-          await for (final chunk in stream) {
-            sink.add(chunk);
-            received += chunk.length;
-            onReceiveProgress(received, total);
-          }
-          await sink.flush();
-          await sink.close();
-          success = (await partFile.length()) > 0;
-        } catch (fbErr) {
-          debugPrint("فشلت المحاولة الاحتياطية أيضاً: $fbErr");
+          await Future.delayed(Duration(milliseconds: 500 * retryCount));
         }
       }
     }
 
-    final int downloadedBytes = await partFile.length();
-    if (!success || downloadedBytes == 0) {
-      throw Exception("تعذر التنزيل بعد عدة محاولات: $lastError");
+    int downloadedBytes = await partFile.length();
+    if (!downloadSucceeded || downloadedBytes == 0) {
+      throw Exception("تعذر التنزيل: تأكد من اتصال الإنترنت وحاول مجدداً ($lastError)");
     }
 
-    // نقل وتسمية الملف النهائي في مكانه المحدد
+    // نقل الملف إلى وجهته النهائية بأمان
     final finalFile = File(savePath);
     if (await finalFile.exists()) {
       try {
@@ -1008,7 +1014,7 @@ class BackendService {
       } catch (_) {}
     }
     await partFile.rename(savePath);
-    debugPrint("تم التنزيل بنجاح 100% بحجم $downloadedBytes بايت وحفظه في $savePath");
+    debugPrint("تم التنزيل بنجاح 100% بحجم $downloadedBytes بايت وحفظه في: $savePath");
   }
 
   // =========================================================================

@@ -56,14 +56,20 @@ class _MainNavigationState extends State<MainNavigation> {
                 valueListenable: AdService().isInitializedNotifier,
                 builder: (context, isInit, _) {
                   if (!isInit) return const SizedBox.shrink();
-                  return Container(
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
                     alignment: Alignment.center,
-                    height: 50,
-                    margin: const EdgeInsets.only(bottom: 6),
+                    height: _isBannerLoaded ? 50 : 0,
+                    margin: EdgeInsets.only(bottom: _isBannerLoaded ? 6 : 0),
                     child: AdService().buildBannerWidget(
                       onLoaded: () {
                         if (mounted && !_isBannerLoaded) {
                           setState(() => _isBannerLoaded = true);
+                        }
+                      },
+                      onFailed: (_, __, ___) {
+                        if (mounted && _isBannerLoaded) {
+                          setState(() => _isBannerLoaded = false);
                         }
                       },
                     ),
