@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'core/app_colors.dart';
 import 'services/backend_service.dart';
@@ -16,10 +17,10 @@ void main() async {
   }
 
   try {
-    await AdService.init(); 
+    await AdService.init(testMode: kDebugMode); 
     AdService().loadInterstitialAd();
   } catch (e) {
-    debugPrint('AdMob Init Error: $e');
+    debugPrint('Unity Ads Init Error: $e');
   }
 
   // انطلاق التطبيق بغض النظر عن أي أخطاء في الخلفية

@@ -18,22 +18,27 @@ class AdService {
   bool _isInterstitialLoading = false;
   bool _isInterstitialLoaded = false;
 
+  final ValueNotifier<bool> isInitializedNotifier = ValueNotifier<bool>(false);
+
   bool get isInitialized => _isInitialized;
   bool get isInterstitialLoaded => _isInterstitialLoaded;
 
   // تهيئة نظام Unity Ads
-  static Future<void> init({bool testMode = false}) async {
+  static Future<void> init({bool? testMode}) async {
+    final bool useTestMode = testMode ?? kDebugMode;
     try {
       await UnityAds.init(
         gameId: gameId,
-        testMode: testMode,
+        testMode: useTestMode,
         onComplete: () {
           _instance._isInitialized = true;
-          debugPrint('Unity Ads Initialized Successfully with Game ID: $gameId');
+          _instance.isInitializedNotifier.value = true;
+          debugPrint('Unity Ads Initialized Successfully with Game ID: $gameId (testMode: $useTestMode)');
           _instance.loadInterstitialAd();
         },
         onFailed: (error, message) {
           _instance._isInitialized = false;
+          _instance.isInitializedNotifier.value = false;
           debugPrint('Unity Ads Initialization Failed: $error - $message');
         },
       );
@@ -45,7 +50,6 @@ class AdService {
   // تحميل الإعلان البيني مسبقاً في الخلفية
   void loadInterstitialAd() {
     if (_isInterstitialLoading) return;
-
     _isInterstitialLoading = true;
     try {
       UnityAds.load(
@@ -69,6 +73,12 @@ class AdService {
 
   // إظهار الإعلان البيني عند التنزيل أو التنقل
   void showInterstitialAd({VoidCallback? onAdClosed}) {
+    if (!_isInitialized) {
+      debugPrint('Unity Ads not initialized yet. Proceeding without ad.');
+      if (onAdClosed != null) onAdClosed();
+      return;
+    }
+
     try {
       UnityAds.showVideoAd(
         placementId: interstitialPlacementId,
@@ -105,18 +115,26 @@ class AdService {
     VoidCallback? onLoaded,
     Function(String, dynamic, String)? onFailed,
   }) {
-    return UnityBannerAd(
-      placementId: bannerPlacementId,
-      onLoad: (placementId) {
-        debugPrint('Unity Banner Loaded: $placementId');
-        if (onLoaded != null) onLoaded();
+    return ValueListenableBuilder<bool>(
+      valueListenable: isInitializedNotifier,
+      builder: (context, initialized, _) {
+        if (!initialized) {
+          return const SizedBox(height: 50);
+        }
+        return UnityBannerAd(
+          placementId: bannerPlacementId,
+          onLoad: (placementId) {
+            debugPrint('Unity Banner Loaded: $placementId');
+            if (onLoaded != null) onLoaded();
+          },
+          onFailed: (placementId, error, message) {
+            debugPrint('Unity Banner Failed: $placementId ($error: $message)');
+            if (onFailed != null) onFailed(placementId, error, message);
+          },
+          onClick: (placementId) => debugPrint('Unity Banner Clicked: $placementId'),
+          onShown: (placementId) => debugPrint('Unity Banner Shown: $placementId'),
+        );
       },
-      onFailed: (placementId, error, message) {
-        debugPrint('Unity Banner Failed: $placementId ($error: $message)');
-        if (onFailed != null) onFailed(placementId, error, message);
-      },
-      onClick: (placementId) => debugPrint('Unity Banner Clicked: $placementId'),
-      onShown: (placementId) => debugPrint('Unity Banner Shown: $placementId'),
     );
   }
 }
