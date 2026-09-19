@@ -8,8 +8,6 @@ import 'package:share_plus/share_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
-import '../../services/ad_service.dart';
-import '../widgets/download_dialogs.dart';
 
 class BrowserTab extends StatefulWidget {
   const BrowserTab({super.key});
@@ -30,17 +28,10 @@ class _BrowserTabState extends State<BrowserTab> {
   bool _canGoBack = false;
   bool _canGoForward = false;
   bool _isDesktopMode = false;
+  bool _hasEnteredSite = false;
 
   // ==========================================
-  // الميزة 1: ملتقط الوسائط الذكي (Smart Video Sniffer)
-  // ==========================================
-  bool _detectedDownloadableMedia = false;
-  String _detectedMediaUrl = '';
-  final Set<String> _sniffedMediaUrls = {};
-  bool _isExtracting = false;
-
-  // ==========================================
-  // الميزة 2: مانع الإعلانات الذكي (AdBlocker)
+  // مانع الإعلانات الذكي (AdBlocker)
   // ==========================================
   bool _adBlockerEnabled = true;
   int _blockedAdsCount = 0;
@@ -77,18 +68,18 @@ class _BrowserTabState extends State<BrowserTab> {
   ];
 
   // ==========================================
-  // الميزة 3: إدارة الإشارات المرجعية (Bookmarks)
+  // إدارة الإشارات المرجعية (Bookmarks)
   // ==========================================
   List<Map<String, String>> _bookmarks = [];
   bool _isCurrentBookmarked = false;
 
   // ==========================================
-  // الميزة 4: وضع التصفح الخفي (Incognito Mode)
+  // وضع التصفح الخفي (Incognito Mode)
   // ==========================================
   bool _isIncognitoMode = false;
 
   // ==========================================
-  // الميزة 5: اختيار محرك البحث المفضل
+  // اختيار محرك البحث المفضل
   // ==========================================
   String _selectedSearchEngine = 'Google';
   final Map<String, String> _searchEngines = {
@@ -100,12 +91,14 @@ class _BrowserTabState extends State<BrowserTab> {
   };
 
   final List<Map<String, dynamic>> _quickShortcuts = [
+    {'name': 'Google', 'url': 'https://www.google.com', 'icon': Icons.search_rounded, 'color': AppColors.cyan},
     {'name': 'YouTube', 'url': 'https://www.youtube.com', 'icon': Icons.smart_display_rounded, 'color': Colors.redAccent},
     {'name': 'TikTok', 'url': 'https://www.tiktok.com', 'icon': Icons.music_note_rounded, 'color': AppColors.cyan},
     {'name': 'Instagram', 'url': 'https://www.instagram.com', 'icon': Icons.camera_alt_rounded, 'color': Colors.pinkAccent},
     {'name': 'Facebook', 'url': 'https://www.facebook.com', 'icon': Icons.facebook_rounded, 'color': Colors.blueAccent},
     {'name': 'SoundCloud', 'url': 'https://soundcloud.com', 'icon': Icons.cloud_rounded, 'color': Colors.orangeAccent},
     {'name': 'Twitter / X', 'url': 'https://x.com', 'icon': Icons.tag_rounded, 'color': Colors.white},
+    {'name': 'Wikipedia', 'url': 'https://ar.wikipedia.org', 'icon': Icons.menu_book_rounded, 'color': Colors.tealAccent},
   ];
 
   @override
@@ -176,12 +169,6 @@ class _BrowserTabState extends State<BrowserTab> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
-      ..addJavaScriptChannel(
-        'MediaSnifferChannel',
-        onMessageReceived: (JavaScriptMessage message) {
-          _handleSnifferJsMessage(message.message);
-        },
-      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (NavigationRequest request) {
@@ -199,9 +186,6 @@ class _BrowserTabState extends State<BrowserTab> {
               }
             }
 
-            // فحص روابط الوسائط المباشرة أثناء التنقل
-            _checkDirectMediaLink(request.url);
-
             return NavigationDecision.navigate;
           },
           onProgress: (int progress) {
@@ -213,12 +197,15 @@ class _BrowserTabState extends State<BrowserTab> {
           },
           onPageStarted: (String url) {
             if (mounted) {
+              final isSite = url.isNotEmpty && url != 'about:blank';
               setState(() {
                 _isLoading = true;
                 _currentUrl = url;
                 _urlController.text = url;
-                _detectedDownloadableMedia = false;
-                _sniffedMediaUrls.clear();
+                if (isSite) {
+                  _hasEnteredSite = true;
+                  _backend.isBrowserExpanded.value = true;
+                }
               });
             }
           },
@@ -234,10 +221,12 @@ class _BrowserTabState extends State<BrowserTab> {
                 _canGoForward = canFwd;
                 _currentUrl = url;
                 _currentTitle = title;
+                if (url.isNotEmpty && url != 'about:blank') {
+                  _hasEnteredSite = true;
+                  _backend.isBrowserExpanded.value = true;
+                }
               });
               _checkBookmarkStatus();
-              _sniffMediaUrl(url);
-              _injectSnifferScript();
               if (_adBlockerEnabled) {
                 _injectAdCleanerScript();
               }
@@ -258,28 +247,6 @@ class _BrowserTabState extends State<BrowserTab> {
     await prefs.setInt('browser_adblock_count', _blockedAdsCount);
   }
 
-  // حقن سكربت كاشف الوسائط الفائق في الصفحة
-  void _injectSnifferScript() {
-    const jsCode = '''
-      (function() {
-        try {
-          var found = [];
-          var mediaEls = document.querySelectorAll('video, audio, source');
-          for (var i = 0; i < mediaEls.length; i++) {
-            var src = mediaEls[i].src || mediaEls[i].currentSrc;
-            if (src && (src.startsWith('http://') || src.startsWith('https://'))) {
-              if (found.indexOf(src) === -1) found.push(src);
-            }
-          }
-          if (found.length > 0 && window.MediaSnifferChannel) {
-            window.MediaSnifferChannel.postMessage(JSON.stringify(found));
-          }
-        } catch(e) {}
-      })();
-    ''';
-    _controller.runJavaScript(jsCode);
-  }
-
   // حقن سكربت تنظيف الإعلانات من الصفحة
   void _injectAdCleanerScript() {
     const jsClean = '''
@@ -293,65 +260,6 @@ class _BrowserTabState extends State<BrowserTab> {
       })();
     ''';
     _controller.runJavaScript(jsClean);
-  }
-
-  void _handleSnifferJsMessage(String message) {
-    try {
-      final List decoded = jsonDecode(message);
-      for (var item in decoded) {
-        if (item is String && item.isNotEmpty) {
-          _sniffedMediaUrls.add(item);
-        }
-      }
-      if (_sniffedMediaUrls.isNotEmpty && mounted) {
-        setState(() {
-          _detectedDownloadableMedia = true;
-          _detectedMediaUrl = _sniffedMediaUrls.first;
-        });
-      }
-    } catch (_) {}
-  }
-
-  void _checkDirectMediaLink(String url) {
-    final lower = url.toLowerCase();
-    if (lower.endsWith('.mp4') || lower.endsWith('.mp3') || lower.endsWith('.m3u8') || lower.endsWith('.webm') || lower.endsWith('.m4a')) {
-      _sniffedMediaUrls.add(url);
-      if (mounted) {
-        setState(() {
-          _detectedDownloadableMedia = true;
-          _detectedMediaUrl = url;
-        });
-      }
-    }
-  }
-
-  void _sniffMediaUrl(String url) {
-    final lower = url.toLowerCase();
-    final isSupportedPlatform = lower.contains('youtube.com/watch') ||
-        lower.contains('youtu.be/') ||
-        lower.contains('youtube.com/shorts') ||
-        lower.contains('tiktok.com') ||
-        lower.contains('instagram.com/p/') ||
-        lower.contains('instagram.com/reel/') ||
-        lower.contains('facebook.com') ||
-        lower.contains('x.com/') ||
-        lower.contains('twitter.com/') ||
-        lower.contains('soundcloud.com') ||
-        lower.contains('.mp4') ||
-        lower.contains('.mp3') ||
-        lower.contains('.m3u8');
-
-    if (isSupportedPlatform) {
-      _sniffedMediaUrls.add(url);
-      setState(() {
-        _detectedDownloadableMedia = true;
-        _detectedMediaUrl = url;
-      });
-    } else if (_sniffedMediaUrls.isEmpty) {
-      setState(() {
-        _detectedDownloadableMedia = false;
-      });
-    }
   }
 
   void _navigateToUrl(String input) {
@@ -369,8 +277,31 @@ class _BrowserTabState extends State<BrowserTab> {
     }
 
     _urlController.text = finalUrl;
+    // عند الدخول لموقع تكبر الشاشة لتغطية كامل التطبيق
+    setState(() {
+      _hasEnteredSite = true;
+      _backend.isBrowserExpanded.value = true;
+    });
     _controller.loadRequest(Uri.parse(finalUrl));
     FocusScope.of(context).unfocus();
+  }
+
+  void _returnToHome() {
+    setState(() {
+      _hasEnteredSite = false;
+      _backend.isBrowserExpanded.value = false;
+      _currentUrl = 'https://www.google.com';
+      _urlController.text = 'https://www.google.com';
+    });
+    _controller.loadRequest(Uri.parse('https://www.google.com'));
+  }
+
+  void _toggleFullScreenCoverage() {
+    setState(() {
+      final nextState = !_backend.isBrowserExpanded.value;
+      _backend.isBrowserExpanded.value = nextState;
+      _hasEnteredSite = nextState;
+    });
   }
 
   void _toggleDesktopMode() {
@@ -392,7 +323,6 @@ class _BrowserTabState extends State<BrowserTab> {
     });
 
     if (_isIncognitoMode) {
-      // تفريغ الكاش والكوكيز لحماية الخصوصية
       try {
         final cookieManager = WebViewCookieManager();
         await cookieManager.clearCookies();
@@ -564,7 +494,7 @@ class _BrowserTabState extends State<BrowserTab> {
     );
   }
 
-  // قائمة الإجراءات الكاملة (Page Actions Menu)
+  // قائمة الإجراءات (Page Actions Menu)
   void _showPageActionsMenu() {
     showModalBottomSheet(
       context: context,
@@ -592,8 +522,16 @@ class _BrowserTabState extends State<BrowserTab> {
             const SizedBox(height: 15),
             const Divider(color: Colors.white12),
             Wrap(
-              runSpacing: 10,
+              runSpacing: 8,
               children: [
+                ListTile(
+                  leading: Icon(_backend.isBrowserExpanded.value ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, color: AppColors.cyan),
+                  title: Text(_backend.isBrowserExpanded.value ? 'تصغير الشاشة وإظهار القوائم' : 'تكبير الشاشة لتغطية كامل التطبيق', style: const TextStyle(color: Colors.white)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _toggleFullScreenCoverage();
+                  },
+                ),
                 ListTile(
                   leading: Icon(_isCurrentBookmarked ? Icons.star_rounded : Icons.star_outline_rounded, color: AppColors.cyan),
                   title: Text(_isCurrentBookmarked ? 'إزالة من الإشارات المرجعية' : 'إضافة إلى الإشارات المرجعية ⭐', style: const TextStyle(color: Colors.white)),
@@ -626,6 +564,14 @@ class _BrowserTabState extends State<BrowserTab> {
                   onTap: () {
                     Navigator.pop(ctx);
                     _toggleIncognitoMode();
+                  },
+                ),
+                ListTile(
+                  leading: Icon(_isDesktopMode ? Icons.desktop_windows_rounded : Icons.phone_android_rounded, color: AppColors.cyan),
+                  title: Text(_isDesktopMode ? 'العرض بنسخة الهاتف' : 'العرض بنسخة سطح المكتب 💻', style: const TextStyle(color: Colors.white)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _toggleDesktopMode();
                   },
                 ),
                 ListTile(
@@ -675,350 +621,6 @@ class _BrowserTabState extends State<BrowserTab> {
     );
   }
 
-  // عرض الوسائط الملتقطة (Smart Sniffer Sheet)
-  void _showSniffedMediaSheet() {
-    if (_sniffedMediaUrls.isEmpty && _detectedMediaUrl.isNotEmpty) {
-      _sniffedMediaUrls.add(_detectedMediaUrl);
-    }
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Container(
-        height: MediaQuery.of(context).size.height * 0.6,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.video_camera_back_rounded, color: AppColors.cyan),
-                const SizedBox(width: 8),
-                Text('الوسائط الملتقطة (${_sniffedMediaUrls.length})', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-              ],
-            ),
-            const SizedBox(height: 10),
-            const Divider(color: Colors.white12),
-            Expanded(
-              child: ListView.separated(
-                itemCount: _sniffedMediaUrls.length,
-                separatorBuilder: (_, __) => const Divider(color: Colors.white10),
-                itemBuilder: (context, idx) {
-                  final mUrl = _sniffedMediaUrls.elementAt(idx);
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.cyan.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.play_circle_outline_rounded, color: AppColors.cyan),
-                    ),
-                    title: Text(
-                      mUrl.split('/').last.split('?').first,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(
-                      mUrl,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-                    ),
-                    trailing: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.cyan,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _detectedMediaUrl = mUrl;
-                        _startDownloadFromBrowser();
-                      },
-                      icon: const Icon(Icons.download_rounded, size: 16),
-                      label: const Text('تحميل', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _startDownloadFromBrowser() async {
-    if (_detectedMediaUrl.isEmpty) return;
-
-    setState(() => _isExtracting = true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('جاري تحليل الرابط واستخراج الجودات... 🔍'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-
-    try {
-      final mediaData = await _backend.extractMediaLinks(_detectedMediaUrl);
-      if (mounted) {
-        setState(() {
-          _isExtracting = false;
-        });
-
-        _showFormatsModal(mediaData);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isExtracting = false);
-        // إذا كان ملفاً مباشراً وليس يوتيوب، نقوم بتحميله فوراً
-        _showDirectDownloadOption(_detectedMediaUrl);
-      }
-    }
-  }
-
-  void _showDirectDownloadOption(String directUrl) {
-    final fileName = directUrl.split('/').last.split('?').first;
-    final ext = fileName.contains('.') ? fileName.split('.').last : 'mp4';
-    
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('تحميل وسائط مباشرة', style: TextStyle(color: Colors.white, fontSize: 16)),
-        content: Text('تم العثور على ملف وسائط مباشر ($fileName). هل ترغب في بدء التنزيل؟', style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء', style: TextStyle(color: AppColors.textMuted)),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan, foregroundColor: Colors.black),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _backend.startDownloadInBackground(
-                selectedUrl: directUrl,
-                title: fileName,
-                ext: ext,
-                needsMerge: false,
-                highestAudioUrl: '',
-              );
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      const Icon(Icons.downloading_rounded, color: AppColors.cyan),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'بدأ التحميل في الخلفية: $fileName',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  backgroundColor: AppColors.surface,
-                  duration: const Duration(seconds: 3),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              );
-            },
-            icon: const Icon(Icons.download_rounded, size: 16),
-            label: const Text('تحميل', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showFormatsModal(Map<String, dynamic> mediaData) {
-    final title = mediaData['title'] ?? 'فيديو من المتصفح';
-    final highestAudioUrl = mediaData['highestAudioUrl'] ?? '';
-    final int? highestAudioTag = mediaData['highestAudioTag'];
-    final String? videoId = mediaData['id'];
-    final videos = List<Map<String, dynamic>>.from(mediaData['video'] ?? []);
-    final audios = List<Map<String, dynamic>>.from(mediaData['audio'] ?? []);
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.65,
-          maxChildSize: 0.9,
-          minChildSize: 0.4,
-          expand: false,
-          builder: (_, scrollController) {
-            return Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(color: Colors.white12),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: ListView(
-                      controller: scrollController,
-                      children: [
-                        if (videos.isNotEmpty) ...[
-                          const Text('🎬 جودات الفيديو (مرتبة مع المميزات):', style: TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          ...videos.map((v) => _buildFormatTile(v, title, highestAudioUrl, highestAudioTag, videoId, false)),
-                        ],
-                        const SizedBox(height: 15),
-                        if (audios.isNotEmpty) ...[
-                          const Text('🎵 مقطع صوتي (مرتب مع المميزات):', style: TextStyle(color: AppColors.magenta, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          ...audios.map((a) => _buildFormatTile(a, title, highestAudioUrl, highestAudioTag, videoId, true)),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildFormatTile(Map<String, dynamic> format, String title, String audioUrl, int? audioTag, String? videoId, bool isAudio) {
-    final String? badge = format['quality_badge'];
-    final String? desc = format['quality_desc'];
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Row(
-        children: [
-          Icon(isAudio ? Icons.audiotrack_rounded : Icons.videocam_rounded, color: isAudio ? AppColors.magenta : AppColors.cyan, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      format['quality_name'] ?? (isAudio ? 'MP3 Audio' : 'Video'),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                    if (badge != null) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: isAudio ? AppColors.magenta.withOpacity(0.2) : AppColors.cyan.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(badge, style: TextStyle(color: isAudio ? AppColors.magenta : AppColors.cyan, fontSize: 9, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ],
-                ),
-                if (desc != null)
-                  Text(desc, style: const TextStyle(color: AppColors.textMuted, fontSize: 10)),
-                Text(
-                  'MB ${format['size']} • ${format['ext'].toString().toUpperCase()}',
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isAudio ? AppColors.magenta : AppColors.cyan,
-              foregroundColor: isAudio ? Colors.white : Colors.black,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              elevation: 2,
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              try {
-                AdService().showInterstitialAd();
-              } catch (_) {}
-
-              _backend.startDownloadInBackground(
-                selectedUrl: format['url'],
-                title: title,
-                ext: format['ext'],
-                needsMerge: format['needs_merge'] ?? false,
-                highestAudioUrl: audioUrl,
-                videoId: format['video_id'] ?? videoId,
-                videoTag: format['tag'],
-                highestAudioTag: audioTag,
-              );
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      const Icon(Icons.downloading_rounded, color: AppColors.cyan, size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'بدأ التحميل في الخلفية: $title',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  backgroundColor: AppColors.surface,
-                  duration: const Duration(seconds: 3),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              );
-            },
-            icon: const Icon(Icons.download_rounded, size: 16),
-            label: const Text('تحميل', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _urlController.dispose();
@@ -1027,295 +629,223 @@ class _BrowserTabState extends State<BrowserTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // شريط العنوان والتحكم المطور والمرتب للمتصفح
-            Container(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
-              decoration: BoxDecoration(
-                color: _isIncognitoMode ? const Color(0xFF16162A) : AppColors.surface,
-                border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.06))),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.arrow_back_ios_rounded, size: 18, color: _canGoBack ? Colors.white : Colors.white24),
-                        onPressed: _canGoBack ? () => _controller.goBack() : null,
-                        tooltip: 'رجوع',
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.arrow_forward_ios_rounded, size: 18, color: _canGoForward ? Colors.white : Colors.white24),
-                        onPressed: _canGoForward ? () => _controller.goForward() : null,
-                        tooltip: 'تقدم',
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      IconButton(
-                        icon: Icon(_isLoading ? Icons.close_rounded : Icons.refresh_rounded, size: 20, color: Colors.white70),
-                        onPressed: () {
-                          if (_isLoading) {
-                            _controller.runJavaScript('window.stop();');
-                          } else {
-                            _controller.reload();
-                          }
-                        },
-                        tooltip: 'تحديث',
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      Expanded(
-                        child: Container(
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.35),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _isIncognitoMode ? const Color(0xFF7986CB) : Colors.white12,
-                            ),
+    return PopScope(
+      canPop: !_canGoBack && !_backend.isBrowserExpanded.value,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        if (_canGoBack) {
+          _controller.goBack();
+        } else if (_backend.isBrowserExpanded.value) {
+          setState(() {
+            _backend.isBrowserExpanded.value = false;
+            _hasEnteredSite = false;
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // شريط العنوان والتحكم المطور للمتصفح
+              Container(
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                decoration: BoxDecoration(
+                  color: _isIncognitoMode ? const Color(0xFF16162A) : AppColors.surface,
+                  border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.06))),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        // زر الصفحة الرئيسية / تصغير الشاشة عند تصفح المواقع
+                        if (_backend.isBrowserExpanded.value || _hasEnteredSite)
+                          IconButton(
+                            icon: const Icon(Icons.home_rounded, size: 22, color: AppColors.cyan),
+                            onPressed: _returnToHome,
+                            tooltip: 'الرئيسية واستعادة القوائم',
+                            visualDensity: VisualDensity.compact,
                           ),
-                          child: TextField(
-                            controller: _urlController,
-                            style: const TextStyle(color: Colors.white, fontSize: 13),
-                            textInputAction: TextInputAction.go,
-                            onSubmitted: _navigateToUrl,
-                            decoration: InputDecoration(
-                              hintText: _isIncognitoMode ? '🕶️ بحث خفي أو رابط...' : 'ابحث أو أدخل رابط...',
-                              hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-                              prefixIcon: Icon(
-                                _isIncognitoMode ? Icons.visibility_off_rounded : Icons.search_rounded,
-                                size: 18,
-                                color: _isIncognitoMode ? const Color(0xFF7986CB) : AppColors.cyan,
-                              ),
-                              suffixIcon: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (_adBlockerEnabled)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                      margin: const EdgeInsets.only(right: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.greenAccent.withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.shield_rounded, color: Colors.greenAccent, size: 12),
-                                          const SizedBox(width: 3),
-                                          Text('$_blockedAdsCount', style: const TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-                                        ],
-                                      ),
-                                    ),
-                                  IconButton(
-                                    icon: Icon(
-                                      _isCurrentBookmarked ? Icons.star_rounded : Icons.star_outline_rounded,
-                                      size: 18,
-                                      color: _isCurrentBookmarked ? AppColors.cyan : Colors.white54,
-                                    ),
-                                    onPressed: _toggleBookmark,
-                                    tooltip: 'إشارة مرجعية',
-                                    visualDensity: VisualDensity.compact,
-                                  ),
-                                  if (_urlController.text.isNotEmpty)
-                                    IconButton(
-                                      icon: const Icon(Icons.clear, size: 16, color: Colors.white54),
-                                      onPressed: () => _urlController.clear(),
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                ],
-                              ),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                            ),
-                          ),
+                        IconButton(
+                          icon: Icon(Icons.arrow_back_ios_rounded, size: 18, color: _canGoBack ? Colors.white : Colors.white24),
+                          onPressed: _canGoBack ? () => _controller.goBack() : null,
+                          tooltip: 'رجوع',
+                          visualDensity: VisualDensity.compact,
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(Icons.more_vert_rounded, color: Colors.white70, size: 22),
-                        tooltip: 'قائمة المتصفح',
-                        onPressed: _showPageActionsMenu,
-                      ),
-                    ],
-                  ),
-                  if (_isLoading)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: _progress,
-                          minHeight: 2.5,
-                          backgroundColor: Colors.transparent,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            _isIncognitoMode ? const Color(0xFF7986CB) : AppColors.cyan,
-                          ),
+                        IconButton(
+                          icon: Icon(Icons.arrow_forward_ios_rounded, size: 18, color: _canGoForward ? Colors.white : Colors.white24),
+                          onPressed: _canGoForward ? () => _controller.goForward() : null,
+                          tooltip: 'تقدم',
+                          visualDensity: VisualDensity.compact,
                         ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            // شريط اختصارات المنصات الأنيق والمرتب
-            Container(
-              height: 42,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceLight.withOpacity(0.25),
-                border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.04))),
-              ),
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: _quickShortcuts.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (ctx, i) {
-                  final s = _quickShortcuts[i];
-                  return Center(
-                    child: InkWell(
-                      onTap: () => _navigateToUrl(s['url']),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.04),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.08)),
+                        IconButton(
+                          icon: Icon(_isLoading ? Icons.close_rounded : Icons.refresh_rounded, size: 20, color: Colors.white70),
+                          onPressed: () {
+                            if (_isLoading) {
+                              _controller.runJavaScript('window.stop();');
+                            } else {
+                              _controller.reload();
+                            }
+                          },
+                          tooltip: 'تحديث',
+                          visualDensity: VisualDensity.compact,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(s['icon'] as IconData, size: 14, color: s['color'] as Color),
-                            const SizedBox(width: 6),
-                            Text(
-                              s['name'] as String,
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            // عرض صفحة الويب
-            Expanded(
-              child: Stack(
-                children: [
-                  WebViewWidget(controller: _controller),
-
-                  // لافتة التقاط الفيديو التلقائية العائمة مع زر كاشف الوسائط (الميزة 1)
-                  if (_detectedDownloadableMedia)
-                    Positioned(
-                      bottom: 85,
-                      left: 15,
-                      right: 15,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            height: 38,
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  AppColors.cyan.withOpacity(0.3),
-                                  AppColors.magenta.withOpacity(0.3),
-                                ],
+                              color: Colors.black.withOpacity(0.35),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _isIncognitoMode ? const Color(0xFF7986CB) : Colors.white12,
                               ),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppColors.cyan, width: 1.5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.5),
-                                  blurRadius: 15,
-                                  spreadRadius: 2,
-                                ),
-                              ],
                             ),
-                            child: Row(
-                              children: [
-                                InkWell(
-                                  onTap: _showSniffedMediaSheet,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: const BoxDecoration(
-                                      color: AppColors.cyan,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.download_done_rounded, color: Colors.black, size: 20),
-                                  ),
+                            child: TextField(
+                              controller: _urlController,
+                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                              textInputAction: TextInputAction.go,
+                              onSubmitted: _navigateToUrl,
+                              decoration: InputDecoration(
+                                hintText: _isIncognitoMode ? '🕶️ بحث خفي أو رابط...' : 'ابحث أو أدخل رابط...',
+                                hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                                prefixIcon: Icon(
+                                  _isIncognitoMode ? Icons.visibility_off_rounded : Icons.search_rounded,
+                                  size: 18,
+                                  color: _isIncognitoMode ? const Color(0xFF7986CB) : AppColors.cyan,
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: InkWell(
-                                    onTap: _showSniffedMediaSheet,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            const Text(
-                                              '🎬 ملتقط الوسائط الذكي',
-                                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                              decoration: BoxDecoration(color: AppColors.magenta, borderRadius: BorderRadius.circular(8)),
-                                              child: Text('${_sniffedMediaUrls.length}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                            ),
-                                          ],
+                                suffixIcon: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (_adBlockerEnabled)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                        margin: const EdgeInsets.only(right: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.greenAccent.withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(6),
                                         ),
-                                        const Text(
-                                          'تم رصد ملفات وسائط جاهزة للتنزيل الفوري',
-                                          style: TextStyle(color: Colors.white70, fontSize: 11),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.cyan,
-                                    foregroundColor: Colors.black,
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                  onPressed: _isExtracting ? null : _startDownloadFromBrowser,
-                                  child: _isExtracting
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
-                                        )
-                                      : const Row(
+                                        child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(Icons.download_rounded, size: 16),
-                                            SizedBox(width: 4),
-                                            Text('تحميل', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                            const Icon(Icons.shield_rounded, color: Colors.greenAccent, size: 12),
+                                            const SizedBox(width: 3),
+                                            Text('$_blockedAdsCount', style: const TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                                           ],
                                         ),
+                                      ),
+                                    IconButton(
+                                      icon: Icon(
+                                        _isCurrentBookmarked ? Icons.star_rounded : Icons.star_outline_rounded,
+                                        size: 18,
+                                        color: _isCurrentBookmarked ? AppColors.cyan : Colors.white54,
+                                      ),
+                                      onPressed: _toggleBookmark,
+                                      tooltip: 'إشارة مرجعية',
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    if (_urlController.text.isNotEmpty)
+                                      IconButton(
+                                        icon: const Icon(Icons.clear, size: 16, color: Colors.white54),
+                                        onPressed: () => _urlController.clear(),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                  ],
+                                ),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // زر تبديل وضع ملء الشاشة الكامل لتغطية التطبيق
+                        IconButton(
+                          icon: Icon(
+                            _backend.isBrowserExpanded.value ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
+                            color: _backend.isBrowserExpanded.value ? AppColors.cyan : Colors.white70,
+                            size: 22,
+                          ),
+                          tooltip: _backend.isBrowserExpanded.value ? 'تصغير الشاشة' : 'تكبير الشاشة لتغطية التطبيق',
+                          onPressed: _toggleFullScreenCoverage,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.more_vert_rounded, color: Colors.white70, size: 22),
+                          tooltip: 'قائمة المتصفح',
+                          onPressed: _showPageActionsMenu,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                    if (_isLoading)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: _progress,
+                            minHeight: 2.5,
+                            backgroundColor: Colors.transparent,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              _isIncognitoMode ? const Color(0xFF7986CB) : AppColors.cyan,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // شريط اختصارات المنصات السريع (يختفي عند تصفح المواقع لتوسيع شاشة العرض لأقصى مساحة)
+              if (!_backend.isBrowserExpanded.value && !_hasEnteredSite)
+                Container(
+                  height: 42,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight.withOpacity(0.25),
+                    border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.04))),
+                  ),
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _quickShortcuts.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (ctx, i) {
+                      final s = _quickShortcuts[i];
+                      return Center(
+                        child: InkWell(
+                          onTap: () => _navigateToUrl(s['url']),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.04),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white.withOpacity(0.08)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(s['icon'] as IconData, size: 14, color: s['color'] as Color),
+                                const SizedBox(width: 6),
+                                Text(
+                                  s['name'] as String,
+                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                ],
+                      );
+                    },
+                  ),
+                ),
+
+              // عرض صفحة الويب بكامل المساحة المتاحة للشاشة بدون أي عوائق أو أشرطة تحميل
+              Expanded(
+                child: WebViewWidget(controller: _controller),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
