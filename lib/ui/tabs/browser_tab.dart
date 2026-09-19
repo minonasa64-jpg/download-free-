@@ -806,23 +806,41 @@ class _BrowserTabState extends State<BrowserTab> {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('إلغاء', style: TextStyle(color: AppColors.textMuted)),
           ),
-          ElevatedButton(
+          ElevatedButton.icon(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan, foregroundColor: Colors.black),
             onPressed: () {
               Navigator.pop(ctx);
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => DownloadProgressDialog(
-                  selectedUrl: directUrl,
-                  title: fileName,
-                  ext: ext,
-                  needsMerge: false,
-                  highestAudioUrl: '',
+              _backend.startDownloadInBackground(
+                selectedUrl: directUrl,
+                title: fileName,
+                ext: ext,
+                needsMerge: false,
+                highestAudioUrl: '',
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.downloading_rounded, color: AppColors.cyan),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'بدأ التحميل في الخلفية: $fileName',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: AppColors.surface,
+                  duration: const Duration(seconds: 3),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               );
             },
-            child: const Text('بدء التنزيل'),
+            icon: const Icon(Icons.download_rounded, size: 16),
+            label: const Text('تحميل', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -946,84 +964,55 @@ class _BrowserTabState extends State<BrowserTab> {
               ],
             ),
           ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isAudio ? AppColors.magenta : AppColors.cyan,
-                  foregroundColor: isAudio ? Colors.white : Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () {
-                  Navigator.pop(context);
-                  AdService().showInterstitialAd();
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isAudio ? AppColors.magenta : AppColors.cyan,
+              foregroundColor: isAudio ? Colors.white : Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 2,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              try {
+                AdService().showInterstitialAd();
+              } catch (_) {}
 
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => DownloadProgressDialog(
-                      selectedUrl: format['url'],
-                      title: title,
-                      ext: format['ext'],
-                      needsMerge: format['needs_merge'] ?? false,
-                      highestAudioUrl: audioUrl,
-                      videoId: format['video_id'] ?? videoId,
-                      videoTag: format['tag'],
-                      highestAudioTag: audioTag,
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.download_rounded, size: 14),
-                label: const Text('تحميل', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-              ),
-              const SizedBox(height: 4),
-              InkWell(
-                onTap: () {
-                  Navigator.pop(context);
-                  AdService().showInterstitialAd();
+              _backend.startDownloadInBackground(
+                selectedUrl: format['url'],
+                title: title,
+                ext: format['ext'],
+                needsMerge: format['needs_merge'] ?? false,
+                highestAudioUrl: audioUrl,
+                videoId: format['video_id'] ?? videoId,
+                videoTag: format['tag'],
+                highestAudioTag: audioTag,
+              );
 
-                  _backend.startDownloadInBackground(
-                    selectedUrl: format['url'],
-                    title: title,
-                    ext: format['ext'],
-                    needsMerge: format['needs_merge'] ?? false,
-                    highestAudioUrl: audioUrl,
-                    videoId: format['video_id'] ?? videoId,
-                    videoTag: format['tag'],
-                    highestAudioTag: audioTag,
-                  );
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Row(
-                        children: [
-                          Icon(Icons.downloading_rounded, color: AppColors.cyan),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text('بدأ التحميل في الخلفية بنجاح 📥... تابع التقدم من الإشعارات أو تبويب التنزيلات.'),
-                          ),
-                        ],
-                      ),
-                      backgroundColor: AppColors.surface,
-                      duration: Duration(seconds: 4),
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
                     children: [
-                      Icon(Icons.arrow_downward_rounded, size: 12, color: isAudio ? AppColors.magenta : AppColors.cyan),
-                      const SizedBox(width: 2),
-                      Text('في الخلفية', style: TextStyle(color: isAudio ? AppColors.magenta : AppColors.cyan, fontSize: 10, fontWeight: FontWeight.bold)),
+                      const Icon(Icons.downloading_rounded, color: AppColors.cyan, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'بدأ التحميل في الخلفية: $title',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
+                  backgroundColor: AppColors.surface,
+                  duration: const Duration(seconds: 3),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-              ),
-            ],
+              );
+            },
+            icon: const Icon(Icons.download_rounded, size: 16),
+            label: const Text('تحميل', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
           ),
         ],
       ),
@@ -1043,12 +1032,12 @@ class _BrowserTabState extends State<BrowserTab> {
       body: SafeArea(
         child: Column(
           children: [
-            // شريط العنوان والتحكم بالمتصفح
+            // شريط العنوان والتحكم المطور والمرتب للمتصفح
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
               decoration: BoxDecoration(
-                color: _isIncognitoMode ? const Color(0xFF1A1A2E) : AppColors.surface,
-                border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
+                color: _isIncognitoMode ? const Color(0xFF16162A) : AppColors.surface,
+                border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.06))),
               ),
               child: Column(
                 children: [
@@ -1057,10 +1046,14 @@ class _BrowserTabState extends State<BrowserTab> {
                       IconButton(
                         icon: Icon(Icons.arrow_back_ios_rounded, size: 18, color: _canGoBack ? Colors.white : Colors.white24),
                         onPressed: _canGoBack ? () => _controller.goBack() : null,
+                        tooltip: 'رجوع',
+                        visualDensity: VisualDensity.compact,
                       ),
                       IconButton(
                         icon: Icon(Icons.arrow_forward_ios_rounded, size: 18, color: _canGoForward ? Colors.white : Colors.white24),
                         onPressed: _canGoForward ? () => _controller.goForward() : null,
+                        tooltip: 'تقدم',
+                        visualDensity: VisualDensity.compact,
                       ),
                       IconButton(
                         icon: Icon(_isLoading ? Icons.close_rounded : Icons.refresh_rounded, size: 20, color: Colors.white70),
@@ -1071,12 +1064,14 @@ class _BrowserTabState extends State<BrowserTab> {
                             _controller.reload();
                           }
                         },
+                        tooltip: 'تحديث',
+                        visualDensity: VisualDensity.compact,
                       ),
                       Expanded(
                         child: Container(
-                          height: 40,
+                          height: 38,
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.4),
+                            color: Colors.black.withOpacity(0.35),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: _isIncognitoMode ? const Color(0xFF7986CB) : Colors.white12,
@@ -1088,7 +1083,7 @@ class _BrowserTabState extends State<BrowserTab> {
                             textInputAction: TextInputAction.go,
                             onSubmitted: _navigateToUrl,
                             decoration: InputDecoration(
-                              hintText: _isIncognitoMode ? '🕶️ بحث خفي أو رابط...' : 'ابحث ($_selectedSearchEngine) أو أدخل رابط...',
+                              hintText: _isIncognitoMode ? '🕶️ بحث خفي أو رابط...' : 'ابحث أو أدخل رابط...',
                               hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
                               prefixIcon: Icon(
                                 _isIncognitoMode ? Icons.visibility_off_rounded : Icons.search_rounded,
@@ -1098,6 +1093,23 @@ class _BrowserTabState extends State<BrowserTab> {
                               suffixIcon: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  if (_adBlockerEnabled)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                      margin: const EdgeInsets.only(right: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.greenAccent.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.shield_rounded, color: Colors.greenAccent, size: 12),
+                                          const SizedBox(width: 3),
+                                          Text('$_blockedAdsCount', style: const TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                    ),
                                   IconButton(
                                     icon: Icon(
                                       _isCurrentBookmarked ? Icons.star_rounded : Icons.star_outline_rounded,
@@ -1106,22 +1118,23 @@ class _BrowserTabState extends State<BrowserTab> {
                                     ),
                                     onPressed: _toggleBookmark,
                                     tooltip: 'إشارة مرجعية',
+                                    visualDensity: VisualDensity.compact,
                                   ),
                                   if (_urlController.text.isNotEmpty)
                                     IconButton(
                                       icon: const Icon(Icons.clear, size: 16, color: Colors.white54),
                                       onPressed: () => _urlController.clear(),
+                                      visualDensity: VisualDensity.compact,
                                     ),
                                 ],
                               ),
                               border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 4),
-                      // زر قائمة الإجراءات الشاملة (الميزة 6)
                       IconButton(
                         icon: const Icon(Icons.more_vert_rounded, color: Colors.white70, size: 22),
                         tooltip: 'قائمة المتصفح',
@@ -1136,7 +1149,7 @@ class _BrowserTabState extends State<BrowserTab> {
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
                           value: _progress,
-                          minHeight: 3,
+                          minHeight: 2.5,
                           backgroundColor: Colors.transparent,
                           valueColor: AlwaysStoppedAnimation<Color>(
                             _isIncognitoMode ? const Color(0xFF7986CB) : AppColors.cyan,
@@ -1148,36 +1161,14 @@ class _BrowserTabState extends State<BrowserTab> {
               ),
             ),
 
-            // شريط الإحصائيات السريع (مانع الإعلانات + الوضع الخفي)
-            if (_adBlockerEnabled || _isIncognitoMode)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                color: _isIncognitoMode ? const Color(0xFF14142B) : AppColors.surfaceLight.withOpacity(0.2),
-                child: Row(
-                  children: [
-                    if (_adBlockerEnabled) ...[
-                      const Icon(Icons.shield_rounded, color: Colors.greenAccent, size: 14),
-                      const SizedBox(width: 4),
-                      Text('محجوب: $_blockedAdsCount إعلان', style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold)),
-                    ],
-                    const Spacer(),
-                    if (_isIncognitoMode)
-                      const Row(
-                        children: [
-                          Icon(Icons.visibility_off, color: Color(0xFF7986CB), size: 14),
-                          SizedBox(width: 4),
-                          Text('الوضع الخفي نشط 🕶️', style: TextStyle(color: Color(0xFF7986CB), fontSize: 11, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-
-            // شريط اختصارات المنصات السريعة
+            // شريط اختصارات المنصات الأنيق والمرتب
             Container(
-              height: 44,
+              height: 42,
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              color: AppColors.surfaceLight.withOpacity(0.3),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLight.withOpacity(0.25),
+                border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.04))),
+              ),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -1185,26 +1176,28 @@ class _BrowserTabState extends State<BrowserTab> {
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (ctx, i) {
                   final s = _quickShortcuts[i];
-                  return InkWell(
-                    onTap: () => _navigateToUrl(s['url']),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.white10),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(s['icon'] as IconData, size: 14, color: s['color'] as Color),
-                          const SizedBox(width: 6),
-                          Text(
-                            s['name'] as String,
-                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
-                          ),
-                        ],
+                  return Center(
+                    child: InkWell(
+                      onTap: () => _navigateToUrl(s['url']),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withOpacity(0.08)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(s['icon'] as IconData, size: 14, color: s['color'] as Color),
+                            const SizedBox(width: 6),
+                            Text(
+                              s['name'] as String,
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );

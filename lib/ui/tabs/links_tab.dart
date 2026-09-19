@@ -807,26 +807,46 @@ class _LinksTabState extends State<LinksTab> {
                           ),
                         ),
                         onPressed: () {
-                          AdService().showInterstitialAd();
+                          try {
+                            AdService().showInterstitialAd();
+                          } catch (_) {}
 
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (context) => DownloadProgressDialog(
-                              selectedUrl: _selectedFormat!['url'],
-                              title: title,
-                              ext: _selectedFormat!['ext'],
-                              needsMerge: _selectedFormat!['needs_merge'],
-                              highestAudioUrl: highestAudioUrl,
-                              videoId: _selectedFormat!['video_id'] ?? _mediaData?['id'],
-                              videoTag: _selectedFormat!['tag'],
-                              highestAudioTag: _mediaData?['highestAudioTag'],
+                          _backend.startDownloadInBackground(
+                            selectedUrl: _selectedFormat!['url'],
+                            title: title,
+                            ext: _selectedFormat!['ext'],
+                            needsMerge: _selectedFormat!['needs_merge'] ?? false,
+                            highestAudioUrl: highestAudioUrl,
+                            videoId: _selectedFormat!['video_id'] ?? _mediaData?['id'],
+                            videoTag: _selectedFormat!['tag'],
+                            highestAudioTag: _mediaData?['highestAudioTag'],
+                          );
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  const Icon(Icons.downloading_rounded, color: AppColors.cyan, size: 20),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'بدأ التحميل في الخلفية: $title',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: AppColors.surface,
+                              duration: const Duration(seconds: 3),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                           );
                         },
-                        icon: const Icon(Icons.download, color: Colors.white),
+                        icon: const Icon(Icons.download_rounded, color: Colors.white),
                         label: const Text(
-                          '⬇️ تحميل الآن',
+                          'تحميل',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,
