@@ -208,11 +208,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v1.2.7"
-          RELEASE_TITLE="Boykta Pro v1.2.7 - إعلانات Unity Ads وإصلاح توقف التنزيل"
+          TAG="v1.2.8"
+          RELEASE_TITLE="Boykta Pro v1.2.8 - إصلاح ظهور إعلانات Unity Ads الرسمية"
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           
-          NOTES="🚀 **Boykta Pro v1.2.7** - تحديث استقرار التنزيل ونظام Unity Ads!
+          NOTES="🚀 **Boykta Pro v1.2.8** - تحديث استقرار التنزيل ونظام Unity Ads!
 
           ### ✨ أبرز ما في هذا التحديث:
           - 🎯 **استبدال AdMob بنظام Unity Ads بالكامل:** دمج معرّف اللعبة الرسمي (Android Game ID: 800377154) مع الإعلانات البينية وشريط البنر.
