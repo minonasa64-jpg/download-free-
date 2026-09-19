@@ -1,86 +1,122 @@
 import 'package:flutter/foundation.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:flutter/material.dart';
+import 'package:unity_ads_plugin/unity_ads_plugin.dart';
 
 class AdService {
   static final AdService _instance = AdService._internal();
   factory AdService() => _instance;
   AdService._internal();
 
-  InterstitialAd? _interstitialAd;
+  // رقم تعريف اللعبة الرسمي من Unity Ads لأجهزة Android
+  static const String gameId = '800377154';
+
+  // معرّفات الوحدات الإعلانية (الإعلانات البينية وشريط البنر)
+  static const String interstitialPlacementId = 'Interstitial_Android';
+  static const String bannerPlacementId = 'Banner_Android';
+
+  bool _isInitialized = false;
   bool _isInterstitialLoading = false;
+  bool _isInterstitialLoaded = false;
 
-  // معرفات الاختبار الرسمية من Google AdMob لأجهزة Android
-  // (عندما تنشئ حساب AdMob، استبدلها بوحداتك الإعلانية الحقيقية)
-  static const String bannerAdUnitId = 'ca-app-pub-3940256099942544/6300978111';
-  static const String interstitialAdUnitId = 'ca-app-pub-3940256099942544/1033173712';
+  bool get isInitialized => _isInitialized;
+  bool get isInterstitialLoaded => _isInterstitialLoaded;
 
-  // تهيئة النظام
-  static Future<void> init() async {
-    await MobileAds.instance.initialize();
+  // تهيئة نظام Unity Ads
+  static Future<void> init({bool testMode = false}) async {
+    try {
+      await UnityAds.init(
+        gameId: gameId,
+        testMode: testMode,
+        onComplete: () {
+          _instance._isInitialized = true;
+          debugPrint('Unity Ads Initialized Successfully with Game ID: $gameId');
+          _instance.loadInterstitialAd();
+        },
+        onFailed: (error, message) {
+          _instance._isInitialized = false;
+          debugPrint('Unity Ads Initialization Failed: $error - $message');
+        },
+      );
+    } catch (e) {
+      debugPrint('Unity Ads Init Exception: $e');
+    }
   }
 
-  // تحميل إعلان بيني مسبقاً في الخلفية
+  // تحميل الإعلان البيني مسبقاً في الخلفية
   void loadInterstitialAd() {
-    if (_interstitialAd != null || _isInterstitialLoading) return;
+    if (_isInterstitialLoading) return;
 
     _isInterstitialLoading = true;
-    InterstitialAd.load(
-      adUnitId: interstitialAdUnitId,
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          _interstitialAd = ad;
+    try {
+      UnityAds.load(
+        placementId: interstitialPlacementId,
+        onComplete: (placementId) {
+          _isInterstitialLoaded = true;
           _isInterstitialLoading = false;
-          debugPrint("Interstitial Ad loaded successfully.");
-
-          _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
-            onAdDismissedFullScreenContent: (ad) {
-              ad.dispose();
-              _interstitialAd = null;
-              loadInterstitialAd(); // تحميل إعلان آخر للعملية القادمة
-            },
-            onAdFailedToShowFullScreenContent: (ad, error) {
-              ad.dispose();
-              _interstitialAd = null;
-              loadInterstitialAd();
-            },
-          );
+          debugPrint('Unity Interstitial Loaded Successfully: $placementId');
         },
-        onAdFailedToLoad: (error) {
+        onFailed: (placementId, error, message) {
+          _isInterstitialLoaded = false;
           _isInterstitialLoading = false;
-          _interstitialAd = null;
-          debugPrint("Failed to load Interstitial Ad: ${error.message}");
+          debugPrint('Unity Interstitial Failed to Load: $placementId ($error: $message)');
         },
-      ),
-    );
+      );
+    } catch (e) {
+      _isInterstitialLoading = false;
+      debugPrint('Unity Interstitial Load Exception: $e');
+    }
   }
 
-  // إظهار الإعلان البيني
+  // إظهار الإعلان البيني عند التنزيل أو التنقل
   void showInterstitialAd({VoidCallback? onAdClosed}) {
-    if (_interstitialAd != null) {
-      _interstitialAd!.show();
-      _interstitialAd = null;
-      loadInterstitialAd(); // إعادة التحميل للمرة القادمة
-      if (onAdClosed != null) onAdClosed();
-    } else {
+    try {
+      UnityAds.showVideoAd(
+        placementId: interstitialPlacementId,
+        onStart: (placementId) => debugPrint('Unity Video Ad Started: $placementId'),
+        onClick: (placementId) => debugPrint('Unity Video Ad Clicked: $placementId'),
+        onSkipped: (placementId) {
+          debugPrint('Unity Video Ad Skipped: $placementId');
+          _isInterstitialLoaded = false;
+          loadInterstitialAd();
+          if (onAdClosed != null) onAdClosed();
+        },
+        onComplete: (placementId) {
+          debugPrint('Unity Video Ad Completed: $placementId');
+          _isInterstitialLoaded = false;
+          loadInterstitialAd();
+          if (onAdClosed != null) onAdClosed();
+        },
+        onFailed: (placementId, error, message) {
+          debugPrint('Unity Video Ad Failed: $placementId ($error: $message)');
+          _isInterstitialLoaded = false;
+          loadInterstitialAd();
+          if (onAdClosed != null) onAdClosed();
+        },
+      );
+    } catch (e) {
+      debugPrint('Unity Show Video Ad Exception: $e');
       loadInterstitialAd();
       if (onAdClosed != null) onAdClosed();
     }
   }
 
-  // إنشاء إعلان بنر جاهز للعرض
-  BannerAd createBannerAd({required Function() onAdLoaded}) {
-    return BannerAd(
-      adUnitId: bannerAdUnitId,
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (ad) => onAdLoaded(),
-        onAdFailedToLoad: (ad, error) {
-          debugPrint('BannerAd failed to load: $error');
-          ad.dispose();
-        },
-      ),
-    )..load();
+  // بناء ويدجت شريط البنر الإعلاني (Banner Strip)
+  Widget buildBannerWidget({
+    VoidCallback? onLoaded,
+    Function(String, dynamic, String)? onFailed,
+  }) {
+    return UnityBannerAd(
+      placementId: bannerPlacementId,
+      onLoad: (placementId) {
+        debugPrint('Unity Banner Loaded: $placementId');
+        if (onLoaded != null) onLoaded();
+      },
+      onFailed: (placementId, error, message) {
+        debugPrint('Unity Banner Failed: $placementId ($error: $message)');
+        if (onFailed != null) onFailed(placementId, error, message);
+      },
+      onClick: (placementId) => debugPrint('Unity Banner Clicked: $placementId'),
+      onShown: (placementId) => debugPrint('Unity Banner Shown: $placementId'),
+    );
   }
 }

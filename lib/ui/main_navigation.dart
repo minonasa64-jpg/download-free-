@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../core/app_colors.dart';
 import '../services/backend_service.dart';
 import '../services/ad_service.dart';
@@ -20,7 +19,6 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   final BackendService _backend = BackendService();
   int _currentIndex = 0;
-  BannerAd? _bannerAd;
   bool _isBannerLoaded = false;
 
   final List<Widget> _tabs = const [
@@ -30,30 +28,6 @@ class _MainNavigationState extends State<MainNavigation> {
     DownloadsTab(),
     SettingsTab(),
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    _initBanner();
-  }
-
-  void _initBanner() {
-    _bannerAd = AdService().createBannerAd(
-      onAdLoaded: () {
-        if (mounted) {
-          setState(() {
-            _isBannerLoaded = true;
-          });
-        }
-      },
-    );
-  }
-
-  @override
-  void dispose() {
-    _bannerAd?.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,15 +51,19 @@ class _MainNavigationState extends State<MainNavigation> {
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // إعلان البنر (يظهر إذا تم تحميله بنجاح)
-              if (_isBannerLoaded && _bannerAd != null)
-                Container(
-                  alignment: Alignment.center,
-                  width: _bannerAd!.size.width.toDouble(),
-                  height: _bannerAd!.size.height.toDouble(),
-                  margin: const EdgeInsets.only(bottom: 5),
-                  child: AdWidget(ad: _bannerAd!),
+              // شريط إعلانات Unity Ads (Banner Strip)
+              Container(
+                alignment: Alignment.center,
+                height: 50,
+                margin: const EdgeInsets.only(bottom: 6),
+                child: AdService().buildBannerWidget(
+                  onLoaded: () {
+                    if (mounted && !_isBannerLoaded) {
+                      setState(() => _isBannerLoaded = true);
+                    }
+                  },
                 ),
+              ),
 
               // شريط التنقل الزجاجي
               ValueListenableBuilder<String>(

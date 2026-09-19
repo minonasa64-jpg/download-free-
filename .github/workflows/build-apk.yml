@@ -43,6 +43,7 @@ jobs:
           
           perms = [
               'android.permission.INTERNET',
+              'android.permission.ACCESS_NETWORK_STATE',
               'android.permission.WRITE_EXTERNAL_STORAGE',
               'android.permission.READ_EXTERNAL_STORAGE',
               'android.permission.READ_MEDIA_VIDEO',
@@ -65,10 +66,6 @@ jobs:
           if app is not None:
               app.set('{http://schemas.android.com/apk/res/android}largeHeap', 'true')
               app.set('{http://schemas.android.com/apk/res/android}requestLegacyExternalStorage', 'true')
-              ad = ET.Element('meta-data')
-              ad.set('{http://schemas.android.com/apk/res/android}name', 'com.google.android.gms.ads.APPLICATION_ID')
-              ad.set('{http://schemas.android.com/apk/res/android}value', 'ca-app-pub-3940256099942544~3347511713')
-              app.append(ad)
 
               for act in app.findall('activity'):
                   act.set('{http://schemas.android.com/apk/res/android}supportsPictureInPicture', 'true')
@@ -188,17 +185,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v1.2.5"
-          RELEASE_TITLE="Boykta Pro v1.2.5 - التحديث الكامل: التنزيل التوربو والشاشة الكاملة للمتصفح"
+          TAG="v1.2.6"
+          RELEASE_TITLE="Boykta Pro v1.2.6 - تفعيل إعلانات Unity Ads الرسمية"
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           
-          NOTES="🚀 **Boykta Pro v1.2.5** - تحديث الاستقرار والسرعة وتحسين المتصفح وإصلاح التنزيل!
+          NOTES="🚀 **Boykta Pro v1.2.6** - تحديث دمج شبكة Unity Ads الإعلانية!
 
-          ### ✨ أبرز التحسينات في هذا التحديث:
-          - ⚡ **حل مشكلة عدم اكتمال التنزيل:** نظام تنزيل أجزاء متطور (Chunked Range Engine) مع استئناف تلقائي وتجديد الروابط المنتهية (403 Forbidden) لضمان اكتمال الملفات بنسبة 100%.
-          - 📱 **شاشة كاملة للمتصفح:** عند الدخول لأي موقع تكبر الشاشة لتغطي كامل التطبيق مع إخفاء أشرطة التنقل لتسهيل القراءة والتصفح.
-          - 🚫 **حذف ميزة التنزيل من المتصفح:** إزالة الأزرار واللافتات العائمة المزعجة لتجربة تصفح نقية وسريعة مع مانع إعلانات قوي.
-          - 📊 **حصر شريط تقدم التنزيل في قسم التنزيلات فقط:** إخفاء شريط التنزيل من كافة الأقسام الأخرى لراحة المستخدم والتركيز.
+          ### ✨ أبرز ما في هذا التحديث:
+          - 🎯 **استبدال AdMob بنظام Unity Ads بالكامل:** دمج معرّف اللعبة الرسمي (Android Game ID: 800377154).
+          - 📺 **الإعلانات البينية (Interstitial Ads):** تفعيل إعلانات الفيديو البينية عند التنزيل وأثناء التنقل.
+          - 🏷️ **شريط البنر الإعلاني (Banner Strip):** دمج شريط بنر Unity Ads فوق شريط التنقل السفلي لدعم المطور واستقرار الإيرادات.
+          - ⚡ **جميع تحسينات السرعة السابقة:** التنزيل التوربو المقسم بالأجزاء (Chunked Range)، استئناف التنزيل، شاشة المتصفح الكاملة، وحصر شريط التقدم في قسم التنزيلات.
           
           📲 **التثبيت المباشر:** قم بتحميل ملف \`app-release.apk\` المرفق أدناه وتثبيته مباشرة على هاتفك الأندرويد."
 
