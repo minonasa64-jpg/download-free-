@@ -76,54 +76,60 @@ jobs:
 
       - name: Setup FlutterFragmentActivity and PiP Channel
         run: |
-          mkdir -p android/app/src/main/java/com/boykta/pro_downloader
-          cat << 'EOF' > android/app/src/main/java/com/boykta/pro_downloader/MainActivity.java
-package com.boykta.pro_downloader;
+          python3 -c '
+          import os
 
-import android.app.PictureInPictureParams;
-import android.os.Build;
-import android.util.Rational;
-import androidx.annotation.NonNull;
-import io.flutter.embedding.android.FlutterFragmentActivity;
-import io.flutter.embedding.engine.FlutterEngine;
-import io.flutter.plugin.common.MethodChannel;
-import io.flutter.plugins.GeneratedPluginRegistrant;
+          dir_path = "android/app/src/main/java/com/boykta/pro_downloader"
+          os.makedirs(dir_path, exist_ok=True)
+          java_code = """package com.boykta.pro_downloader;
 
-public class MainActivity extends FlutterFragmentActivity {
-    private static final String CHANNEL = "com.boykta.app/pip";
+          import android.app.PictureInPictureParams;
+          import android.os.Build;
+          import android.util.Rational;
+          import androidx.annotation.NonNull;
+          import io.flutter.embedding.android.FlutterFragmentActivity;
+          import io.flutter.embedding.engine.FlutterEngine;
+          import io.flutter.plugin.common.MethodChannel;
+          import io.flutter.plugins.GeneratedPluginRegistrant;
 
-    @Override
-    public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
-        super.configureFlutterEngine(flutterEngine);
-        try {
-            GeneratedPluginRegistrant.registerWith(flutterEngine);
-        } catch (Exception e) {
-            android.util.Log.e("MainActivity", "Plugin registration error: " + e.getMessage());
-        }
+          public class MainActivity extends FlutterFragmentActivity {
+              private static final String CHANNEL = "com.boykta.app/pip";
 
-        new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL)
-            .setMethodCallHandler((call, result) -> {
-                if ("enterPip".equals(call.method)) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        try {
-                            PictureInPictureParams params = new PictureInPictureParams.Builder()
-                                .setAspectRatio(new Rational(16, 9))
-                                .build();
-                            enterPictureInPictureMode(params);
-                            result.success(true);
-                        } catch (Exception e) {
-                            result.error("PIP_ERROR", e.getMessage(), null);
-                        }
-                    } else {
-                        result.error("NOT_SUPPORTED", "PiP requires Android Oreo (API 26) or higher", null);
-                    }
-                } else {
-                    result.notImplemented();
-                }
-            });
-    }
-}
-EOF
+              @Override
+              public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
+                  super.configureFlutterEngine(flutterEngine);
+                  try {
+                      GeneratedPluginRegistrant.registerWith(flutterEngine);
+                  } catch (Exception e) {
+                      android.util.Log.e("MainActivity", "Plugin registration error: " + e.getMessage());
+                  }
+
+                  new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL)
+                      .setMethodCallHandler((call, result) -> {
+                          if ("enterPip".equals(call.method)) {
+                              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                  try {
+                                      PictureInPictureParams params = new PictureInPictureParams.Builder()
+                                          .setAspectRatio(new Rational(16, 9))
+                                          .build();
+                                      enterPictureInPictureMode(params);
+                                      result.success(true);
+                                  } catch (Exception e) {
+                                      result.error("PIP_ERROR", e.getMessage(), null);
+                                  }
+                              } else {
+                                  result.error("NOT_SUPPORTED", "PiP requires Android Oreo (API 26) or higher", null);
+                              }
+                          } else {
+                              result.notImplemented();
+                          }
+                      });
+              }
+          }
+          """
+          with open(os.path.join(dir_path, "MainActivity.java"), "w") as f:
+              f.write(java_code)
+          '
           find android/app/src/main -name "MainActivity.kt" -exec rm -f {} +
 
       - name: Apply FFmpeg Resolution Strategy and Build Fixes
