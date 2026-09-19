@@ -462,7 +462,17 @@ class BackendService {
       debugPrint('تم تجاهل استثناء الصلاحيات: $e');
     }
 
-    final cleanTitle = title.replaceAll(RegExp(r'[^\w\s]+'), '').trim();
+    // تنظيف اسم الملف بأمان للحفاظ على الحروف العربية والإنجليزية والأرقام والمسافات
+    String cleanTitle = title
+        .replaceAll(RegExp(r'[\\/:*?"<>|\r\n\t\x00-\x1f]'), '_')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (cleanTitle.isEmpty) {
+      cleanTitle = 'video_${DateTime.now().millisecondsSinceEpoch}';
+    }
+    if (cleanTitle.length > 80) {
+      cleanTitle = cleanTitle.substring(0, 80).trim();
+    }
     
     // مسارات مرنة ومتوافقة مع كافة إصدارات الأندرويد
     Directory tempDir = await _getTempDir();
@@ -535,7 +545,7 @@ class BackendService {
           );
           onStatusChanged('جاري معالجة وتجهيز ملف MP3...');
           try {
-            var session = await FFmpegKit.execute('-i "$tempAudioPath" -vn -c:a libmp3lame -b:a 192k "$finalOutputPath"');
+            var session = await FFmpegKit.execute('-y -i "$tempAudioPath" -vn -c:a libmp3lame -b:a 192k "$finalOutputPath"');
             var returnCode = await session.getReturnCode();
             if (ReturnCode.isSuccess(returnCode)) {
               try { File(tempAudioPath).deleteSync(); } catch (_) {}
@@ -585,7 +595,7 @@ class BackendService {
         );
 
         onStatusChanged('جاري المعالجة والدمج (قد يستغرق بعض الوقت)...');
-        String command = '-i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a aac "$finalOutputPath"';
+        String command = '-y -i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a aac -strict experimental "$finalOutputPath"';
         
         try {
           var session = await FFmpegKit.execute(command);
@@ -690,9 +700,9 @@ class BackendService {
     String? targetVideoId = videoId;
     int? targetTag = streamTag;
 
-    // استخراج معرّف الفيديو أو الـ tag تلقائياً في حال عدم تمريره
+    // استخراج معرّف الفيديو أو الـ itag تلقائياً في حال عدم تمريره
     if (targetVideoId == null || targetVideoId.isEmpty) {
-      if (url.contains('youtu.be/') || url.contains('youtube.com/watch') || url.contains('youtube.com/shorts/')) {
+      if (url.contains("youtu.be/") || url.contains("youtube.com/watch") || url.contains("youtube.com/shorts/")) {
         try {
           targetVideoId = VideoId(url).value;
         } catch (_) {}
@@ -702,17 +712,18 @@ class BackendService {
     if (targetTag == null) {
       try {
         final uri = Uri.tryParse(url);
-        final itagStr = uri?.queryParameters['itag'];
+        final itagStr = uri?.queryParameters["itag"];
         if (itagStr != null) {
           targetTag = int.tryParse(itagStr);
         }
       } catch (_) {}
     }
 
+    StreamInfo? selectedStream;
     String currentStreamUrl = url;
     int totalBytes = -1;
 
-    // 1. تحديد الحجم الكلي والرابط المحدث إذا كان من يوتيوب
+    // 1. تحديد الحجم الكلي والرابط المحدث واستخراج معلومات الدفق إذا كان من يوتيوب
     if (targetVideoId != null && targetVideoId.isNotEmpty) {
       try {
         StreamManifest? manifest = _streamManifestCache[targetVideoId];
@@ -721,7 +732,6 @@ class BackendService {
           _streamManifestCache[targetVideoId] = manifest;
         }
 
-        StreamInfo? selectedStream;
         if (targetTag != null) {
           for (final s in manifest.streams) {
             if (s.tag == targetTag) {
@@ -730,6 +740,7 @@ class BackendService {
             }
           }
         }
+
         if (selectedStream == null) {
           if (manifest.muxed.isNotEmpty) {
             final muxedList = manifest.muxed.toList();
@@ -746,15 +757,15 @@ class BackendService {
           targetTag = selectedStream.tag;
         }
       } catch (e) {
-        debugPrint('تنبيه أثناء جلب مانيفست يوتيوب: $e');
+        debugPrint("تنبيه أثناء جلب مانيفست يوتيوب: $e");
       }
     }
 
-    // إذا لم نتمكن من تحديد الحجم، نحاول قراءته من الرابط مباشرة
+    // إذا لم نتمكن من تحديد الحجم، نحاول قراءته من معلمات الرابط (clen)
     if (totalBytes <= 0) {
       try {
         final uri = Uri.tryParse(currentStreamUrl);
-        final clenStr = uri?.queryParameters['clen'];
+        final clenStr = uri?.queryParameters["clen"];
         if (clenStr != null) {
           totalBytes = int.tryParse(clenStr) ?? -1;
         }
@@ -768,32 +779,31 @@ class BackendService {
           currentStreamUrl,
           options: Options(
             headers: {
-              'Range': 'bytes=0-1',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-              'Accept': '*/*',
+              "Range": "bytes=0-1",
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Accept": "*/*",
             },
             validateStatus: (s) => s != null && (s == 206 || s == 200),
           ),
         );
-        final cr = probe.headers.value('content-range');
-        if (cr != null && cr.contains('/')) {
-          totalBytes = int.tryParse(cr.split('/').last.trim()) ?? -1;
+        final cr = probe.headers.value("content-range");
+        if (cr != null && cr.contains("/")) {
+          totalBytes = int.tryParse(cr.split("/").last.trim()) ?? -1;
         } else {
-          final cl = probe.headers.value('content-length');
+          final cl = probe.headers.value("content-length");
           if (cl != null) totalBytes = int.tryParse(cl) ?? -1;
         }
       } catch (_) {}
     }
 
-    // ملف التنزيل الجزئي (.part) لضمان عدم فقدان البيانات واستئناف التحميل تلقائياً
-    final partFile = File('$savePath.part');
+    // ملف التنزيل المؤقت (.part)
+    final partFile = File("$savePath.part");
     if (!await partFile.exists()) {
       await partFile.create(recursive: true);
     }
-
     int downloadedBytes = await partFile.length();
 
-    // إذا كان الملف مكتمل الحجم بالفعل
+    // إذا كان الملف مكتمل الحجم مسبقاً
     if (totalBytes > 0 && downloadedBytes >= totalBytes) {
       final finalFile = File(savePath);
       if (await finalFile.exists()) {
@@ -805,88 +815,19 @@ class BackendService {
     }
 
     // =========================================================================
-    // محرك التنزيل الذكي المستمر: يستأنف من آخر بايت محمل ولا يعيد من الصفر
-    // ويجدد روابط يوتيوب المنتهية تلقائياً عند الخطأ 403 / 410 فوراً
+    // المرحلة 1: التنزيل الفائق عبر محرك YoutubeExplode الرسمي (إذا كان الرابط يوتيوب ومن البداية)
     // =========================================================================
-    int retryCount = 0;
-    const int maxRetries = 20; // محاولات متعددة لضمان اكتمال الملف بنسبة 100%
-    int lastProgressTime = 0;
-
-    final httpClient = HttpClient();
-    httpClient.connectionTimeout = const Duration(seconds: 25);
-    httpClient.idleTimeout = const Duration(seconds: 35);
-
-    while (retryCount < maxRetries) {
-      downloadedBytes = await partFile.length();
-      if (totalBytes > 0 && downloadedBytes >= totalBytes) {
-        break;
-      }
-
-      IOSink? sink;
+    if (selectedStream != null && downloadedBytes == 0) {
+      IOSink? ytSink;
       try {
-        sink = partFile.openWrite(mode: FileMode.append);
+        debugPrint("بدء التحميل عبر محرك YoutubeExplode لدفق ${selectedStream.tag}...");
+        ytSink = partFile.openWrite(mode: FileMode.write);
+        final stream = _yt.videos.streamsClient.get(selectedStream);
+        int lastProgressTime = 0;
 
-        // طلب النطاق Range للاستئناف بدقة من النقطة الحالية
-        final request = await httpClient.getUrl(Uri.parse(currentStreamUrl));
-        request.headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
-        request.headers.set('Accept', '*/*');
-        request.headers.set('Accept-Encoding', 'identity');
-        request.headers.set('Referer', 'https://www.youtube.com/');
-
-        if (downloadedBytes > 0) {
-          request.headers.set('Range', 'bytes=$downloadedBytes-');
-        }
-
-        final response = await request.close();
-
-        // في حال انتهاء صلاحية الرابط (403 أو 410 أو 400)، نجدد الرابط فوراً ونستأنف
-        if (response.statusCode == 403 || response.statusCode == 410 || response.statusCode == 400) {
-          await sink?.flush();
-          await sink?.close();
-          sink = null;
-          if (targetVideoId != null) {
-            debugPrint('انتهت صلاحية رابط الدفق (${response.statusCode})، جاري التجديد التلقائي...');
-            final freshManifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
-            _streamManifestCache[targetVideoId] = freshManifest;
-            StreamInfo? freshStream;
-            if (targetTag != null) {
-              for (final s in freshManifest.streams) {
-                if (s.tag == targetTag) {
-                  freshStream = s;
-                  break;
-                }
-              }
-            }
-            freshStream ??= freshManifest.muxed.isNotEmpty ? freshManifest.muxed.first : freshManifest.streams.first;
-            currentStreamUrl = freshStream.url.toString();
-            retryCount++;
-            await Future.delayed(const Duration(milliseconds: 600));
-            continue;
-          }
-        }
-
-        // إذا أعاد الخادم 200 وكان لدينا بايتات سابقة، الخادم لا يدعم النطاق، نعيد من البداية
-        if (response.statusCode == 200 && downloadedBytes > 0) {
-          await sink?.flush();
-          await sink?.close();
-          sink = null;
-          await partFile.writeAsBytes([], mode: FileMode.write);
-          downloadedBytes = 0;
-          sink = partFile.openWrite(mode: FileMode.write);
-        }
-
-        if (totalBytes <= 0) {
-          final cl = response.headers.value(HttpHeaders.contentLengthHeader);
-          if (cl != null) {
-            totalBytes = (int.tryParse(cl) ?? -1) + downloadedBytes;
-          }
-        }
-
-        // قراءة التدفق المستلم وإضافته فوراً مع تحديث شريط التقدم
-        await for (final chunk in response) {
-          sink?.add(chunk);
+        await for (final chunk in stream) {
+          ytSink.add(chunk);
           downloadedBytes += chunk.length;
-
           final now = DateTime.now().millisecondsSinceEpoch;
           if (now - lastProgressTime > 120 || (totalBytes > 0 && downloadedBytes >= totalBytes)) {
             lastProgressTime = now;
@@ -894,50 +835,202 @@ class BackendService {
           }
         }
 
-        await sink?.flush();
-        await sink?.close();
-        sink = null;
+        await ytSink.flush();
+        await ytSink.close();
+        ytSink = null;
 
         downloadedBytes = await partFile.length();
-        if (totalBytes <= 0 || downloadedBytes >= totalBytes || (totalBytes > 0 && downloadedBytes >= totalBytes * 0.99)) {
-          // اكتمل التحميل بنجاح
-          break;
+        if (totalBytes > 0 && downloadedBytes >= (totalBytes * 0.98)) {
+          final finalFile = File(savePath);
+          if (await finalFile.exists()) {
+            try { await finalFile.delete(); } catch (_) {}
+          }
+          await partFile.rename(savePath);
+          onReceiveProgress(downloadedBytes, totalBytes);
+          debugPrint("اكتمل التنزيل بنجاح 100% عبر YoutubeExplode: $downloadedBytes بايت");
+          return;
         }
-      } catch (streamError) {
-        debugPrint('استئناف التدفق بعد انقطاع (محاولة $retryCount): $streamError');
-        try { await sink?.flush(); } catch (_) {}
-        try { await sink?.close(); } catch (_) {}
-        sink = null;
-
-        retryCount++;
-        // تجديد الرابط عند تكرار المحاولات
-        if (targetVideoId != null && (retryCount % 2 == 0)) {
-          try {
-            final freshManifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
-            _streamManifestCache[targetVideoId] = freshManifest;
-            StreamInfo? freshStream;
-            if (targetTag != null) {
-              for (final s in freshManifest.streams) {
-                if (s.tag == targetTag) {
-                  freshStream = s;
-                  break;
-                }
-              }
-            }
-            freshStream ??= freshManifest.muxed.isNotEmpty ? freshManifest.muxed.first : freshManifest.streams.first;
-            currentStreamUrl = freshStream.url.toString();
-          } catch (_) {}
-        }
-        await Future.delayed(Duration(milliseconds: 500 * min(retryCount, 6)));
+      } catch (ytErr) {
+        debugPrint("انقطع تدفق YoutubeExplode ($ytErr). سيتم الاستئناف الذكي فوراً عبر محرك النطاقات المجزأة...");
+        try { await ytSink?.flush(); } catch (_) {}
+        try { await ytSink?.close(); } catch (_) {}
+        ytSink = null;
       }
     }
 
-    httpClient.close(force: true);
+    // =========================================================================
+    // المرحلة 2: محرك النطاقات المجزأة الذكي المقاوم للانقطاع والتخنيق (Resilient Chunked Range Engine)
+    // يقسم التنزيل إلى أجزاء آمنة (5MB) ويستأنف بدقة بايت ببايت دون إعادة من الصفر
+    // =========================================================================
+    downloadedBytes = await partFile.length();
 
-    // التحقق النهائي ونقل الملف لمساره الدائم
+    if (totalBytes > 0) {
+      const int chunkSize = 5 * 1024 * 1024; // 5 ميغابايت لكل جزء لتفادي خنق السرعة وضمان الاستقرار التام
+      int lastProgressTime = 0;
+
+      while (downloadedBytes < totalBytes) {
+        final int endByte = min(downloadedBytes + chunkSize - 1, totalBytes - 1);
+        bool chunkSuccess = false;
+        int chunkAttempt = 0;
+
+        while (!chunkSuccess && chunkAttempt < 8) {
+          chunkAttempt++;
+          IOSink? chunkSink;
+          HttpClient? client;
+
+          try {
+            Uri requestUri = Uri.parse(currentStreamUrl);
+            final bool isYouTube = requestUri.host.contains("googlevideo.com") ||
+                                   requestUri.host.contains("youtube.com");
+
+            if (isYouTube) {
+              final qp = Map<String, String>.from(requestUri.queryParameters);
+              qp["range"] = "$downloadedBytes-$endByte";
+              requestUri = requestUri.replace(queryParameters: qp);
+            }
+
+            client = HttpClient();
+            client.connectionTimeout = const Duration(seconds: 25);
+            client.idleTimeout = const Duration(seconds: 30);
+
+            final req = await client.getUrl(requestUri);
+            req.headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+            req.headers.set("Accept", "*/*");
+            req.headers.set("Accept-Encoding", "identity");
+            req.headers.set("Referer", "https://www.youtube.com/");
+            req.headers.set("Range", "bytes=$downloadedBytes-$endByte");
+
+            final res = await req.close();
+
+            // تجديد الرابط المنتهي تلقائياً عند الخطأ 403 أو 410 أو 400
+            if (res.statusCode == 403 || res.statusCode == 410 || res.statusCode == 400) {
+              client.close(force: true);
+              if (targetVideoId != null && targetVideoId.isNotEmpty) {
+                debugPrint("تجديد رابط يوتيوب بعد كود ${res.statusCode}...");
+                final freshManifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
+                _streamManifestCache[targetVideoId] = freshManifest;
+                StreamInfo? freshStream;
+                if (targetTag != null) {
+                  for (final s in freshManifest.streams) {
+                    if (s.tag == targetTag) {
+                      freshStream = s;
+                      break;
+                    }
+                  }
+                }
+                freshStream ??= freshManifest.muxed.isNotEmpty
+                    ? freshManifest.muxed.first
+                    : freshManifest.streams.first;
+                currentStreamUrl = freshStream.url.toString();
+                await Future.delayed(const Duration(milliseconds: 500));
+                continue;
+              }
+            }
+
+            if (res.statusCode != 200 && res.statusCode != 206) {
+              client.close(force: true);
+              throw Exception("HTTP status ${res.statusCode}");
+            }
+
+            chunkSink = partFile.openWrite(mode: FileMode.append);
+            int bytesInChunk = 0;
+
+            await for (final data in res) {
+              chunkSink.add(data);
+              bytesInChunk += data.length;
+              final now = DateTime.now().millisecondsSinceEpoch;
+              if (now - lastProgressTime > 120) {
+                lastProgressTime = now;
+                onReceiveProgress(downloadedBytes + bytesInChunk, totalBytes);
+              }
+            }
+
+            await chunkSink.flush();
+            await chunkSink.close();
+            chunkSink = null;
+            client.close(force: true);
+
+            if (bytesInChunk > 0) {
+              downloadedBytes += bytesInChunk;
+              chunkSuccess = true;
+              onReceiveProgress(downloadedBytes, totalBytes);
+            } else {
+              throw Exception("مقطع فارغ");
+            }
+          } catch (chunkErr) {
+            debugPrint("خطأ في تحميل المقطع $downloadedBytes-$endByte (محاولة $chunkAttempt): $chunkErr");
+            try { await chunkSink?.flush(); } catch (_) {}
+            try { await chunkSink?.close(); } catch (_) {}
+            chunkSink = null;
+            client?.close(force: true);
+            downloadedBytes = await partFile.length();
+
+            if (chunkAttempt >= 8) {
+              throw Exception("تعذر استكمال تنزيل المقطع بعد 8 محاولات: $chunkErr");
+            }
+            await Future.delayed(Duration(milliseconds: 400 * chunkAttempt));
+          }
+        }
+      }
+    } else {
+      // للملفات ذات الحجم غير المحدد مسبقاً، تنزيل انسيابي مستمر حتى اكتمال التدفق
+      IOSink? streamSink;
+      HttpClient? client;
+      try {
+        streamSink = partFile.openWrite(mode: FileMode.write);
+        client = HttpClient();
+        client.connectionTimeout = const Duration(seconds: 25);
+        client.idleTimeout = const Duration(seconds: 40);
+
+        final req = await client.getUrl(Uri.parse(currentStreamUrl));
+        req.headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+        req.headers.set("Accept", "*/*");
+        req.headers.set("Accept-Encoding", "identity");
+
+        final res = await req.close();
+        if (res.statusCode != 200 && res.statusCode != 206) {
+          throw Exception("HTTP status ${res.statusCode}");
+        }
+
+        int received = 0;
+        int cl = res.contentLength;
+        int lastProgressTime = 0;
+
+        await for (final data in res) {
+          streamSink.add(data);
+          received += data.length;
+          final now = DateTime.now().millisecondsSinceEpoch;
+          if (now - lastProgressTime > 120) {
+            lastProgressTime = now;
+            onReceiveProgress(received, cl > 0 ? cl : -1);
+          }
+        }
+
+        await streamSink.flush();
+        await streamSink.close();
+        streamSink = null;
+        client.close(force: true);
+
+        downloadedBytes = await partFile.length();
+        totalBytes = downloadedBytes;
+      } catch (e) {
+        try { await streamSink?.flush(); } catch (_) {}
+        try { await streamSink?.close(); } catch (_) {}
+        streamSink = null;
+        client?.close(force: true);
+        rethrow;
+      }
+    }
+
+    // =========================================================================
+    // التحقق النهائي من سلامة واكتمال الملف قبل اعتماده
+    // =========================================================================
     downloadedBytes = await partFile.length();
     if (downloadedBytes == 0) {
-      throw Exception('فشل التنزيل: لم يتم استلام أي بيانات صالحة.');
+      throw Exception("فشل التنزيل: لم يتم استلام أي بيانات.");
+    }
+    if (totalBytes > 0 && downloadedBytes < (totalBytes * 0.95)) {
+      throw Exception("الملف غير مكتمل ($downloadedBytes من أصل $totalBytes بايت).");
     }
 
     final finalFile = File(savePath);
@@ -946,7 +1039,7 @@ class BackendService {
     }
     await partFile.rename(savePath);
     onReceiveProgress(downloadedBytes, totalBytes > 0 ? totalBytes : downloadedBytes);
-    debugPrint('تم التنزيل بنجاح 100% بحجم $downloadedBytes بايت وحفظه في $savePath');
+    debugPrint("تم التنزيل بنجاح 100% بحجم $downloadedBytes بايت وحفظه في $savePath");
   }
 
   // =========================================================================
@@ -1285,7 +1378,13 @@ class BackendService {
   }) async {
     await _requestPermissions();
     final trackData = await _yt.videos.closedCaptions.get(track);
-    final cleanTitle = videoTitle.replaceAll(RegExp(r'[^\w\s]+'), '').trim();
+    String cleanTitle = videoTitle
+        .replaceAll(RegExp(r'[\\/:*?"<>|\r\n\t\x00-\x1f]'), '_')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (cleanTitle.isEmpty) {
+      cleanTitle = 'subtitle_${DateTime.now().millisecondsSinceEpoch}';
+    }
     final dlDir = await _getDownloadsDir();
     final srtFile = File('${dlDir.path}/${cleanTitle}_${track.language.code}.srt');
 

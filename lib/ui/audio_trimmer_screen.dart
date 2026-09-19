@@ -115,13 +115,17 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
     try {
       final fileName = widget.file.path.split('/').last;
       final rawName = fileName.contains('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
-      final cleanName = rawName.replaceAll(RegExp(r'[^\w\s]+'), '').trim();
+      final cleanName = rawName
+          .replaceAll(RegExp(r'[\\/:*?"<>|\r\n\t\x00-\x1f]'), '_')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      final safeName = cleanName.isEmpty ? "audio" : cleanName;
 
       final parentDir = widget.file.parent;
       final lowerPath = widget.file.path.toLowerCase();
       final isSourceMp3 = lowerPath.endsWith('.mp3');
       final ext = isSourceMp3 ? 'mp3' : 'm4a';
-      final outPath = '${parentDir.path}/${cleanName}_ringtone_${_startSeconds.toInt()}s_${_endSeconds.toInt()}s.$ext';
+      final outPath = '${parentDir.path}/${safeName}_ringtone_${_startSeconds.toInt()}s_${_endSeconds.toInt()}s.$ext';
 
       final startStr = _startSeconds.toStringAsFixed(1);
       final durationStr = (_endSeconds - _startSeconds).toStringAsFixed(1);
@@ -136,7 +140,7 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
 
       // محاولة بديلة احتياطية في حال تعذر القص المباشر
       if (!ReturnCode.isSuccess(returnCode) || !await File(outPath).exists()) {
-        final fallbackOut = '${parentDir.path}/${cleanName}_ringtone_${_startSeconds.toInt()}s_${_endSeconds.toInt()}s.m4a';
+        final fallbackOut = '${parentDir.path}/${safeName}_ringtone_${_startSeconds.toInt()}s_${_endSeconds.toInt()}s.m4a';
         final fallbackCmd = '-y -ss $startStr -t $durationStr -i "${widget.file.path}" -vn -c:a aac -b:a 192k "$fallbackOut"';
         session = await FFmpegKit.execute(fallbackCmd);
         returnCode = await session.getReturnCode();
