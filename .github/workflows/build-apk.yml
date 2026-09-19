@@ -78,53 +78,52 @@ jobs:
         run: |
           mkdir -p android/app/src/main/java/com/boykta/pro_downloader
           cat << 'EOF' > android/app/src/main/java/com/boykta/pro_downloader/MainActivity.java
-          package com.boykta.pro_downloader;
+package com.boykta.pro_downloader;
 
-          import android.app.PictureInPictureParams;
-          import android.os.Build;
-          import android.util.Rational;
-          import androidx.annotation.NonNull;
-          import io.flutter.embedding.android.FlutterFragmentActivity;
-          import io.flutter.embedding.engine.FlutterEngine;
-          import io.flutter.plugin.common.MethodCall;
-          import io.flutter.plugin.common.MethodChannel;
-          import io.flutter.plugins.GeneratedPluginRegistrant;
+import android.app.PictureInPictureParams;
+import android.os.Build;
+import android.util.Rational;
+import androidx.annotation.NonNull;
+import io.flutter.embedding.android.FlutterFragmentActivity;
+import io.flutter.embedding.engine.FlutterEngine;
+import io.flutter.plugin.common.MethodChannel;
+import io.flutter.plugins.GeneratedPluginRegistrant;
 
-          public class MainActivity extends FlutterFragmentActivity {
-              private static final String CHANNEL = "com.boykta.app/pip";
+public class MainActivity extends FlutterFragmentActivity {
+    private static final String CHANNEL = "com.boykta.app/pip";
 
-              @Override
-              public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
-                  super.configureFlutterEngine(flutterEngine);
-                  try {
-                      GeneratedPluginRegistrant.registerWith(flutterEngine);
-                  } catch (Exception e) {
-                      android.util.Log.e("MainActivity", "Plugin registration error: " + e.getMessage());
-                  }
+    @Override
+    public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
+        super.configureFlutterEngine(flutterEngine);
+        try {
+            GeneratedPluginRegistrant.registerWith(flutterEngine);
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Plugin registration error: " + e.getMessage());
+        }
 
-                  new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL)
-                      .setMethodCallHandler((call, result) -> {
-                          if ("enterPip".equals(call.method)) {
-                              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                  try {
-                                      PictureInPictureParams params = new PictureInPictureParams.Builder()
-                                          .setAspectRatio(new Rational(16, 9))
-                                          .build();
-                                      enterPictureInPictureMode(params);
-                                      result.success(true);
-                                  } catch (Exception e) {
-                                      result.error("PIP_ERROR", e.getMessage(), null);
-                                  }
-                              } else {
-                                  result.error("NOT_SUPPORTED", "PiP requires Android Oreo (API 26) or higher", null);
-                              }
-                          } else {
-                              result.notImplemented();
-                          }
-                      });
-              }
-          }
-          EOF
+        new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL)
+            .setMethodCallHandler((call, result) -> {
+                if ("enterPip".equals(call.method)) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        try {
+                            PictureInPictureParams params = new PictureInPictureParams.Builder()
+                                .setAspectRatio(new Rational(16, 9))
+                                .build();
+                            enterPictureInPictureMode(params);
+                            result.success(true);
+                        } catch (Exception e) {
+                            result.error("PIP_ERROR", e.getMessage(), null);
+                        }
+                    } else {
+                        result.error("NOT_SUPPORTED", "PiP requires Android Oreo (API 26) or higher", null);
+                    }
+                } else {
+                    result.notImplemented();
+                }
+            });
+    }
+}
+EOF
           find android/app/src/main -name "MainActivity.kt" -exec rm -f {} +
 
       - name: Apply FFmpeg Resolution Strategy and Build Fixes
@@ -144,12 +143,17 @@ jobs:
               }
           }
           EOF
-          if [ -f "android/build.gradle" ]; then
-            sed -i -E "s/ext\.kotlin_version\s*=\s*'[^']+'/ext.kotlin_version = '2.1.0'/g" android/build.gradle || true
-            sed -i -E "s/kotlin-gradle-plugin:[0-9.]+/kotlin-gradle-plugin:2.1.0/g" android/build.gradle || true
-          fi
           if [ -f "android/settings.gradle" ]; then
-            sed -i -E 's/id "org\.jetbrains\.kotlin\.android" version "[^"]+"/id "org.jetbrains.kotlin.android" version "2.1.0"/g' android/settings.gradle || true
+            sed -i -E 's/id "com\.android\.application" version "[0-9.]+"/id "com.android.application" version "7.4.2"/g' android/settings.gradle || true
+            sed -i -E 's/id "org\.jetbrains\.kotlin\.android" version "[^"]+"/id "org.jetbrains.kotlin.android" version "2.0.21"/g' android/settings.gradle || true
+          fi
+          if [ -f "android/build.gradle" ]; then
+            sed -i -E "s/ext\.kotlin_version\s*=\s*'[^']+'/ext.kotlin_version = '2.0.21'/g" android/build.gradle || true
+            sed -i -E "s/kotlin-gradle-plugin:[0-9.]+/kotlin-gradle-plugin:2.0.21/g" android/build.gradle || true
+            sed -i -E "s/com\.android\.tools\.build:gradle:[0-9.]+/com.android.tools.build:gradle:7.4.2/g" android/build.gradle || true
+          fi
+          if [ -f "android/gradle/wrapper/gradle-wrapper.properties" ]; then
+            sed -i -E 's/gradle-[0-9.]+-all\.zip/gradle-7.6.3-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties || true
           fi
           if [ -f "android/app/build.gradle" ]; then
             sed -i -E 's/JavaVersion\.VERSION_1_8/JavaVersion.VERSION_17/g' android/app/build.gradle || true
@@ -186,7 +190,7 @@ jobs:
         run: dart run flutter_launcher_icons
 
       - name: Build Release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --verbose
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
