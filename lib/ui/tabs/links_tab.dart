@@ -378,8 +378,8 @@ class _LinksTabState extends State<LinksTab> {
                         controller: _urlController,
                         style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
                         decoration: const InputDecoration(
-                          hintText: 'https://...',
-                          hintStyle: TextStyle(color: AppColors.textMuted),
+                          hintText: 'ضع رابط أي فيديو (YouTube, TikTok, Insta, FB, X, أو أي موقع)...',
+                          hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                         ),
@@ -459,34 +459,41 @@ class _LinksTabState extends State<LinksTab> {
   Widget _buildQuickPlatforms() {
     final platforms = [
       {'name': 'YouTube', 'icon': Icons.smart_display_rounded, 'color': Colors.redAccent},
-      {'name': 'قوائم تشغيل', 'icon': Icons.playlist_play_rounded, 'color': AppColors.cyan},
       {'name': 'TikTok', 'icon': Icons.music_note_rounded, 'color': AppColors.magenta},
       {'name': 'Instagram', 'icon': Icons.camera_alt_rounded, 'color': Colors.pinkAccent},
+      {'name': 'Facebook', 'icon': Icons.facebook_rounded, 'color': Colors.blueAccent},
+      {'name': 'X / Twitter', 'icon': Icons.tag_rounded, 'color': Colors.lightBlueAccent},
+      {'name': 'Pinterest', 'icon': Icons.pin_drop_rounded, 'color': Colors.red},
+      {'name': 'أي موقع ويب', 'icon': Icons.language_rounded, 'color': AppColors.cyan},
     ];
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: platforms.map((p) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withOpacity(0.08)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(p['icon'] as IconData, size: 14, color: p['color'] as Color),
-              const SizedBox(width: 5),
-              Text(
-                p['name'] as String,
-                style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: platforms.map((p) {
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(p['icon'] as IconData, size: 14, color: p['color'] as Color),
+                const SizedBox(width: 5),
+                Text(
+                  p['name'] as String,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
