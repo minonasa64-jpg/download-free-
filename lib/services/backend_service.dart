@@ -300,23 +300,7 @@ class BackendService {
 
       List<Map<String, dynamic>> videoFormats = [];
       
-      for (var stream in manifest.videoOnly) {
-        final qInfo = getVideoQualityInfo(stream.qualityLabel);
-        videoFormats.add({
-          'url': stream.url.toString(),
-          'tag': stream.tag,
-          'video_id': video.id.value,
-          'quality_name': stream.qualityLabel,
-          'quality_order': qInfo['order'],
-          'quality_badge': qInfo['badge'],
-          'quality_desc': qInfo['desc'],
-          'size': stream.size.totalMegaBytes.toStringAsFixed(1),
-          'size_bytes': stream.size.totalBytes,
-          'ext': 'mp4', 
-          'needs_merge': true,
-        });
-      }
-      
+      // نجمع أولاً التدفقات المدمجة الجاهزة (Muxed) مع صوت كامل مدمج
       for (var stream in manifest.muxed) {
         final qInfo = getVideoQualityInfo(stream.qualityLabel);
         videoFormats.add({
@@ -331,6 +315,31 @@ class BackendService {
           'size_bytes': stream.size.totalBytes,
           'ext': 'mp4',
           'needs_merge': false,
+        });
+      }
+
+      // ثم تدفقات الفيديو عالية الدقة (1080p, 2K, 4K)، مع فرز صيغة MP4 (H.264) أولاً للدمج السريع الفوري
+      final sortedVideoOnly = List<VideoStreamInfo>.from(manifest.videoOnly);
+      sortedVideoOnly.sort((a, b) {
+        final aIsMp4 = a.container.name.toLowerCase() == 'mp4' ? 1 : 0;
+        final bIsMp4 = b.container.name.toLowerCase() == 'mp4' ? 1 : 0;
+        return bIsMp4.compareTo(aIsMp4);
+      });
+
+      for (var stream in sortedVideoOnly) {
+        final qInfo = getVideoQualityInfo(stream.qualityLabel);
+        videoFormats.add({
+          'url': stream.url.toString(),
+          'tag': stream.tag,
+          'video_id': video.id.value,
+          'quality_name': stream.qualityLabel,
+          'quality_order': qInfo['order'],
+          'quality_badge': qInfo['badge'],
+          'quality_desc': qInfo['desc'],
+          'size': stream.size.totalMegaBytes.toStringAsFixed(1),
+          'size_bytes': stream.size.totalBytes,
+          'ext': 'mp4', 
+          'needs_merge': true,
         });
       }
 
@@ -353,9 +362,17 @@ class BackendService {
         });
       }
 
-      final highestAudioStream = manifest.audioOnly.withHighestBitrate();
-      String highestAudioUrl = highestAudioStream.url.toString();
-      int highestAudioTag = highestAudioStream.tag;
+      // اختيار أفضل دفق صوتي، مع تفضيل دفق MP4/M4A (AAC) للدمج الفائق السرعة والتوافق التام
+      AudioOnlyStreamInfo? bestAudioStream;
+      final mp4Audios = manifest.audioOnly.where((s) => s.container.name.toLowerCase() == 'mp4').toList();
+      if (mp4Audios.isNotEmpty) {
+        bestAudioStream = mp4Audios.withHighestBitrate();
+      } else if (manifest.audioOnly.isNotEmpty) {
+        bestAudioStream = manifest.audioOnly.withHighestBitrate();
+      }
+
+      String highestAudioUrl = bestAudioStream?.url.toString() ?? '';
+      int? highestAudioTag = bestAudioStream?.tag;
 
       List<Map<String, dynamic>> subtitlesList = [];
       try {
@@ -713,29 +730,38 @@ class BackendService {
         dynamic mergeError;
 
         if (audioSize > 2048) {
-          final List<String> ffmpegCommands = [
-            '-y -i "$tempVideoPath" -i "$tempAudioPath" -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -movflags +faststart -shortest "$finalOutputPath"',
-            '-y -i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a copy -movflags +faststart -shortest "$finalOutputPath"',
-            '-y -i "$tempVideoPath" -i "$tempAudioPath" -c:v copy -c:a aac -strict experimental "$finalOutputPath"',
+          // استخدام executeWithArguments المباشر لتفادي أي مشاكل في تجزئة السلاسل والمسافات والرموز العربية
+          final List<List<String>> ffmpegArgList = [
+            // المحاولة الأولى: دمج الفيديو مع تحويل مسار الصوت إلى AAC نقي 192kbps متوافق 100%
+            ['-y', '-i', tempVideoPath, '-i', tempAudioPath, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-shortest', finalOutputPath],
+            // المحاولة الثانية: نسخ مباشر لكلا المسارين بدون إعادة ترميز
+            ['-y', '-i', tempVideoPath, '-i', tempAudioPath, '-c:v', 'copy', '-c:a', 'copy', '-movflags', '+faststart', '-shortest', finalOutputPath],
+            // المحاولة الثالثة: دعم تجريبي للأكواد المتنوعة (مثل VP9/Opus مع MP4)
+            ['-y', '-i', tempVideoPath, '-i', tempAudioPath, '-c:v', 'copy', '-c:a', 'aac', '-strict', '-2', finalOutputPath],
+            // المحاولة الرابعة: أمر شامل مع التقصير التلقائي
+            ['-y', '-i', tempVideoPath, '-i', tempAudioPath, '-shortest', finalOutputPath],
           ];
 
-          for (final cmd in ffmpegCommands) {
+          for (final args in ffmpegArgList) {
             try {
-              debugPrint("تنفيذ أمر FFmpeg: $cmd");
-              final session = await FFmpegKit.execute(cmd);
+              debugPrint("تنفيذ أمر FFmpeg بالأرجيومنت: ${args.join(' ')}");
+              final session = await FFmpegKit.executeWithArguments(args);
               final returnCode = await session.getReturnCode();
 
               if (ReturnCode.isSuccess(returnCode)) {
                 final outFile = File(finalOutputPath);
                 if (await outFile.exists() && await outFile.length() > (videoSize / 2)) {
                   mergeSuccess = true;
-                  debugPrint("نجح الدمج بنجاح تام! الحجم النهائي: ${await outFile.length()} بايت");
+                  debugPrint("نجح دمج الصوت والفيديو بنجاح تام! الحجم النهائي: ${await outFile.length()} بايت");
                   break;
                 }
+              } else {
+                final logs = await session.getAllLogsAsString();
+                debugPrint("فشل أمر FFmpeg: $logs");
               }
             } catch (e) {
               mergeError = e;
-              debugPrint("فشل تنفيذ المحاولة: $e");
+              debugPrint("خطأ أثناء تنفيذ FFmpeg: $e");
             }
           }
         }
@@ -747,12 +773,12 @@ class BackendService {
         } else {
           final vFile = File(tempVideoPath);
           if (await vFile.exists()) {
-            debugPrint("تحذير: تم حفظ الفيديو بدون دمج بسبب: $mergeError");
+            debugPrint("تحذير: تعذر الدمج وسيتم نسخ الفيديو: $mergeError");
             await vFile.copy(finalOutputPath);
             try { vFile.deleteSync(); } catch (_) {}
             try { File(tempAudioPath).deleteSync(); } catch (_) {}
           } else {
-            throw Exception('فشل الدمج واكتمال الملف ($mergeError)');
+            throw Exception('فشل اكتمال الملف ($mergeError)');
           }
         }
       }

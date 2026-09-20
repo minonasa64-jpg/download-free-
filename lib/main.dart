@@ -17,7 +17,7 @@ void main() async {
   }
 
   try {
-    await AdService.init(testMode: kDebugMode); 
+    await AdService.init(); 
     AdService().loadInterstitialAd();
   } catch (e) {
     debugPrint('Unity Ads Init Error: $e');

@@ -208,8 +208,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v1.2.8"
-          RELEASE_TITLE="Boykta Pro v1.2.8 - إصلاح ظهور إعلانات Unity Ads الرسمية"
+          TAG="v1.2.9"
+          RELEASE_TITLE="Boykta Pro v1.2.9 - إصلاح دمج الصوت بدقة عالية وظهور إعلانات البنر"
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           
           NOTES="🚀 **Boykta Pro v1.2.8** - تحديث استقرار التنزيل ونظام Unity Ads!

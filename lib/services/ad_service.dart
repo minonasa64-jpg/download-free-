@@ -36,7 +36,8 @@ class AdService {
 
   // تهيئة نظام Unity Ads
   static Future<void> init({bool? testMode}) async {
-    final bool useTestMode = testMode ?? kDebugMode;
+    // تفعيل وضع الاختبار تلقائياً للمشاريع غير المنشورة في المتجر لضمان ظهور الإعلانات فوراً للمستخدمين
+    final bool useTestMode = testMode ?? true;
     try {
       debugPrint("Unity Ads: Initializing with Game ID: $gameId (testMode: $useTestMode)...");
       await UnityAds.init(
@@ -53,7 +54,6 @@ class AdService {
           _instance.isInitializedNotifier.value = false;
           debugPrint("Unity Ads: Initialization failed: $error - $message");
           
-          // إذا فشلت التهيئة بالوضع العادي (مثلاً لأن المشروع جديد في لوحة Unity)، نجرب بوضع الاختبار
           if (!useTestMode) {
             debugPrint("Unity Ads: Retrying initialization with testMode: true...");
             UnityAds.init(
@@ -203,47 +203,57 @@ class _SmartUnityBannerState extends State<_SmartUnityBanner> {
     }
 
     return Center(
-      child: Container(
+      child: SizedBox(
         width: 320,
         height: 50,
-        alignment: Alignment.center,
-        color: Colors.transparent,
-        child: UnityBannerAd(
-          key: ValueKey(_currentPlacement),
-          placementId: _currentPlacement,
-          onLoad: (placementId) {
-            debugPrint("Unity Banner Loaded: $placementId");
-            if (mounted && !_isAdLoaded) {
-              setState(() => _isAdLoaded = true);
-            }
-            if (widget.onLoaded != null) widget.onLoaded!();
-          },
-          onShown: (placementId) {
-            debugPrint("Unity Banner Shown: $placementId");
-            if (mounted && !_isAdLoaded) {
-              setState(() => _isAdLoaded = true);
-            }
-          },
-          onFailed: (placementId, error, message) {
-            debugPrint("Unity Banner Failed on $placementId: $error - $message");
-            if (_currentPlacement == AdService.primaryBannerPlacementId) {
-              debugPrint("Retrying banner with fallback: ${AdService.fallbackBannerPlacementId}");
-              if (mounted) {
-                setState(() {
-                  _currentPlacement = AdService.fallbackBannerPlacementId;
-                });
-              }
-            } else {
-              debugPrint("All banner placements failed.");
-              if (mounted) {
-                setState(() => _hasFailed = true);
-              }
-              if (widget.onFailed != null) {
-                widget.onFailed!(placementId, error, message);
-              }
-            }
-          },
-          onClick: (placementId) => debugPrint("Unity Banner Clicked: $placementId"),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // عند بدء التحميل وقبل اكتماله لا يظهر أي شريط أسود
+            if (!_isAdLoaded)
+              const SizedBox.shrink(),
+            // ويدجت الإعلان الرسمي مع استجابة فورية للظهور
+            Opacity(
+              opacity: _isAdLoaded ? 1.0 : 0.01,
+              child: UnityBannerAd(
+                key: ValueKey(_currentPlacement),
+                placementId: _currentPlacement,
+                onLoad: (placementId) {
+                  debugPrint("Unity Banner Loaded: $placementId");
+                  if (mounted && !_isAdLoaded) {
+                    setState(() => _isAdLoaded = true);
+                  }
+                  if (widget.onLoaded != null) widget.onLoaded!();
+                },
+                onShown: (placementId) {
+                  debugPrint("Unity Banner Shown: $placementId");
+                  if (mounted && !_isAdLoaded) {
+                    setState(() => _isAdLoaded = true);
+                  }
+                },
+                onFailed: (placementId, error, message) {
+                  debugPrint("Unity Banner Failed on $placementId: $error - $message");
+                  if (_currentPlacement == AdService.primaryBannerPlacementId) {
+                    debugPrint("Retrying banner with fallback: ${AdService.fallbackBannerPlacementId}");
+                    if (mounted) {
+                      setState(() {
+                        _currentPlacement = AdService.fallbackBannerPlacementId;
+                      });
+                    }
+                  } else {
+                    debugPrint("All banner placements failed.");
+                    if (mounted) {
+                      setState(() => _hasFailed = true);
+                    }
+                    if (widget.onFailed != null) {
+                      widget.onFailed!(placementId, error, message);
+                    }
+                  }
+                },
+                onClick: (placementId) => debugPrint("Unity Banner Clicked: $placementId"),
+              ),
+            ),
+          ],
         ),
       ),
     );
