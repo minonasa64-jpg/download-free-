@@ -520,22 +520,34 @@ class UniversalExtractorService {
       final html = res.data.toString();
 
       // استخراج العنوان
-      final titleMatch = RegExp(r'<meta[^>]*property=["\']og:title["\'][^>]*content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html) ??
-          RegExp(r'<meta[^>]*name=["\']twitter:title["\'][^>]*content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html) ??
-          RegExp(r'<title[^>]*>([^<]+)<\/title>', caseSensitive: false).firstMatch(html);
+      final titleMatch = RegExp(r'<meta[^>]*property="og:title"[^>]*content="([^"]+)"', caseSensitive: false).firstMatch(html) ??
+          RegExp(r"<meta[^>]*property='og:title'[^>]*content='([^']+)'", caseSensitive: false).firstMatch(html) ??
+          RegExp(r'<meta[^>]*content="([^"]+)"[^>]*property="og:title"', caseSensitive: false).firstMatch(html) ??
+          RegExp(r"<meta[^>]*content='([^']+)'[^>]*property='og:title'", caseSensitive: false).firstMatch(html) ??
+          RegExp(r'<meta[^>]*name="twitter:title"[^>]*content="([^"]+)"', caseSensitive: false).firstMatch(html) ??
+          RegExp(r"<meta[^>]*name='twitter:title'[^>]*content='([^']+)'", caseSensitive: false).firstMatch(html) ??
+          RegExp(r'<title[^>]*>([^<]+)</title>', caseSensitive: false).firstMatch(html);
       final title = (titleMatch?.group(1) ?? 'فيديو من الإنترنت').replaceAll('&amp;', '&').trim();
 
       // استخراج الصورة المصغرة
-      final thumbMatch = RegExp(r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html) ??
-          RegExp(r'<meta[^>]*name=["\']twitter:image["\'][^>]*content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html);
+      final thumbMatch = RegExp(r'<meta[^>]*property="og:image"[^>]*content="([^"]+)"', caseSensitive: false).firstMatch(html) ??
+          RegExp(r"<meta[^>]*property='og:image'[^>]*content='([^']+)'", caseSensitive: false).firstMatch(html) ??
+          RegExp(r'<meta[^>]*content="([^"]+)"[^>]*property="og:image"', caseSensitive: false).firstMatch(html) ??
+          RegExp(r"<meta[^>]*content='([^']+)'[^>]*property='og:image'", caseSensitive: false).firstMatch(html) ??
+          RegExp(r'<meta[^>]*name="twitter:image"[^>]*content="([^"]+)"', caseSensitive: false).firstMatch(html) ??
+          RegExp(r"<meta[^>]*name='twitter:image'[^>]*content='([^']+)'", caseSensitive: false).firstMatch(html);
       final thumbnail = (thumbMatch?.group(1) ?? '').replaceAll('&amp;', '&');
 
       // استخراج رابط الفيديو من وسوم OpenGraph أو Twitter Card أو Video Tags
-      final videoMatch = RegExp(r'<meta[^>]*property=["\']og:video(?::secure_url|:url)?["\'][^>]*content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html) ??
-          RegExp(r'<meta[^>]*name=["\']twitter:player:stream["\'][^>]*content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html) ??
-          RegExp(r'<source[^>]*src=["\']([^"\']+\.mp4[^"\']*)["\']', caseSensitive: false).firstMatch(html) ??
-          RegExp(r'<video[^>]*src=["\']([^"\']+\.mp4[^"\']*)["\']', caseSensitive: false).firstMatch(html) ??
-          RegExp(r'"contentUrl":\s*"(https?:\\\/\\\/[^"]+\.mp4[^"]*)"', caseSensitive: false).firstMatch(html);
+      final videoMatch = RegExp(r'<meta[^>]*property="og:video(?::secure_url|:url)?"[^>]*content="([^"]+)"', caseSensitive: false).firstMatch(html) ??
+          RegExp(r"<meta[^>]*property='og:video(?::secure_url|:url)?'[^>]*content='([^']+)'", caseSensitive: false).firstMatch(html) ??
+          RegExp(r'<meta[^>]*name="twitter:player:stream"[^>]*content="([^"]+)"', caseSensitive: false).firstMatch(html) ??
+          RegExp(r"<meta[^>]*name='twitter:player:stream'[^>]*content='([^']+)'", caseSensitive: false).firstMatch(html) ??
+          RegExp(r'<source[^>]*src="([^"]+\.mp4[^"]*)"', caseSensitive: false).firstMatch(html) ??
+          RegExp(r"<source[^>]*src='([^']+\.mp4[^']*)'", caseSensitive: false).firstMatch(html) ??
+          RegExp(r'<video[^>]*src="([^"]+\.mp4[^"]*)"', caseSensitive: false).firstMatch(html) ??
+          RegExp(r"<video[^>]*src='([^']+\.mp4[^']*)'", caseSensitive: false).firstMatch(html) ??
+          RegExp(r'"contentUrl":\s*"([^"]+\.mp4[^"]*)"', caseSensitive: false).firstMatch(html);
 
       if (videoMatch != null) {
         String videoUrl = videoMatch.group(1)!.replaceAll(r'\/', '/').replaceAll('&amp;', '&');
@@ -561,7 +573,7 @@ class UniversalExtractorService {
   }
 
   /// بناء هيكل نتيجة وسائط موحد
-  Map<String, dynamic>> _buildSimpleMediaResult({
+  Map<String, dynamic> _buildSimpleMediaResult({
     required String id,
     required String title,
     required String thumbnail,
