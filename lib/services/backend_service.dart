@@ -410,25 +410,19 @@ class BackendService {
 
   Future<Directory> _getTempDir() async {
     try {
-      Directory temp = Directory('/storage/emulated/0/Download/Boykta_Temp');
-      if (!await temp.exists()) await temp.create(recursive: true);
-      return temp;
+      final tmpDir = await getTemporaryDirectory();
+      final dir = Directory('${tmpDir.path}/Boykta_Temp');
+      if (!await dir.exists()) await dir.create(recursive: true);
+      return dir;
     } catch (_) {
-      try {
-        final extDir = await getExternalStorageDirectory();
-        if (extDir != null) {
-          final dir = Directory('${extDir.path}/Boykta_Temp');
-          if (!await dir.exists()) await dir.create(recursive: true);
-          return dir;
-        }
-      } catch (_) {}
       try {
         final docDir = await getApplicationDocumentsDirectory();
         final dir = Directory('${docDir.path}/Boykta_Temp');
         if (!await dir.exists()) await dir.create(recursive: true);
         return dir;
-      } catch (_) {}
-      return Directory.systemTemp;
+      } catch (_) {
+        return Directory.systemTemp;
+      }
     }
   }
 
@@ -826,9 +820,17 @@ class BackendService {
           try { await File(tempVideoPath).delete(); } catch (_) {}
           try { await File(tempAudioPath).delete(); } catch (_) {}
         } else {
-          try { await File(tempVideoPath).delete(); } catch (_) {}
-          try { await File(tempAudioPath).delete(); } catch (_) {}
-          throw Exception('تعذر إتمام دمج الصوت مع الفيديو بدقة عالية عبر FFmpeg. يرجى اختيار جودة أخرى أو إعادة المحاولة.');
+          final vFile = File(tempVideoPath);
+          if (await vFile.exists() && await vFile.length() > 0) {
+            debugPrint('تحذير: فشل دمج FFmpeg، سيتم حفظ الفيديو مباشرة كبديل');
+            await vFile.copy(finalOutputPath);
+            try { await vFile.delete(); } catch (_) {}
+            try { await File(tempAudioPath).delete(); } catch (_) {}
+          } else {
+            try { await File(tempVideoPath).delete(); } catch (_) {}
+            try { await File(tempAudioPath).delete(); } catch (_) {}
+            throw Exception('تعذر إتمام دمج الصوت مع الفيديو بدقة عالية عبر FFmpeg. يرجى اختيار جودة أخرى أو إعادة المحاولة.');
+          }
         }
       }
 
@@ -1006,7 +1008,6 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
           options: Options(
             headers: {
               "Range": "bytes=0-1",
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
               "Accept": "*/*",
             },
             validateStatus: (s) => s != null && (s == 206 || s == 200),
@@ -1035,7 +1036,12 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
       if (await finalFile.exists()) {
         try { await finalFile.delete(); } catch (_) {}
       }
-      await partFile.rename(savePath);
+      try {
+        await partFile.rename(savePath);
+      } catch (_) {
+        await partFile.copy(savePath);
+        try { await partFile.delete(); } catch (_) {}
+      }
       onReceiveProgress(totalBytes, totalBytes);
       return;
     }
@@ -1071,7 +1077,12 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
           if (await finalFile.exists()) {
             try { await finalFile.delete(); } catch (_) {}
           }
-          await partFile.rename(savePath);
+          try {
+            await partFile.rename(savePath);
+          } catch (_) {
+            await partFile.copy(savePath);
+            try { await partFile.delete(); } catch (_) {}
+          }
           onReceiveProgress(downloadedBytes, totalBytes);
           debugPrint("اكتمل التنزيل بنجاح 100% عبر YoutubeExplode: $downloadedBytes بايت");
           return;
@@ -1086,12 +1097,12 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
 
     // =========================================================================
     // المرحلة 2: محرك النطاقات المجزأة الذكي المقاوم للانقطاع والتخنيق (Resilient Chunked Range Engine)
-    // يقسم التنزيل إلى أجزاء آمنة (5MB) ويستأنف بدقة بايت ببايت دون إعادة من الصفر
+    // يقسم التنزيل إلى أجزاء آمنة (4MB) ويستأنف بدقة بايت ببايت دون كود 403 Forbidden
     // =========================================================================
     downloadedBytes = await partFile.length();
 
     if (totalBytes > 0) {
-      const int chunkSize = 5 * 1024 * 1024; // 5 ميغابايت لكل جزء لتفادي خنق السرعة وضمان الاستقرار التام
+      const int chunkSize = 4 * 1024 * 1024; // 4 ميغابايت لكل جزء لتفادي خنق السرعة وضمان الاستقرار التام
       int lastProgressTime = 0;
 
       while (downloadedBytes < totalBytes) {
@@ -1105,25 +1116,36 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
           HttpClient? client;
 
           try {
-            final requestUri = Uri.parse(currentStreamUrl);
+            Uri requestUri = Uri.parse(currentStreamUrl);
+            final isAndroid = requestUri.queryParameters['c'] == 'ANDROID';
+
+            // إذا لم يكن الدفق من عميل أندرويد (مثل iOS أو TV أو Web)، تتطلب خوادم googlevideo تمرير النطاق كمعلمة استعلام
+            if (!isAndroid) {
+              final qp = Map<String, String>.from(requestUri.queryParameters);
+              qp['range'] = '$downloadedBytes-$endByte';
+              requestUri = requestUri.replace(queryParameters: qp);
+            }
+
             client = HttpClient();
             client.connectionTimeout = const Duration(seconds: 25);
             client.idleTimeout = const Duration(seconds: 30);
 
             final req = await client.getUrl(requestUri);
-            req.headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+            if (isAndroid) {
+              req.headers.set("Range", "bytes=$downloadedBytes-$endByte");
+            }
             req.headers.set("Accept", "*/*");
             req.headers.set("Accept-Encoding", "identity");
-            req.headers.set("Referer", "https://www.youtube.com/");
-            req.headers.set("Range", "bytes=$downloadedBytes-$endByte");
+            // لا نرسل Referer ولا User-Agent سطح مكتب لتجنب خطأ 403 Forbidden من خوادم googlevideo
 
             final res = await req.close();
 
-            // تجديد الرابط المنتهي تلقائياً عند الخطأ 403 أو 410 أو 400
+            // تجديد الرابط المنتهي تلقائياً عند كود 403 أو 410 أو 400
             if (res.statusCode == 403 || res.statusCode == 410 || res.statusCode == 400) {
               client.close(force: true);
               if (targetVideoId != null && targetVideoId.isNotEmpty) {
                 debugPrint("تجديد رابط يوتيوب بعد كود ${res.statusCode}...");
+                _streamManifestCache.remove(targetVideoId);
                 final freshManifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
                 _streamManifestCache[targetVideoId] = freshManifest;
                 StreamInfo? freshStream;
@@ -1136,15 +1158,23 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
                   }
                 }
                 final isAudioDownload = savePath.contains('raw_a_') || savePath.contains('aud_') || savePath.endsWith('.mp3') || savePath.endsWith('.m4a') || savePath.endsWith('.dat');
-                if (isAudioDownload && freshManifest.audioOnly.isNotEmpty) {
-                  freshStream ??= freshManifest.audioOnly.withHighestBitrate();
-                } else {
-                  freshStream ??= freshManifest.muxed.isNotEmpty
-                      ? freshManifest.muxed.first
-                      : freshManifest.streams.first;
+                if (freshStream == null) {
+                  if (isAudioDownload && freshManifest.audioOnly.isNotEmpty) {
+                    freshStream = freshManifest.audioOnly.withHighestBitrate();
+                  } else {
+                    freshStream = freshManifest.muxed.isNotEmpty
+                        ? freshManifest.muxed.first
+                        : freshManifest.streams.first;
+                  }
                 }
-                currentStreamUrl = freshStream.url.toString();
-                await Future.delayed(const Duration(milliseconds: 500));
+                if (freshStream != null) {
+                  currentStreamUrl = freshStream.url.toString();
+                  targetTag = freshStream.tag;
+                  if (freshStream.size.totalBytes > 0) {
+                    totalBytes = freshStream.size.totalBytes;
+                  }
+                }
+                await Future.delayed(const Duration(milliseconds: 400));
                 continue;
               }
             }
@@ -1190,7 +1220,7 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
             if (chunkAttempt >= 8) {
               throw Exception("تعذر استكمال تنزيل المقطع بعد 8 محاولات: $chunkErr");
             }
-            await Future.delayed(Duration(milliseconds: 400 * chunkAttempt));
+            await Future.delayed(Duration(milliseconds: 350 * chunkAttempt));
           }
         }
       }
@@ -1205,7 +1235,6 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
         client.idleTimeout = const Duration(seconds: 40);
 
         final req = await client.getUrl(Uri.parse(currentStreamUrl));
-        req.headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
         req.headers.set("Accept", "*/*");
         req.headers.set("Accept-Encoding", "identity");
 
@@ -1259,7 +1288,12 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
     if (await finalFile.exists()) {
       try { await finalFile.delete(); } catch (_) {}
     }
-    await partFile.rename(savePath);
+    try {
+      await partFile.rename(savePath);
+    } catch (_) {
+      await partFile.copy(savePath);
+      try { await partFile.delete(); } catch (_) {}
+    }
     onReceiveProgress(downloadedBytes, totalBytes > 0 ? totalBytes : downloadedBytes);
     debugPrint("تم التنزيل بنجاح 100% بحجم $downloadedBytes بايت وحفظه في $savePath");
   }
