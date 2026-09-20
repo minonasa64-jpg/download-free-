@@ -505,21 +505,24 @@ class UniversalExtractorService {
   // 7. استخراج أي صفحة ويب عامة أو المحرك الاحتياطي الشامل (Generic HTML5 / OpenGraph Scraper)
   // =========================================================================
   Future<Map<String, dynamic>> _extractGenericWebOrFallbacks(String url, {String? forcedPlatform}) async {
-    debugPrint('جاري فحص محتوى صفحة الويب عبر HTML Scraper: $url');
+    debugPrint('جاري فحص محتوى صفحة الويب عبر HTML Scraper الشامل: $url');
     try {
       final res = await _dio.get(
         url,
         options: Options(
           followRedirects: true,
+          validateStatus: (s) => s != null && s < 500,
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
           },
         ),
       );
 
       final html = res.data.toString();
 
-      // استخراج العنوان
+      // 1. استخراج العنوان
       final titleMatch = RegExp(r'<meta[^>]*property="og:title"[^>]*content="([^"]+)"', caseSensitive: false).firstMatch(html) ??
           RegExp(r"<meta[^>]*property='og:title'[^>]*content='([^']+)'", caseSensitive: false).firstMatch(html) ??
           RegExp(r'<meta[^>]*content="([^"]+)"[^>]*property="og:title"', caseSensitive: false).firstMatch(html) ??
@@ -527,9 +530,10 @@ class UniversalExtractorService {
           RegExp(r'<meta[^>]*name="twitter:title"[^>]*content="([^"]+)"', caseSensitive: false).firstMatch(html) ??
           RegExp(r"<meta[^>]*name='twitter:title'[^>]*content='([^']+)'", caseSensitive: false).firstMatch(html) ??
           RegExp(r'<title[^>]*>([^<]+)</title>', caseSensitive: false).firstMatch(html);
-      final title = (titleMatch?.group(1) ?? 'فيديو من الإنترنت').replaceAll('&amp;', '&').trim();
+      String title = (titleMatch?.group(1) ?? 'فيديو من الإنترنت').replaceAll('&amp;', '&').trim();
+      if (title.isEmpty) title = 'فيديو من الإنترنت';
 
-      // استخراج الصورة المصغرة
+      // 2. استخراج الصورة المصغرة
       final thumbMatch = RegExp(r'<meta[^>]*property="og:image"[^>]*content="([^"]+)"', caseSensitive: false).firstMatch(html) ??
           RegExp(r"<meta[^>]*property='og:image'[^>]*content='([^']+)'", caseSensitive: false).firstMatch(html) ??
           RegExp(r'<meta[^>]*content="([^"]+)"[^>]*property="og:image"', caseSensitive: false).firstMatch(html) ??
@@ -538,22 +542,42 @@ class UniversalExtractorService {
           RegExp(r"<meta[^>]*name='twitter:image'[^>]*content='([^']+)'", caseSensitive: false).firstMatch(html);
       final thumbnail = (thumbMatch?.group(1) ?? '').replaceAll('&amp;', '&');
 
-      // استخراج رابط الفيديو من وسوم OpenGraph أو Twitter Card أو Video Tags
-      final videoMatch = RegExp(r'<meta[^>]*property="og:video(?::secure_url|:url)?"[^>]*content="([^"]+)"', caseSensitive: false).firstMatch(html) ??
-          RegExp(r"<meta[^>]*property='og:video(?::secure_url|:url)?'[^>]*content='([^']+)'", caseSensitive: false).firstMatch(html) ??
-          RegExp(r'<meta[^>]*name="twitter:player:stream"[^>]*content="([^"]+)"', caseSensitive: false).firstMatch(html) ??
-          RegExp(r"<meta[^>]*name='twitter:player:stream'[^>]*content='([^']+)'", caseSensitive: false).firstMatch(html) ??
-          RegExp(r'<source[^>]*src="([^"]+\.mp4[^"]*)"', caseSensitive: false).firstMatch(html) ??
-          RegExp(r"<source[^>]*src='([^']+\.mp4[^']*)'", caseSensitive: false).firstMatch(html) ??
-          RegExp(r'<video[^>]*src="([^"]+\.mp4[^"]*)"', caseSensitive: false).firstMatch(html) ??
-          RegExp(r"<video[^>]*src='([^']+\.mp4[^']*)'", caseSensitive: false).firstMatch(html) ??
-          RegExp(r'"contentUrl":\s*"([^"]+\.mp4[^"]*)"', caseSensitive: false).firstMatch(html);
+      // 3. استخراج رابط الفيديو أو البث الشامل بجميع الصيغ (mp4, m3u8, webm, mov, m4v, flv, ogv)
+      final videoPatterns = [
+        r'<meta[^>]*property="og:video(?::secure_url|:url)?"[^>]*content="([^"]+)"',
+        r"<meta[^>]*property='og:video(?::secure_url|:url)?'[^>]*content='([^']+)'",
+        r'<meta[^>]*name="twitter:player:stream"[^>]*content="([^"]+)"',
+        r"<meta[^>]*name='twitter:player:stream'[^>]*content='([^']+)'",
+        r'<source[^>]*src="([^"]+\.(?:mp4|m3u8|webm|mov|m4v)[^"]*)"',
+        r"<source[^>]*src='([^']+\.(?:mp4|m3u8|webm|mov|m4v)[^']*)'",
+        r'<video[^>]*src="([^"]+\.(?:mp4|m3u8|webm|mov|m4v)[^"]*)"',
+        r"<video[^>]*src='([^']+\.(?:mp4|m3u8|webm|mov|m4v)[^']*)'",
+        r'"contentUrl":\s*"([^"]+\.(?:mp4|m3u8|webm|mov|m4v)[^"]*)"',
+        r'"videoUrl":\s*"([^"]+\.(?:mp4|m3u8|webm|mov|m4v)[^"]*)"',
+        r'https?:\\?/\\?/[^"\'\s]+\.(?:mp4|m3u8|webm|mov|m4v)(?:\?[^"\'\s]*)?',
+        r'https?://[^"\'\s]+\.(?:mp4|m3u8|webm|mov|m4v)(?:\?[^"\'\s]*)?',
+      ];
 
-      if (videoMatch != null) {
-        String videoUrl = videoMatch.group(1)!.replaceAll(r'\/', '/').replaceAll('&amp;', '&');
+      String? foundVideoUrl;
+      for (final p in videoPatterns) {
+        final m = RegExp(p, caseSensitive: false).firstMatch(html);
+        if (m != null) {
+          foundVideoUrl = m.group(m.groupCount >= 1 ? 1 : 0);
+          if (foundVideoUrl != null && foundVideoUrl.isNotEmpty) {
+            break;
+          }
+        }
+      }
+
+      if (foundVideoUrl != null && foundVideoUrl.isNotEmpty) {
+        String videoUrl = foundVideoUrl.replaceAll(r'\/', '/').replaceAll('&amp;', '&');
         if (!videoUrl.startsWith('http')) {
           final uri = Uri.parse(url);
-          videoUrl = '${uri.scheme}://${uri.host}$videoUrl';
+          if (videoUrl.startsWith('//')) {
+            videoUrl = '${uri.scheme}:$videoUrl';
+          } else {
+            videoUrl = '${uri.scheme}://${uri.host}${videoUrl.startsWith('/') ? '' : '/'}$videoUrl';
+          }
         }
 
         return _buildSimpleMediaResult(
@@ -565,11 +589,52 @@ class UniversalExtractorService {
           author: Uri.tryParse(url)?.host ?? 'Web',
         );
       }
+
+      // إذا لم يكن هناك فيديو صريح، تحقق مما إذا كانت الصفحة تحتوي على ملف صوتي
+      final audioMatch = RegExp(r'<audio[^>]*src="([^"]+\.(?:mp3|m4a|wav|aac|ogg)[^"]*)"', caseSensitive: false).firstMatch(html) ??
+          RegExp(r'<source[^>]*src="([^"]+\.(?:mp3|m4a|wav|aac|ogg)[^"]*)"', caseSensitive: false).firstMatch(html);
+      if (audioMatch != null) {
+        String audioUrl = audioMatch.group(1)!.replaceAll(r'\/', '/').replaceAll('&amp;', '&');
+        if (!audioUrl.startsWith('http')) {
+          final uri = Uri.parse(url);
+          audioUrl = '${uri.scheme}://${uri.host}$audioUrl';
+        }
+        return _buildSimpleMediaResult(
+          id: 'web_audio_${DateTime.now().millisecondsSinceEpoch}',
+          title: title,
+          thumbnail: thumbnail,
+          videoUrl: audioUrl,
+          platform: 'audio',
+          author: Uri.tryParse(url)?.host ?? 'Web',
+        );
+      }
     } catch (e) {
       debugPrint('HTML Scraper خطأ: $e');
     }
 
-    throw Exception('تعذر استخراج الفيديو من هذا الرابط. يرجى التأكد من أن الرابط عام وصالح.');
+    // إذا فشل كل ما سبق، نفحص الرابط الأصلي مباشرة: هل يقبل البث أو التحميل كملف وسائط؟
+    try {
+      final head = await _dio.head(
+        url,
+        options: Options(
+          followRedirects: true,
+          validateStatus: (s) => s != null && s < 400,
+        ),
+      );
+      final ct = head.headers.value('content-type')?.toLowerCase() ?? '';
+      if (ct.contains('video') || ct.contains('audio') || ct.contains('application/octet-stream') || ct.contains('application/vnd.apple.mpegurl')) {
+        return _buildSimpleMediaResult(
+          id: 'direct_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'ملف وسائط من الإنترنت (${Uri.tryParse(url)?.host ?? "Direct"})',
+          thumbnail: '',
+          videoUrl: url,
+          platform: 'direct',
+          author: Uri.tryParse(url)?.host ?? 'Direct Link',
+        );
+      }
+    } catch (_) {}
+
+    throw Exception('تعذر العثور على وسائط قابلة للتحميل في هذا الرابط. يرجى التأكد من أن الصفحة أو الفيديو متاح للعامة.');
   }
 
   /// بناء هيكل نتيجة وسائط موحد

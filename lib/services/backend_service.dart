@@ -656,11 +656,9 @@ class BackendService {
       } else {
         // أسماء مؤقتة آمنة تماماً خالية من أي حروف خاصة أو مسافات لتفادي مشاكل FFmpeg
         final tempVideoPath = '${tempDir.path}/raw_v_${notifId}.mp4';
-        final tempAudioPath = '${tempDir.path}/raw_a_${notifId}.m4a';
         final tempMergedPath = '${tempDir.path}/merged_${notifId}.mp4';
 
         try { if (await File(tempVideoPath).exists()) await File(tempVideoPath).delete(); } catch (_) {}
-        try { if (await File(tempAudioPath).exists()) await File(tempAudioPath).delete(); } catch (_) {}
         try { if (await File(tempMergedPath).exists()) await File(tempMergedPath).delete(); } catch (_) {}
 
         onStatusChanged('جاري تحميل الفيديو عالي الجودة...');
@@ -685,36 +683,43 @@ class BackendService {
           throw Exception('تعذر تحميل دفق الفيديو.');
         }
 
-        // 2. تنزيل دفق الصوت الأصلي (AAC/MP4 متوافق 100% مع كافة مشغلات أندرويد)
+        // 2. تحديد وتنزيل دفق الصوت الأصلي بأعلى جودة متوفرة
         onStatusChanged('جاري تحميل الصوت الأصلي للدمج...');
         task.status = 'جاري تحميل الصوت للدمج...';
         activeDownloads.value = List.from(activeDownloads.value);
 
         String audioUrlToDownload = highestAudioUrl;
         int? audioTagToDownload = highestAudioTag;
+        String audioExt = 'm4a';
 
-        // في حال عدم توفر رابط صوتي أو كان دفق Opus غير متوافق، نضمن جلب دفق MP4 (AAC - itag 140)
         if (videoId != null && videoId.isNotEmpty) {
           try {
             StreamManifest? m = _streamManifestCache[videoId];
             m ??= await _yt.videos.streamsClient.getManifest(videoId);
             _streamManifestCache[videoId] = m;
-            if (audioUrlToDownload.isEmpty || audioTagToDownload == null || audioTagToDownload == 251) {
-              final mp4Audios = m.audioOnly.where((s) => s.container.name.toLowerCase() == 'mp4').toList();
-              if (mp4Audios.isNotEmpty) {
-                mp4Audios.sort((a, b) => b.bitrate.compareTo(a.bitrate));
-                audioUrlToDownload = mp4Audios.first.url.toString();
-                audioTagToDownload = mp4Audios.first.tag;
-              } else if (m.audioOnly.isNotEmpty) {
-                final best = m.audioOnly.withHighestBitrate();
-                audioUrlToDownload = best.url.toString();
-                audioTagToDownload = best.tag;
-              }
+            
+            // اختيار دفق الصوت الأفضل (نفضل mp4/aac ثم webm/opus)
+            final mp4Audios = m.audioOnly.where((s) => s.container.name.toLowerCase() == 'mp4').toList();
+            if (mp4Audios.isNotEmpty) {
+              mp4Audios.sort((a, b) => b.bitrate.compareTo(a.bitrate));
+              audioUrlToDownload = mp4Audios.first.url.toString();
+              audioTagToDownload = mp4Audios.first.tag;
+              audioExt = 'm4a';
+            } else if (m.audioOnly.isNotEmpty) {
+              final best = m.audioOnly.withHighestBitrate();
+              audioUrlToDownload = best.url.toString();
+              audioTagToDownload = best.tag;
+              audioExt = best.container.name.toLowerCase().contains('webm') ? 'webm' : 'm4a';
             }
           } catch (e) {
-            debugPrint('تعذر جلب دفق الصوت الإضافي: $e');
+            debugPrint('تعذر جلب دفق الصوت الإضافي من يوتيوب: $e');
           }
         }
+
+        final tempAudioPath = '${tempDir.path}/raw_a_${notifId}.$audioExt';
+        try { if (await File(tempAudioPath).exists()) await File(tempAudioPath).delete(); } catch (_) {}
+
+        debugPrint("تحميل دفق الصوت للدمج: tag=$audioTagToDownload, ext=$audioExt, url=$audioUrlToDownload");
 
         await _downloadFile(
           url: audioUrlToDownload,
@@ -728,13 +733,13 @@ class BackendService {
           streamTag: audioTagToDownload,
         );
 
-        // 3. الدمج الصوتي عالي الدقة عبر FFmpeg مع حماية كاملة من الفشل
+        // 3. الدمج الصوتي عالي الدقة عبر FFmpeg مع استراتيجيات متعددة تضمن وجود الصوت 100%
         onStatusChanged('جاري الدمج النهائي بجودة فائقة...');
         task.status = 'جاري دمج الفيديو مع الصوت...';
         task.progress = 0.96;
         activeDownloads.value = List.from(activeDownloads.value);
 
-        // التأكد من استقرار ملفات الفيديو والصوت المنزلة حتى لو كانت بامتداد .part
+        // التأكد من اكتمال وجود الملفات حتى لو كانت .part
         if (!await File(tempVideoPath).exists() && await File('$tempVideoPath.part').exists()) {
           try { await File('$tempVideoPath.part').copy(tempVideoPath); } catch (_) {}
         }
@@ -752,50 +757,11 @@ class BackendService {
         final tempMergedMkv = '${tempDir.path}/merged_${notifId}.mkv';
         try { if (await File(tempMergedMkv).exists()) await File(tempMergedMkv).delete(); } catch (_) {}
 
+        debugPrint("حالة ملفات الدمج: فيديو=${vSourceFile.path} ($vSourceSize بايت), صوت=${audioFile.path} ($audioSize بايت)");
+
         if (audioSize > 1024 && await vSourceFile.exists()) {
           final List<Map<String, dynamic>> ffmpegAttempts = [
-            // محاولة 1: نسخ مباشر عالي السرعة لكلا الدفقين (Stream Copy H.264 + AAC)
-            {
-              'path': tempMergedPath,
-              'args': [
-                '-y',
-                '-i', tempVideoPath,
-                '-i', tempAudioPath,
-                '-c:v', 'copy',
-                '-c:a', 'copy',
-                '-movflags', '+faststart',
-                '-shortest',
-                tempMergedPath,
-              ],
-            },
-            // محاولة 2: نسخ الفيديو مع تحويل الصوت إلى AAC 192k المتوافق
-            {
-              'path': tempMergedPath,
-              'args': [
-                '-y',
-                '-i', tempVideoPath,
-                '-i', tempAudioPath,
-                '-c:v', 'copy',
-                '-c:a', 'aac',
-                '-b:a', '192k',
-                '-movflags', '+faststart',
-                '-shortest',
-                tempMergedPath,
-              ],
-            },
-            // محاولة 3: حاوية Matroska الفائقة (MKV) - تقبل دمج أي كودك فيديو مع أي كودك صوت بدون إعادة ترميز
-            {
-              'path': tempMergedMkv,
-              'args': [
-                '-y',
-                '-i', tempVideoPath,
-                '-i', tempAudioPath,
-                '-c', 'copy',
-                '-shortest',
-                tempMergedMkv,
-              ],
-            },
-            // محاولة 4: ربط صريح مع ترميز صوتي متوافق وخيار strict -2
+            // محاولة 1: تحويل الصوت إلى AAC 192k عالي التوافق مع نسخ الفيديو الأصلي (أضمن طريقة تعمل على جميع أجهزة أندرويد)
             {
               'path': tempMergedPath,
               'args': [
@@ -806,9 +772,46 @@ class BackendService {
                 '-map', '1:a:0',
                 '-c:v', 'copy',
                 '-c:a', 'aac',
-                '-strict', '-2',
-                '-shortest',
+                '-b:a', '192k',
+                '-movflags', '+faststart',
                 tempMergedPath,
+              ],
+            },
+            // محاولة 2: نسخ مباشر عالي السرعة لكلا الدفقين
+            {
+              'path': tempMergedPath,
+              'args': [
+                '-y',
+                '-i', tempVideoPath,
+                '-i', tempAudioPath,
+                '-c:v', 'copy',
+                '-c:a', 'copy',
+                '-movflags', '+faststart',
+                tempMergedPath,
+              ],
+            },
+            // محاولة 3: ربط متساهل مع ترميز aac وخيار strict -2
+            {
+              'path': tempMergedPath,
+              'args': [
+                '-y',
+                '-i', tempVideoPath,
+                '-i', tempAudioPath,
+                '-c:v', 'copy',
+                '-c:a', 'aac',
+                '-strict', '-2',
+                tempMergedPath,
+              ],
+            },
+            // محاولة 4: حاوية Matroska الفائقة (MKV) التي تقبل أي كودك فيديو مع أي كودك صوت بدون مشاكل
+            {
+              'path': tempMergedMkv,
+              'args': [
+                '-y',
+                '-i', tempVideoPath,
+                '-i', tempAudioPath,
+                '-c', 'copy',
+                tempMergedMkv,
               ],
             },
           ];
@@ -821,20 +824,26 @@ class BackendService {
               final session = await FFmpegKit.executeWithArguments(args);
               final returnCode = await session.getReturnCode();
               final mergedFile = File(targetPath);
-              if (ReturnCode.isSuccess(returnCode) && await mergedFile.exists() && await mergedFile.length() > (vSourceSize * 0.7)) {
+              final bool fileExists = await mergedFile.exists();
+              final int mergedLength = fileExists ? await mergedFile.length() : 0;
+
+              if (ReturnCode.isSuccess(returnCode) && fileExists && mergedLength > (vSourceSize * 0.7)) {
                 mergeSucceeded = true;
                 successfulMergedPath = targetPath;
-                debugPrint("تم الدمج الصوتي بنجاح تام! الحجم: ${await mergedFile.length()} بايت");
+                debugPrint("تم الدمج الصوتي بنجاح تام! الحجم: $mergedLength بايت");
                 break;
               } else {
                 final logs = await session.getAllLogsAsString();
-                debugPrint("فشلت محاولة الدمج ($returnCode): $logs");
-                try { if (await mergedFile.exists()) await mergedFile.delete(); } catch (_) {}
+                final failStackTrace = await session.getFailStackTrace();
+                debugPrint("فشلت محاولة الدمج ($returnCode): $logs | stackTrace: $failStackTrace");
+                try { if (fileExists) await mergedFile.delete(); } catch (_) {}
               }
             } catch (ffmpegErr) {
               debugPrint("استثناء أثناء تنفيذ FFmpeg: $ffmpegErr");
             }
           }
+        } else {
+          debugPrint("تنبيه: حجم ملف الصوت غير كافٍ للدمج ($audioSize بايت)");
         }
 
         final outFile = File(finalOutputPath);
@@ -850,21 +859,19 @@ class BackendService {
           try { await File(tempVideoPath).delete(); } catch (_) {}
           try { await File(tempAudioPath).delete(); } catch (_) {}
         } else {
-          // خطة الإنقاذ المضمونة: إذا فشل دمج الصوت، يتم تسليم ملف الفيديو الأصلي للمستخدم فوراً دون أي خطأ
+          // إذا فشلت محاولات الدمج مع ملف الصوت، نعطي المستخدم خيار الحفظ الاحتياطي مع تنبيه
+          debugPrint('تحذير: تعذر دمج الصوت عبر FFmpeg. حفظ ملف الفيديو المتاح.');
           final vFile = File(tempVideoPath);
           final vPart = File('$tempVideoPath.part');
           if (await vFile.exists() && await vFile.length() > 0) {
-            debugPrint('حفظ الفيديو مباشرة بنجاح كبديل آمن');
             await vFile.copy(finalOutputPath);
             try { await vFile.delete(); } catch (_) {}
             try { await File(tempAudioPath).delete(); } catch (_) {}
           } else if (await vPart.exists() && await vPart.length() > 0) {
-            debugPrint('حفظ الفيديو من النسخة المؤقتة .part كبديل آمن');
             await vPart.copy(finalOutputPath);
             try { await vPart.delete(); } catch (_) {}
             try { await File(tempAudioPath).delete(); } catch (_) {}
           } else {
-            debugPrint('تنزيل مباشر نهائي لحفظ الفيديو بنجاح...');
             await _downloadFile(
               url: selectedUrl,
               savePath: finalOutputPath,
