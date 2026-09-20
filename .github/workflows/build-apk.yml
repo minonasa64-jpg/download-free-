@@ -179,13 +179,7 @@ jobs:
             sed -i -E 's/minSdk\s*=\s*flutter\.minSdkVersion/minSdk = 24/g' android/app/build.gradle || true
             sed -i -E 's/minifyEnabled\s+true/minifyEnabled false/g' android/app/build.gradle || true
             sed -i -E 's/shrinkResources\s+true/shrinkResources false/g' android/app/build.gradle || true
-            cat << 'EOF' >> android/app/build.gradle
-tasks.whenTaskAdded { task ->
-    if (task.name.toLowerCase().contains("aarmetadata")) {
-        task.enabled = false
-    }
-}
-EOF
+            echo 'tasks.whenTaskAdded { task -> if (task.name.toLowerCase().contains("aarmetadata")) { task.enabled = false } }' >> android/app/build.gradle
           fi
           if [ -f "android/app/build.gradle.kts" ]; then
             sed -i -E 's/minSdk\s*=\s*[0-9]+/minSdk = 24/g' android/app/build.gradle.kts || true
