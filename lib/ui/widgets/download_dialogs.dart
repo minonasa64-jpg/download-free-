@@ -331,14 +331,22 @@ class _BatchDownloadProgressDialogState extends State<BatchDownloadProgressDialo
           }
         } else {
           final videos = List<Map<String, dynamic>>.from(mediaData['video'] ?? []);
-          // نفضل صيغة muxed لتسريع التنزيل الدفعي
-          final directVideo = videos.firstWhere(
-            (v) => v['needs_merge'] == false,
-            orElse: () => videos.isNotEmpty ? videos.first : {'url': '', 'needs_merge': false},
-          );
-          selectedUrl = directVideo['url'] ?? '';
-          targetTag = directVideo['tag'];
-          needsMerge = directVideo['needs_merge'] ?? false;
+          // ترتيب الجودات تنازلياً لاختيار أقصى جودة متوفرة (1080p Full HD)
+          videos.sort((a, b) {
+            int orderA = a['quality_order'] is int
+                ? a['quality_order']
+                : (int.tryParse(a['quality_order']?.toString() ?? '') ?? 0);
+            int orderB = b['quality_order'] is int
+                ? b['quality_order']
+                : (int.tryParse(b['quality_order']?.toString() ?? '') ?? 0);
+            return orderB.compareTo(orderA);
+          });
+
+          // نختار أعلى دقة (1080p FHD أو أعلى المتاح)
+          final topVideo = videos.isNotEmpty ? videos.first : {'url': '', 'needs_merge': false};
+          selectedUrl = topVideo['url'] ?? '';
+          targetTag = topVideo['tag'];
+          needsMerge = topVideo['needs_merge'] ?? false;
         }
 
         if (selectedUrl.isEmpty) {

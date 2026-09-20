@@ -115,11 +115,21 @@ class _LinksTabState extends State<LinksTab> {
             );
             setState(() => _isAnalyzing = false);
           } else {
+            final processedVideos = _processFormats(List<Map<String, dynamic>>.from(videoList));
+            final processedAudios = _processFormats(List<Map<String, dynamic>>.from(audioList));
+            Map<String, dynamic>? initialFormat;
+            if (processedVideos.isNotEmpty) {
+              initialFormat = processedVideos.first; // أعلى جودة تلقائياً (1080p Full HD)
+            } else if (processedAudios.isNotEmpty) {
+              initialFormat = processedAudios.first;
+            }
+
             setState(() {
               _mediaData = result;
               _isPlaylist = false;
               _hasResult = true;
               _isAnalyzing = false;
+              _selectedFormat = initialFormat;
             });
           }
         }
@@ -774,7 +784,7 @@ class _LinksTabState extends State<LinksTab> {
                   ],
                 ),
                 SizedBox(
-                  height: 220,
+                  height: 270,
                   child: TabBarView(
                     children: [
                       _buildFormatList(videoList, Icons.play_circle_outline),
@@ -999,7 +1009,7 @@ class _LinksTabState extends State<LinksTab> {
     }
     var sortedList = uniqueFormats.values.toList();
 
-    // ترتيب القائمة تصاعدياً من أدنى جودة إلى أعلى جودة
+    // ترتيب القائمة تنازلياً من أعلى جودة (1080p Full HD أو أعلى) إلى أدنى جودة
     sortedList.sort((a, b) {
       int orderA = a['quality_order'] is int 
           ? a['quality_order'] 
@@ -1009,11 +1019,11 @@ class _LinksTabState extends State<LinksTab> {
           : (int.tryParse(b['quality_order']?.toString() ?? '') ?? 0);
       
       if (orderA != 0 && orderB != 0 && orderA != orderB) {
-        return orderA.compareTo(orderB);
+        return orderB.compareTo(orderA); // أعلى جودة أولاً
       }
       double sizeA = double.tryParse(a['size'].toString()) ?? 0.0;
       double sizeB = double.tryParse(b['size'].toString()) ?? 0.0;
-      return sizeA.compareTo(sizeB);
+      return sizeB.compareTo(sizeA); // الأكبر حجماً أولاً
     });
     return sortedList;
   }
@@ -1034,6 +1044,10 @@ class _LinksTabState extends State<LinksTab> {
         final isSelected = _selectedFormat == format;
         final String? badge = format['quality_badge'];
         final String? desc = format['quality_desc'];
+        final int order = format['quality_order'] is int 
+            ? format['quality_order'] 
+            : (int.tryParse(format['quality_order']?.toString() ?? '') ?? 0);
+        final bool isHighDef = order >= 1080;
 
         return InkWell(
           onTap: () {
@@ -1042,7 +1056,9 @@ class _LinksTabState extends State<LinksTab> {
             });
           },
           child: Container(
-            color: isSelected ? AppColors.cyan.withOpacity(0.1) : Colors.transparent,
+            color: isSelected 
+                ? AppColors.cyan.withOpacity(0.12) 
+                : (isHighDef ? Colors.white.withOpacity(0.02) : Colors.transparent),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1051,7 +1067,7 @@ class _LinksTabState extends State<LinksTab> {
                   padding: const EdgeInsets.only(top: 2),
                   child: Icon(
                     isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                    color: isSelected ? AppColors.cyan : AppColors.textMuted,
+                    color: isSelected ? AppColors.cyan : (isHighDef ? AppColors.cyan.withOpacity(0.7) : AppColors.textMuted),
                     size: 20,
                   ),
                 ),
@@ -1065,7 +1081,9 @@ class _LinksTabState extends State<LinksTab> {
                           Text(
                             format['quality_name'],
                             style: TextStyle(
-                              color: isSelected ? AppColors.cyan : AppColors.textPrimary,
+                              color: isSelected 
+                                  ? AppColors.cyan 
+                                  : (isHighDef ? Colors.white : AppColors.textPrimary),
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
                             ),
@@ -1077,16 +1095,26 @@ class _LinksTabState extends State<LinksTab> {
                               decoration: BoxDecoration(
                                 color: isSelected 
                                     ? AppColors.cyan.withOpacity(0.2) 
-                                    : AppColors.surfaceLight,
+                                    : (isHighDef ? AppColors.cyan.withOpacity(0.15) : AppColors.surfaceLight),
                                 borderRadius: BorderRadius.circular(4),
+                                border: isHighDef ? Border.all(color: AppColors.cyan.withOpacity(0.4), width: 0.8) : null,
                               ),
-                              child: Text(
-                                badge,
-                                style: TextStyle(
-                                  color: isSelected ? AppColors.cyan : AppColors.textSecondary,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isHighDef) ...[
+                                    const Icon(Icons.star_rounded, color: AppColors.cyan, size: 11),
+                                    const SizedBox(width: 2),
+                                  ],
+                                  Text(
+                                    badge,
+                                    style: TextStyle(
+                                      color: isSelected || isHighDef ? AppColors.cyan : AppColors.textSecondary,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],

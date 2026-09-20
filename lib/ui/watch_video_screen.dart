@@ -203,11 +203,11 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
           : (int.tryParse(b['quality_order']?.toString() ?? '') ?? 0);
 
       if (orderA != 0 && orderB != 0 && orderA != orderB) {
-        return orderA.compareTo(orderB);
+        return orderB.compareTo(orderA); // أعلى جودة أولاً (1080p FHD)
       }
       double sizeA = double.tryParse(a['size'].toString()) ?? 0.0;
       double sizeB = double.tryParse(b['size'].toString()) ?? 0.0;
-      return sizeA.compareTo(sizeB);
+      return sizeB.compareTo(sizeA); // الأكبر حجماً أولاً
     });
     return sortedList;
   }

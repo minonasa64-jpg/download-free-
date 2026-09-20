@@ -112,10 +112,10 @@ class UniversalExtractorService {
         if (hdPlayUrl.isNotEmpty) {
           videoFormats.add({
             'url': hdPlayUrl,
-            'quality_name': 'عالي الدقة HD (بدون علامة مائية)',
+            'quality_name': 'عالي الدقة 1080p Full HD (بدون علامة مائية)',
             'quality_order': 1080,
-            'quality_badge': 'HD فائقة',
-            'quality_desc': 'جودة فائقة الوضوح وبدون أي علامة مائية',
+            'quality_badge': '1080p FHD',
+            'quality_desc': 'أقصى جودة فائقة 1080p Full HD وبدون أي علامة مائية',
             'size': (sizeMb * 1.3).toStringAsFixed(1),
             'size_bytes': (sizeBytes * 1.3).toInt(),
             'ext': 'mp4',
@@ -127,9 +127,9 @@ class UniversalExtractorService {
         if (playUrl.isNotEmpty) {
           videoFormats.add({
             'url': playUrl,
-            'quality_name': 'بدون علامة مائية (سريع)',
+            'quality_name': 'عالي الدقة 720p HD (بدون علامة مائية)',
             'quality_order': 720,
-            'quality_badge': 'HD متوازن',
+            'quality_badge': '720p HD',
             'quality_desc': 'تنزيل سريع وبجودة عالية خالية من العلامة المائية',
             'size': sizeMb.toStringAsFixed(1),
             'size_bytes': sizeBytes,
@@ -649,10 +649,10 @@ class UniversalExtractorService {
     final List<Map<String, dynamic>> videoFormats = [
       {
         'url': videoUrl,
-        'quality_name': 'عالي الجودة MP4 (الأصلية)',
+        'quality_name': 'عالي الدقة 1080p Full HD (الأصلية)',
         'quality_order': 1080,
-        'quality_badge': 'HD فائقة',
-        'quality_desc': 'جودة الفيديو الكاملة والأصلية من المصدر',
+        'quality_badge': '1080p FHD',
+        'quality_desc': 'أقصى دقة وجودة فيديو فائقة وكاملة من المصدر',
         'size': 'جاهز',
         'size_bytes': 0,
         'ext': 'mp4',
@@ -661,10 +661,10 @@ class UniversalExtractorService {
       },
       {
         'url': videoUrl,
-        'quality_name': 'جودة قياسية متوازنة MP4',
+        'quality_name': 'عالي الدقة 720p HD (تنزيل سريع)',
         'quality_order': 720,
-        'quality_badge': 'SD متوازن',
-        'quality_desc': 'تنزيل سريع بحجم اقتصادي',
+        'quality_badge': '720p HD',
+        'quality_desc': 'تنزيل سريع بحجم اقتصادي متوازن',
         'size': 'سريع',
         'size_bytes': 0,
         'ext': 'mp4',

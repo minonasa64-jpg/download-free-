@@ -210,8 +210,8 @@ class BackendService {
       desc = 'عالية الدقة HD • توازن مثالي بين نقاء الصورة وسرعة التحميل';
     } else if (lower.contains('1080')) {
       order = 1080;
-      badge = 'فائقة FHD';
-      desc = 'دقة فائقة Full HD • تفاصيل سينمائية كريستالية ونقاء مذهل';
+      badge = '1080p FHD';
+      desc = 'دقة فائقة 1080p Full HD • تفاصيل سينمائية كريستالية ونقاء مذهل';
     } else if (lower.contains('1440') || lower.contains('2k')) {
       order = 1440;
       badge = '2K Quad HD';
@@ -329,6 +329,16 @@ class BackendService {
           'needs_merge': false,
         });
       }
+
+      // ترتيب دفقات الفيديو تنازلياً من أقصى جودة (4K / 2K / 1080p FHD) إلى أقل جودة لضمان تقديم أعلى دقة تلقائياً
+      videoFormats.sort((a, b) {
+        int orderA = a['quality_order'] is int ? a['quality_order'] : 0;
+        int orderB = b['quality_order'] is int ? b['quality_order'] : 0;
+        if (orderA != orderB) return orderB.compareTo(orderA);
+        int sizeA = a['size_bytes'] is int ? a['size_bytes'] : 0;
+        int sizeB = b['size_bytes'] is int ? b['size_bytes'] : 0;
+        return sizeB.compareTo(sizeA);
+      });
 
       List<Map<String, dynamic>> audioFormats = [];
       for (var stream in manifest.audioOnly) {
@@ -1019,6 +1029,23 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
           final isAudioDownload = savePath.contains('raw_a_') || savePath.contains('aud_') || savePath.endsWith('.mp3') || savePath.endsWith('.m4a') || savePath.endsWith('.dat');
           if (isAudioDownload && manifest.audioOnly.isNotEmpty) {
             selectedStream = manifest.audioOnly.withHighestBitrate();
+          } else if (manifest.videoOnly.isNotEmpty) {
+            final videoList = manifest.videoOnly.toList();
+            // البحث أولاً عن دفق 1080p عالي الجودة بصيغة MP4
+            final fhdMp4 = videoList.where((s) => s.qualityLabel.contains('1080') && s.container.name.toLowerCase() == 'mp4').toList();
+            if (fhdMp4.isNotEmpty) {
+              fhdMp4.sort((a, b) => b.bitrate.compareTo(a.bitrate));
+              selectedStream = fhdMp4.first;
+            } else {
+              final fhdAny = videoList.where((s) => s.qualityLabel.contains('1080')).toList();
+              if (fhdAny.isNotEmpty) {
+                fhdAny.sort((a, b) => b.bitrate.compareTo(a.bitrate));
+                selectedStream = fhdAny.first;
+              } else {
+                videoList.sort((a, b) => b.size.totalBytes.compareTo(a.size.totalBytes));
+                selectedStream = videoList.first;
+              }
+            }
           } else if (manifest.muxed.isNotEmpty) {
             final muxedList = manifest.muxed.toList();
             muxedList.sort((a, b) => b.size.totalBytes.compareTo(a.size.totalBytes));
