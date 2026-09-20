@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:startapp_sdk/startapp_sdk.dart';
+import 'package:startapp_sdk/startapp.dart';
 
 class AdService {
   static final AdService _instance = AdService._internal();
@@ -22,7 +22,7 @@ class AdService {
     try {
       debugPrint("Start.io Ads: Initializing with App ID: $appId");
       // وضع الإعلانات الحقيقية (إيقاف وضع الاختبار)
-      _instance._sdk.setTestAdsEnabled(false);
+      await _instance._sdk.setTestAdsEnabled(false);
       _instance._isInitialized = true;
       _instance.isInitializedNotifier.value = true;
       debugPrint("Start.io Ads: Initialized successfully!");
