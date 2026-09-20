@@ -208,8 +208,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v1.2.9"
-          RELEASE_TITLE="Boykta Pro v1.2.9 - إصلاح دمج الصوت بدقة عالية وظهور إعلانات البنر"
+          TAG="v1.3.0"
+          RELEASE_TITLE="Boykta Pro v1.3.0 - استعادة استقرار التنزيل وحل مشكلة دمج الصوت 100%"
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           
           NOTES="🚀 **Boykta Pro v1.2.8** - تحديث استقرار التنزيل ونظام Unity Ads!
