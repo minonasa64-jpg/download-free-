@@ -554,8 +554,8 @@ class UniversalExtractorService {
         r"<video[^>]*src='([^']+\.(?:mp4|m3u8|webm|mov|m4v)[^']*)'",
         r'"contentUrl":\s*"([^"]+\.(?:mp4|m3u8|webm|mov|m4v)[^"]*)"',
         r'"videoUrl":\s*"([^"]+\.(?:mp4|m3u8|webm|mov|m4v)[^"]*)"',
-        r'https?:\\?/\\?/[^"\'\s]+\.(?:mp4|m3u8|webm|mov|m4v)(?:\?[^"\'\s]*)?',
-        r'https?://[^"\'\s]+\.(?:mp4|m3u8|webm|mov|m4v)(?:\?[^"\'\s]*)?',
+        r'''https?:\\?/\\?/[^"'\s]+\.(?:mp4|m3u8|webm|mov|m4v)(?:\?[^"'\s]*)?''',
+        r'''https?://[^"'\s]+\.(?:mp4|m3u8|webm|mov|m4v)(?:\?[^"'\s]*)?''',
       ];
 
       String? foundVideoUrl;
