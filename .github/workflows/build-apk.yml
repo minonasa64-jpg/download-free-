@@ -138,12 +138,8 @@ jobs:
           allprojects {
               configurations.all {
                   resolutionStrategy.eachDependency { DependencyResolveDetails details ->
-                      if (details.requested.group == 'com.arthenica') {
-                          if (details.requested.name.contains('ffmpeg-kit')) {
-                              details.useTarget group: 'dev.ffmpegkit-maintained', name: details.requested.name, version: '8.1.7'
-                          } else {
-                              details.useTarget group: 'dev.ffmpegkit-maintained', name: 'ffmpeg-kit-full', version: '8.1.7'
-                          }
+                      if (details.requested.group == 'com.arthenica' || details.requested.group == 'dev.ffmpegkit-maintained') {
+                          details.useTarget group: 'dev.ffmpegkit-maintained', name: 'ffmpeg-kit-full', version: '8.1.7'
                       }
                   }
               }
@@ -208,8 +204,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v1.3.0"
-          RELEASE_TITLE="Boykta Pro v1.3.0 - استعادة استقرار التنزيل وحل مشكلة دمج الصوت 100%"
+          TAG="v1.3.1"
+          RELEASE_TITLE="Boykta Pro v1.3.1 - حل جذري لدمج الصوت مع الفيديو بتوافقية تامة 100% (AAC Native Stream Copy & FFmpeg Full)"
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           
           NOTES="🚀 **Boykta Pro v1.2.8** - تحديث استقرار التنزيل ونظام Unity Ads!

@@ -977,7 +977,18 @@ class _LinksTabState extends State<LinksTab> {
     if (formats.isEmpty) return [];
     var uniqueFormats = <String, Map<String, dynamic>>{};
     for (var f in formats) {
-      uniqueFormats[f['quality_name']] = f;
+      final key = f['quality_name']?.toString() ?? '';
+      // نفضل الدفق المدمج مسبقاً (muxed) أو صيغة mp4 (H.264) لتفادي أي مشاكل ترميز
+      if (!uniqueFormats.containsKey(key)) {
+        uniqueFormats[key] = f;
+      } else {
+        final existing = uniqueFormats[key]!;
+        if (existing['needs_merge'] == true && f['needs_merge'] == false) {
+          uniqueFormats[key] = f;
+        } else if (existing['container'] != 'mp4' && f['container'] == 'mp4') {
+          uniqueFormats[key] = f;
+        }
+      }
     }
     var sortedList = uniqueFormats.values.toList();
 

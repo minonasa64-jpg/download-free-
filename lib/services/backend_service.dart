@@ -298,6 +298,7 @@ class BackendService {
           'quality_desc': qInfo['desc'],
           'size': stream.size.totalMegaBytes.toStringAsFixed(1),
           'size_bytes': stream.size.totalBytes,
+          'container': stream.container.name.toLowerCase(),
           'ext': 'mp4', 
           'needs_merge': true,
         });
@@ -339,9 +340,20 @@ class BackendService {
         });
       }
 
-      final highestAudioStream = manifest.audioOnly.withHighestBitrate();
-      String highestAudioUrl = highestAudioStream.url.toString();
-      int highestAudioTag = highestAudioStream.tag;
+      // نفضل أولاً دفق الصوت MP4 (AAC - itag 140) لضمان التوافق التام 100% مع حاوية MP4 ومشغلات أندرويد
+      AudioOnlyStreamInfo? compatibleAudioStream;
+      final mp4AudioStreams = manifest.audioOnly
+          .where((s) => s.container.name.toLowerCase() == 'mp4')
+          .toList();
+      if (mp4AudioStreams.isNotEmpty) {
+        mp4AudioStreams.sort((a, b) => b.bitrate.compareTo(a.bitrate));
+        compatibleAudioStream = mp4AudioStreams.first;
+      } else if (manifest.audioOnly.isNotEmpty) {
+        compatibleAudioStream = manifest.audioOnly.withHighestBitrate();
+      }
+
+      String highestAudioUrl = compatibleAudioStream?.url.toString() ?? '';
+      int highestAudioTag = compatibleAudioStream?.tag ?? 140;
 
       List<Map<String, dynamic>> subtitlesList = [];
       try {
@@ -636,7 +648,7 @@ class BackendService {
       } else {
         // أسماء مؤقتة آمنة تماماً خالية من أي حروف خاصة أو مسافات لتفادي مشاكل FFmpeg
         final tempVideoPath = '${tempDir.path}/raw_v_${notifId}.mp4';
-        final tempAudioPath = '${tempDir.path}/raw_a_${notifId}.dat';
+        final tempAudioPath = '${tempDir.path}/raw_a_${notifId}.m4a';
         final tempMergedPath = '${tempDir.path}/merged_${notifId}.mp4';
 
         try { if (await File(tempVideoPath).exists()) await File(tempVideoPath).delete(); } catch (_) {}
@@ -665,7 +677,7 @@ class BackendService {
           throw Exception('تعذر تحميل دفق الفيديو.');
         }
 
-        // 2. تنزيل دفق الصوت الأصلي
+        // 2. تنزيل دفق الصوت الأصلي (AAC/MP4 متوافق 100% مع كافة مشغلات أندرويد)
         onStatusChanged('جاري تحميل الصوت الأصلي للدمج...');
         task.status = 'جاري تحميل الصوت للدمج...';
         activeDownloads.value = List.from(activeDownloads.value);
@@ -673,16 +685,23 @@ class BackendService {
         String audioUrlToDownload = highestAudioUrl;
         int? audioTagToDownload = highestAudioTag;
 
-        // في حال عدم توفر رابط الصوت أو انتهاء صلاحيته، يتم استخراجه من المانيفست المحدث
-        if ((audioUrlToDownload.isEmpty || audioTagToDownload == null) && videoId != null && videoId.isNotEmpty) {
+        // في حال عدم توفر رابط صوتي أو كان دفق Opus غير متوافق، نضمن جلب دفق MP4 (AAC - itag 140)
+        if (videoId != null && videoId.isNotEmpty) {
           try {
             StreamManifest? m = _streamManifestCache[videoId];
             m ??= await _yt.videos.streamsClient.getManifest(videoId);
             _streamManifestCache[videoId] = m;
-            if (m.audioOnly.isNotEmpty) {
-              final bestAudio = m.audioOnly.withHighestBitrate();
-              audioUrlToDownload = bestAudio.url.toString();
-              audioTagToDownload = bestAudio.tag;
+            if (audioUrlToDownload.isEmpty || audioTagToDownload == null || audioTagToDownload == 251) {
+              final mp4Audios = m.audioOnly.where((s) => s.container.name.toLowerCase() == 'mp4').toList();
+              if (mp4Audios.isNotEmpty) {
+                mp4Audios.sort((a, b) => b.bitrate.compareTo(a.bitrate));
+                audioUrlToDownload = mp4Audios.first.url.toString();
+                audioTagToDownload = mp4Audios.first.tag;
+              } else if (m.audioOnly.isNotEmpty) {
+                final best = m.audioOnly.withHighestBitrate();
+                audioUrlToDownload = best.url.toString();
+                audioTagToDownload = best.tag;
+              }
             }
           } catch (e) {
             debugPrint('تعذر جلب دفق الصوت الإضافي: $e');
@@ -713,12 +732,22 @@ class BackendService {
 
         if (audioSize > 1024) {
           final List<List<String>> ffmpegAttempts = [
+            // محاولة 1: نسخ مباشر عالي السرعة لكلا الدفقين (Stream Copy H.264 + AAC) - بدون أي فقد جودة
             [
               '-y',
               '-i', tempVideoPath,
               '-i', tempAudioPath,
-              '-map', '0:v:0',
-              '-map', '1:a:0',
+              '-c:v', 'copy',
+              '-c:a', 'copy',
+              '-movflags', '+faststart',
+              '-shortest',
+              tempMergedPath,
+            ],
+            // محاولة 2: نسخ الفيديو مع ترميز الصوت إلى AAC 192k المتوافق عالمياً
+            [
+              '-y',
+              '-i', tempVideoPath,
+              '-i', tempAudioPath,
               '-c:v', 'copy',
               '-c:a', 'aac',
               '-b:a', '192k',
@@ -726,6 +755,20 @@ class BackendService {
               '-shortest',
               tempMergedPath,
             ],
+            // محاولة 3: ربط صريح لمسار الفيديو ومسار الصوت مع النسخ
+            [
+              '-y',
+              '-i', tempVideoPath,
+              '-i', tempAudioPath,
+              '-map', '0:v:0',
+              '-map', '1:a:0',
+              '-c:v', 'copy',
+              '-c:a', 'copy',
+              '-movflags', '+faststart',
+              '-shortest',
+              tempMergedPath,
+            ],
+            // محاولة 4: ربط صريح مع ترميز AAC وخيار strict -2
             [
               '-y',
               '-i', tempVideoPath,
@@ -738,16 +781,7 @@ class BackendService {
               '-shortest',
               tempMergedPath,
             ],
-            [
-              '-y',
-              '-i', tempVideoPath,
-              '-i', tempAudioPath,
-              '-map', '0:v:0',
-              '-map', '1:a:0',
-              '-c', 'copy',
-              '-shortest',
-              tempMergedPath,
-            ],
+            // محاولة 5: ترميز الصوت بدون أعلام إضافية
             [
               '-y',
               '-i', tempVideoPath,
@@ -765,9 +799,9 @@ class BackendService {
               final session = await FFmpegKit.executeWithArguments(args);
               final returnCode = await session.getReturnCode();
               final mergedFile = File(tempMergedPath);
-              if (ReturnCode.isSuccess(returnCode) && await mergedFile.exists() && await mergedFile.length() > videoSize) {
+              if (ReturnCode.isSuccess(returnCode) && await mergedFile.exists() && await mergedFile.length() > (videoSize * 0.85)) {
                 mergeSucceeded = true;
-                debugPrint("تم الدمج الصوتي بنجاح تام عبر FFmpeg!");
+                debugPrint("تم الدمج الصوتي بنجاح تام عبر FFmpeg! الحجم: ${await mergedFile.length()} بايت");
                 break;
               } else {
                 final logs = await session.getAllLogsAsString();
@@ -792,15 +826,9 @@ class BackendService {
           try { await File(tempVideoPath).delete(); } catch (_) {}
           try { await File(tempAudioPath).delete(); } catch (_) {}
         } else {
-          debugPrint('تنبيه: تعذر إتمام الدمج، جاري نقل دفق الفيديو الأصلي');
-          final vFile = File(tempVideoPath);
-          if (await vFile.exists()) {
-            await vFile.copy(finalOutputPath);
-            try { await vFile.delete(); } catch (_) {}
-            try { await File(tempAudioPath).delete(); } catch (_) {}
-          } else {
-            throw Exception('فشل التنزيل أو الدمج.');
-          }
+          try { await File(tempVideoPath).delete(); } catch (_) {}
+          try { await File(tempAudioPath).delete(); } catch (_) {}
+          throw Exception('تعذر إتمام دمج الصوت مع الفيديو بدقة عالية عبر FFmpeg. يرجى اختيار جودة أخرى أو إعادة المحاولة.');
         }
       }
 
