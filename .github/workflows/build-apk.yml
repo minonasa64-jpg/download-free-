@@ -44,6 +44,7 @@ jobs:
           perms = [
               'android.permission.INTERNET',
               'android.permission.ACCESS_NETWORK_STATE',
+              'android.permission.ACCESS_WIFI_STATE',
               'android.permission.WRITE_EXTERNAL_STORAGE',
               'android.permission.READ_EXTERNAL_STORAGE',
               'android.permission.READ_MEDIA_VIDEO',
@@ -66,6 +67,12 @@ jobs:
           if app is not None:
               app.set('{http://schemas.android.com/apk/res/android}largeHeap', 'true')
               app.set('{http://schemas.android.com/apk/res/android}requestLegacyExternalStorage', 'true')
+
+              # Start.io (StartApp) App ID metadata injection
+              startapp_meta = ET.Element('meta-data')
+              startapp_meta.set('{http://schemas.android.com/apk/res/android}name', 'com.startapp.sdk.APPLICATION_ID')
+              startapp_meta.set('{http://schemas.android.com/apk/res/android}value', '208601935')
+              app.append(startapp_meta)
 
               for act in app.findall('activity'):
                   act.set('{http://schemas.android.com/apk/res/android}supportsPictureInPicture', 'true')
@@ -204,8 +211,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v1.3.1"
-          RELEASE_TITLE="Boykta Pro v1.3.1 - حل جذري لدمج الصوت مع الفيديو بتوافقية تامة 100% (AAC Native Stream Copy & FFmpeg Full)"
+          TAG="v1.3.2"
+          RELEASE_TITLE="Boykta Pro v1.3.2 - تكامل إعلانات Start.io (App ID: 208601935) وحل مشكلة دمج الصوت"
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           
           NOTES="🚀 **Boykta Pro v1.2.8** - تحديث استقرار التنزيل ونظام Unity Ads!

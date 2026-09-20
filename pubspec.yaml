@@ -33,7 +33,7 @@ dependencies:
   audioplayers: ^5.2.1
 
   flutter_local_notifications: ^17.1.2
-  unity_ads_plugin: ^0.5.0
+  startapp_sdk: ^1.0.1
   local_auth: ^2.2.0
   webview_flutter: ^4.7.0
 

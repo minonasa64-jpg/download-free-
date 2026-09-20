@@ -1,166 +1,114 @@
-import "package:flutter/foundation.dart";
-import "package:flutter/material.dart";
-import "package:unity_ads_plugin/unity_ads_plugin.dart";
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:startapp_sdk/startapp_sdk.dart';
 
-/// خدمة إدارة وتنسيق إعلانات Unity Ads الرسمية لتطبيق Boykta
 class AdService {
   static final AdService _instance = AdService._internal();
   factory AdService() => _instance;
   AdService._internal();
 
-  // رقم تعريف اللعبة الرسمي من Unity Ads لأجهزة Android
-  static const String gameId = "800377154";
+  // معرّف تطبيق Start.io (StartApp App ID)
+  static const String appId = "208601935";
 
-  // المعرف الأساسي للمنظمة (Unity Organization ID)
-  static const String organizationId = "11270715503405";
-
-  // معرّفات الوحدات الإعلانية الرسمية المطابقة للوحة تحكم Unity
-  // معرّف إعلان البنر (اللافتة): BP_Banner_Android
-  static const String primaryBannerPlacementId = "BP_Banner_Android";
-  static const String fallbackBannerPlacementId = "Banner_Android";
-
-  // معرّف الإعلان الخلالي (الشاشة الكاملة): BP_Interstitial_Android
-  static const String primaryInterstitialPlacementId = "BP_Interstitial_Android";
-  static const String fallbackInterstitialPlacementId = "Interstitial_Android";
-
+  final StartAppSdk _sdk = StartAppSdk();
   bool _isInitialized = false;
-  bool _isInterstitialLoading = false;
-  bool _isInterstitialLoaded = false;
-  String _activeInterstitialPlacement = primaryInterstitialPlacementId;
-
   final ValueNotifier<bool> isInitializedNotifier = ValueNotifier<bool>(false);
 
-  bool get isInitialized => _isInitialized;
-  bool get isInterstitialLoaded => _isInterstitialLoaded;
-  String get activeInterstitialPlacement => _activeInterstitialPlacement;
+  StartAppInterstitialAd? _interstitialAd;
+  bool _isInterstitialLoading = false;
 
-  // تهيئة نظام Unity Ads
-  static Future<void> init({bool? testMode}) async {
-    // تفعيل وضع الاختبار تلقائياً للمشاريع غير المنشورة في المتجر لضمان ظهور الإعلانات فوراً للمستخدمين
-    final bool useTestMode = testMode ?? true;
+  // تهيئة نظام إعلانات Start.io
+  static Future<void> init() async {
     try {
-      debugPrint("Unity Ads: Initializing with Game ID: $gameId (testMode: $useTestMode)...");
-      await UnityAds.init(
-        gameId: gameId,
-        testMode: useTestMode,
-        onComplete: () {
-          _instance._isInitialized = true;
-          _instance.isInitializedNotifier.value = true;
-          debugPrint("Unity Ads: Initialized successfully with Game ID: $gameId (testMode: $useTestMode)");
-          _instance.loadInterstitialAd();
-        },
-        onFailed: (error, message) {
-          _instance._isInitialized = false;
-          _instance.isInitializedNotifier.value = false;
-          debugPrint("Unity Ads: Initialization failed: $error - $message");
-          
-          if (!useTestMode) {
-            debugPrint("Unity Ads: Retrying initialization with testMode: true...");
-            UnityAds.init(
-              gameId: gameId,
-              testMode: true,
-              onComplete: () {
-                _instance._isInitialized = true;
-                _instance.isInitializedNotifier.value = true;
-                debugPrint("Unity Ads: Fallback testMode initialized successfully!");
-                _instance.loadInterstitialAd();
-              },
-              onFailed: (err, msg) {
-                debugPrint("Unity Ads: Fallback testMode also failed: $err - $msg");
-              },
-            );
-          }
-        },
-      );
+      debugPrint("Start.io Ads: Initializing with App ID: $appId");
+      // وضع الإعلانات الحقيقية (إيقاف وضع الاختبار)
+      _instance._sdk.setTestAdsEnabled(false);
+      _instance._isInitialized = true;
+      _instance.isInitializedNotifier.value = true;
+      debugPrint("Start.io Ads: Initialized successfully!");
+
+      // تحميل إعلان بيني مسبقاً في الخلفية
+      _instance.loadInterstitialAd();
     } catch (e) {
-      debugPrint("Unity Ads Init Exception: $e");
+      debugPrint("Start.io Ads Init Exception: $e");
+      _instance._isInitialized = false;
+      _instance.isInitializedNotifier.value = false;
     }
   }
 
-  // تحميل الإعلان البيني مسبقاً في الخلفية مع دعم المعرّف الأساسي والاحتياطي
+  // تحميل الإعلان البيني مسبقاً في الخلفية
   void loadInterstitialAd() {
     if (_isInterstitialLoading) return;
     _isInterstitialLoading = true;
 
-    _loadInterstitialWithPlacement(_activeInterstitialPlacement);
-  }
-
-  void _loadInterstitialWithPlacement(String placementId) {
     try {
-      debugPrint("Unity Ads: Loading interstitial on placement: $placementId");
-      UnityAds.load(
-        placementId: placementId,
-        onComplete: (loadedId) {
-          _isInterstitialLoaded = true;
-          _isInterstitialLoading = false;
-          _activeInterstitialPlacement = loadedId;
-          debugPrint("Unity Ads: Interstitial loaded successfully on: $loadedId");
+      debugPrint("Start.io: Loading interstitial ad...");
+      _sdk.loadInterstitialAd(
+        onAdDisplayed: () {
+          debugPrint("Start.io: Interstitial ad displayed");
         },
-        onFailed: (failedId, error, message) {
-          _isInterstitialLoaded = false;
+        onAdNotDisplayed: () {
+          debugPrint("Start.io: Interstitial ad not displayed");
+          _interstitialAd?.dispose();
+          _interstitialAd = null;
           _isInterstitialLoading = false;
-          debugPrint("Unity Ads: Interstitial failed to load on $failedId ($error: $message)");
-
-          // محاولة استخدام المعرف البديل إذا فشل المعرف الأساسي
-          if (failedId == primaryInterstitialPlacementId) {
-            debugPrint("Unity Ads: Retrying with fallback placement: $fallbackInterstitialPlacementId");
-            _activeInterstitialPlacement = fallbackInterstitialPlacementId;
-            _isInterstitialLoading = true;
-            _loadInterstitialWithPlacement(fallbackInterstitialPlacementId);
-          } else {
-            // إعادة ضبط للمعرف الأساسي للمرة القادمة
-            _activeInterstitialPlacement = primaryInterstitialPlacementId;
-          }
         },
-      );
+        onAdHidden: () {
+          debugPrint("Start.io: Interstitial ad hidden");
+          _interstitialAd?.dispose();
+          _interstitialAd = null;
+          _isInterstitialLoading = false;
+          // إعادة تحميل إعلان جديد بعد الإغلاق ليكون جاهزاً للمرة القادمة
+          loadInterstitialAd();
+        },
+        onAdClicked: () {
+          debugPrint("Start.io: Interstitial ad clicked");
+        },
+      ).then((ad) {
+        _interstitialAd = ad;
+        _isInterstitialLoading = false;
+        debugPrint("Start.io: Interstitial ad loaded successfully!");
+      }).catchError((err) {
+        _isInterstitialLoading = false;
+        debugPrint("Start.io: Failed to load interstitial ad: $err");
+      });
     } catch (e) {
       _isInterstitialLoading = false;
-      debugPrint("Unity Ads: Interstitial load exception: $e");
+      debugPrint("Start.io: Interstitial load exception: $e");
     }
   }
 
   // إظهار الإعلان البيني عند التنزيل أو التنقل
   void showInterstitialAd({VoidCallback? onAdClosed}) {
-    if (!_isInitialized) {
-      debugPrint("Unity Ads not initialized yet. Proceeding without ad.");
+    if (!_isInitialized || _interstitialAd == null) {
+      debugPrint("Start.io: No interstitial ad ready. Proceeding without delay.");
       if (onAdClosed != null) onAdClosed();
+      loadInterstitialAd();
       return;
     }
 
     try {
-      final placementToShow = _activeInterstitialPlacement;
-      debugPrint("Unity Ads: Showing video ad on placement: $placementToShow");
-      UnityAds.showVideoAd(
-        placementId: placementToShow,
-        onStart: (placementId) => debugPrint("Unity Video Ad Started: $placementId"),
-        onClick: (placementId) => debugPrint("Unity Video Ad Clicked: $placementId"),
-        onSkipped: (placementId) {
-          debugPrint("Unity Video Ad Skipped: $placementId");
-          _isInterstitialLoaded = false;
-          loadInterstitialAd();
-          if (onAdClosed != null) onAdClosed();
-        },
-        onComplete: (placementId) {
-          debugPrint("Unity Video Ad Completed: $placementId");
-          _isInterstitialLoaded = false;
-          loadInterstitialAd();
-          if (onAdClosed != null) onAdClosed();
-        },
-        onFailed: (placementId, error, message) {
-          debugPrint("Unity Video Ad Show Failed: $placementId ($error: $message)");
-          _isInterstitialLoaded = false;
-          loadInterstitialAd();
-          if (onAdClosed != null) onAdClosed();
-        },
-      );
+      debugPrint("Start.io: Showing interstitial ad...");
+      _interstitialAd!.show().then((shown) {
+        debugPrint("Start.io: Interstitial show returned: $shown");
+        if (onAdClosed != null) onAdClosed();
+        _interstitialAd = null;
+        loadInterstitialAd();
+      }).catchError((err) {
+        debugPrint("Start.io: Error showing interstitial ad: $err");
+        if (onAdClosed != null) onAdClosed();
+        _interstitialAd = null;
+        loadInterstitialAd();
+      });
     } catch (e) {
-      debugPrint("Unity Show Video Ad Exception: $e");
-      loadInterstitialAd();
+      debugPrint("Start.io: Show Interstitial Exception: $e");
       if (onAdClosed != null) onAdClosed();
+      _interstitialAd = null;
+      loadInterstitialAd();
     }
   }
 
-  // بناء ويدجت شريط البنر الإعلاني الذكي مع التبديل التلقائي إلى المعرف الاحتياطي
+  // بناء ويدجت شريط البنر الإعلاني الذكي
   Widget buildBannerWidget({
     VoidCallback? onLoaded,
     Function(String, dynamic, String)? onFailed,
@@ -171,7 +119,7 @@ class AdService {
         if (!initialized) {
           return const SizedBox.shrink();
         }
-        return _SmartUnityBanner(
+        return _SmartStartAppBanner(
           onLoaded: onLoaded,
           onFailed: onFailed,
         );
@@ -180,25 +128,72 @@ class AdService {
   }
 }
 
-/// ويدجت داخلي ذكي لبنر Unity Ads يحاول تحميل المعرف الأساسي، وفي حال الفشل ينتقل فوراً للمعرف الاحتياطي
-class _SmartUnityBanner extends StatefulWidget {
+/// ويدجت شريط البنر الإعلاني لـ Start.io
+class _SmartStartAppBanner extends StatefulWidget {
   final VoidCallback? onLoaded;
   final Function(String, dynamic, String)? onFailed;
 
-  const _SmartUnityBanner({this.onLoaded, this.onFailed});
+  const _SmartStartAppBanner({this.onLoaded, this.onFailed});
 
   @override
-  State<_SmartUnityBanner> createState() => _SmartUnityBannerState();
+  State<_SmartStartAppBanner> createState() => _SmartStartAppBannerState();
 }
 
-class _SmartUnityBannerState extends State<_SmartUnityBanner> {
-  String _currentPlacement = AdService.primaryBannerPlacementId;
+class _SmartStartAppBannerState extends State<_SmartStartAppBanner> {
+  StartAppBannerAd? _bannerAd;
   bool _isAdLoaded = false;
   bool _hasFailed = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadBanner();
+  }
+
+  void _loadBanner() {
+    try {
+      StartAppSdk().loadBannerAd(
+        StartAppBannerType.BANNER,
+        onAdImpression: () {
+          debugPrint("Start.io Banner: Impression recorded");
+        },
+        onAdClicked: () {
+          debugPrint("Start.io Banner: Ad clicked");
+        },
+      ).then((ad) {
+        if (mounted) {
+          setState(() {
+            _bannerAd = ad;
+            _isAdLoaded = true;
+          });
+          if (widget.onLoaded != null) widget.onLoaded!();
+        }
+      }).catchError((err) {
+        debugPrint("Start.io Banner: Load failed: $err");
+        if (mounted) {
+          setState(() => _hasFailed = true);
+          if (widget.onFailed != null) {
+            widget.onFailed!("banner", err, err.toString());
+          }
+        }
+      });
+    } catch (e) {
+      debugPrint("Start.io Banner: Exception during load: $e");
+      if (mounted) {
+        setState(() => _hasFailed = true);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (_hasFailed) {
+    if (_hasFailed || !_isAdLoaded || _bannerAd == null) {
       return const SizedBox.shrink();
     }
 
@@ -206,55 +201,7 @@ class _SmartUnityBannerState extends State<_SmartUnityBanner> {
       child: SizedBox(
         width: 320,
         height: 50,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // عند بدء التحميل وقبل اكتماله لا يظهر أي شريط أسود
-            if (!_isAdLoaded)
-              const SizedBox.shrink(),
-            // ويدجت الإعلان الرسمي مع استجابة فورية للظهور
-            Opacity(
-              opacity: _isAdLoaded ? 1.0 : 0.01,
-              child: UnityBannerAd(
-                key: ValueKey(_currentPlacement),
-                placementId: _currentPlacement,
-                onLoad: (placementId) {
-                  debugPrint("Unity Banner Loaded: $placementId");
-                  if (mounted && !_isAdLoaded) {
-                    setState(() => _isAdLoaded = true);
-                  }
-                  if (widget.onLoaded != null) widget.onLoaded!();
-                },
-                onShown: (placementId) {
-                  debugPrint("Unity Banner Shown: $placementId");
-                  if (mounted && !_isAdLoaded) {
-                    setState(() => _isAdLoaded = true);
-                  }
-                },
-                onFailed: (placementId, error, message) {
-                  debugPrint("Unity Banner Failed on $placementId: $error - $message");
-                  if (_currentPlacement == AdService.primaryBannerPlacementId) {
-                    debugPrint("Retrying banner with fallback: ${AdService.fallbackBannerPlacementId}");
-                    if (mounted) {
-                      setState(() {
-                        _currentPlacement = AdService.fallbackBannerPlacementId;
-                      });
-                    }
-                  } else {
-                    debugPrint("All banner placements failed.");
-                    if (mounted) {
-                      setState(() => _hasFailed = true);
-                    }
-                    if (widget.onFailed != null) {
-                      widget.onFailed!(placementId, error, message);
-                    }
-                  }
-                },
-                onClick: (placementId) => debugPrint("Unity Banner Clicked: $placementId"),
-              ),
-            ),
-          ],
-        ),
+        child: StartAppBanner(_bannerAd!),
       ),
     );
   }
