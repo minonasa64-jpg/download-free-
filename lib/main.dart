@@ -20,7 +20,7 @@ void main() async {
     await AdService.init(); 
     AdService().loadInterstitialAd();
   } catch (e) {
-    debugPrint('Start.io Ads Init Error: $e');
+    debugPrint('Unity Ads Init Error: $e');
   }
 
   // انطلاق التطبيق بغض النظر عن أي أخطاء في الخلفية

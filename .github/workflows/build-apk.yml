@@ -68,13 +68,9 @@ jobs:
               app.set('{http://schemas.android.com/apk/res/android}largeHeap', 'true')
               app.set('{http://schemas.android.com/apk/res/android}requestLegacyExternalStorage', 'true')
 
-              # Start.io (StartApp) App ID metadata injection
-              startapp_meta = ET.Element('meta-data')
-              startapp_meta.set('{http://schemas.android.com/apk/res/android}name', 'com.startapp.sdk.APPLICATION_ID')
-              startapp_meta.set('{http://schemas.android.com/apk/res/android}value', '208601935')
-              app.append(startapp_meta)
-
               for act in app.findall('activity'):
+                  if '{http://schemas.android.com/apk/res/android}taskAffinity' in act.attrib:
+                      del act.attrib['{http://schemas.android.com/apk/res/android}taskAffinity']
                   act.set('{http://schemas.android.com/apk/res/android}supportsPictureInPicture', 'true')
                   act.set('{http://schemas.android.com/apk/res/android}configChanges', 'orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode')
               
@@ -148,9 +144,6 @@ jobs:
                       if (details.requested.group == 'com.arthenica' || details.requested.group == 'dev.ffmpegkit-maintained') {
                           details.useTarget group: 'dev.ffmpegkit-maintained', name: 'ffmpeg-kit-full', version: '8.1.7'
                       }
-                      if (details.requested.group == 'com.startapp' && details.requested.name == 'inapp-sdk') {
-                          details.useVersion '5.3.1'
-                      }
                   }
               }
           }
@@ -198,6 +191,10 @@ jobs:
           -dontwarn com.arthenica.ffmpegkit.**
           -keep class * implements io.flutter.embedding.engine.plugins.FlutterPlugin { *; }
           -keep class * implements io.flutter.plugin.common.PluginRegistry$PluginRegistrantCallback { *; }
+          -keep class com.unity3d.ads.** { *; }
+          -keep class com.unity3d.services.** { *; }
+          -dontwarn com.unity3d.ads.**
+          -dontwarn com.unity3d.services.**
           EOF
 
       - name: Install Dependencies
@@ -219,17 +216,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v1.3.2"
-          RELEASE_TITLE="Boykta Pro v1.3.2 - تكامل إعلانات Start.io (App ID: 208601935) وحل مشكلة دمج الصوت"
+          TAG="v1.3.3"
+          RELEASE_TITLE="Boykta Pro v1.3.3 - تكامل إعلانات Unity Ads الرسمية وحل مشكلة دمج الصوت"
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           
-          NOTES="🚀 **Boykta Pro v1.3.2** - تكامل إعلانات Start.io وتحديث استقرار التطبيق والتنزيل!
+          NOTES="🚀 **Boykta Pro v1.3.3** - استبدال نظام الإعلانات بـ Unity Ads بالكامل مع أعلى استقرار!
 
           ### ✨ أبرز ما في هذا التحديث:
-          - 🎯 **تكامل إعلانات Start.io (StartApp) بنجاح:** معرّف التطبيق الرسمي (App ID: 208601935) مع دعم إعلانات البنر والإعلانات البينية السريعة.
-          - 🛡️ **إصلاح جذري لمشكلة توقف التحميل:** محرك تنزيل متواصل ذكي مع استئناف فوري من آخر بايت محمل (.part) دون إعادة التحميل من الصفر أو التوقف عند 4.6MB.
-          - 🔄 **تجديد تلقائي لروابط YouTube المنتهية:** في حال انتهاء صلاحية الرابط أثناء التحميل، يتم تحديث الرابط فوراً في الخلفية ومواصلة التنزيل.
-          - ⚡ **الحفاظ على كافة الميزات السابقة:** وضع التوربو، مشغل الفيديو والصوت، متصفح ملء الشاشة، الخزنة، ومشاركة الملفات محلياً.
+          - 🎮 **تكامل إعلانات Unity Ads بنجاح (100%):** تم ربط معرّف اللعبة (Game ID: 800377154) مع بنرات وإعلانات بينية (Interstitial) سلسة وسريعة.
+          - 🎬 **دمج الصوت والفيديو فائق الجودة:** معالجة دقيقة لتحويل الصوت إلى AAC 192k وخريطة قنوات واضحة لتشغيل مثالي على جميع هواتف أندرويد.
+          - 🛡️ **استئناف التنزيل الذكي:** تجنب أي توقف وتحميل سلس لجميع صيغ الفيديو من مختلف المنصات.
+          - ⚡ **الحفاظ على كافة الميزات:** وضع التوربو، الخزنة الآمنة، متصفح ملء الشاشة، ومشغل الفيديو الاحترافي.
           
           📲 **التثبيت المباشر:** قم بتحميل ملف \`app-release.apk\` المرفق أدناه وتثبيته مباشرة على هاتفك الأندرويد."
 
