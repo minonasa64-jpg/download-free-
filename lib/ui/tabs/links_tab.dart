@@ -1050,6 +1050,9 @@ class _LinksTabState extends State<LinksTab> {
             : (int.tryParse(format['quality_order']?.toString() ?? '') ?? 0);
         final bool isHighDef = order >= 1080;
 
+        final bool isWatermark = format['quality_badge'] == 'مع العلامة المائية' || 
+            (format['quality_name']?.toString().contains('العلامة المائية') ?? false);
+
         return InkWell(
           onTap: () {
             setState(() {
@@ -1077,7 +1080,10 @@ class _LinksTabState extends State<LinksTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
                           Text(
                             format['quality_name'],
@@ -1089,28 +1095,38 @@ class _LinksTabState extends State<LinksTab> {
                               fontSize: 14,
                             ),
                           ),
-                          if (badge != null) ...[
-                            const SizedBox(width: 8),
+                          if (badge != null)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: isSelected 
                                     ? AppColors.cyan.withOpacity(0.2) 
-                                    : (isHighDef ? AppColors.cyan.withOpacity(0.15) : AppColors.surfaceLight),
+                                    : (isWatermark
+                                        ? Colors.amber.withOpacity(0.15)
+                                        : (isHighDef ? AppColors.cyan.withOpacity(0.15) : AppColors.surfaceLight)),
                                 borderRadius: BorderRadius.circular(4),
-                                border: isHighDef ? Border.all(color: AppColors.cyan.withOpacity(0.4), width: 0.8) : null,
+                                border: isWatermark
+                                    ? Border.all(color: Colors.amber.withOpacity(0.4), width: 0.8)
+                                    : (isHighDef ? Border.all(color: AppColors.cyan.withOpacity(0.4), width: 0.8) : null),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  if (isHighDef) ...[
+                                  if (isHighDef && !isWatermark) ...[
                                     const Icon(Icons.star_rounded, color: AppColors.cyan, size: 11),
+                                    const SizedBox(width: 2),
+                                  ] else if (isWatermark) ...[
+                                    const Icon(Icons.branding_watermark_rounded, color: Colors.amber, size: 11),
                                     const SizedBox(width: 2),
                                   ],
                                   Text(
                                     badge,
                                     style: TextStyle(
-                                      color: isSelected || isHighDef ? AppColors.cyan : AppColors.textSecondary,
+                                      color: isSelected 
+                                          ? AppColors.cyan 
+                                          : (isWatermark 
+                                              ? Colors.amber 
+                                              : (isHighDef ? AppColors.cyan : AppColors.textSecondary)),
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -1118,7 +1134,6 @@ class _LinksTabState extends State<LinksTab> {
                                 ],
                               ),
                             ),
-                          ],
                         ],
                       ),
                       if (desc != null) ...[

@@ -87,7 +87,10 @@ class UniversalExtractorService {
     try {
       final response = await _dio.post(
         'https://www.tikwm.com/api/',
-        data: {'url': url},
+        data: {
+          'url': url,
+          'hd': '1',
+        },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
           responseType: ResponseType.json,
@@ -104,11 +107,29 @@ class UniversalExtractorService {
         final wmPlayUrl = (data['wmplay'] ?? '').toString();
         final musicUrl = (data['music'] ?? '').toString();
         final author = data['author'] is Map ? (data['author']['nickname'] ?? 'TikTok') : 'TikTok';
-        final int sizeBytes = (data['size'] as num?)?.toInt() ?? (data['hd_size'] as num?)?.toInt() ?? 0;
+        
+        final int rawSizeBytes = (data['size'] as num?)?.toInt() ?? 0;
+        final int rawHdSizeBytes = (data['hd_size'] as num?)?.toInt() ?? 0;
+        final int rawWmSizeBytes = (data['wm_size'] as num?)?.toInt() ?? 0;
+
+        final int sizeBytes = rawSizeBytes > 0 
+            ? rawSizeBytes 
+            : (rawHdSizeBytes > 0 ? rawHdSizeBytes : (rawWmSizeBytes > 0 ? rawWmSizeBytes : 0));
         final double sizeMb = sizeBytes > 0 ? (sizeBytes / (1024 * 1024)) : 5.0;
+
+        final int hdSizeBytes = rawHdSizeBytes > 0 
+            ? rawHdSizeBytes 
+            : (sizeBytes > 0 ? (sizeBytes * 1.3).toInt() : (7 * 1024 * 1024));
+        final double hdSizeMb = hdSizeBytes > 0 ? (hdSizeBytes / (1024 * 1024)) : (sizeMb * 1.3);
+
+        final int wmSizeBytes = rawWmSizeBytes > 0 
+            ? rawWmSizeBytes 
+            : (sizeBytes > 0 ? sizeBytes : (5 * 1024 * 1024));
+        final double wmSizeMb = wmSizeBytes > 0 ? (wmSizeBytes / (1024 * 1024)) : sizeMb;
 
         final List<Map<String, dynamic>> videoFormats = [];
 
+        // 1. جودة فائقة 1080p Full HD بدون علامة مائية
         if (hdPlayUrl.isNotEmpty) {
           videoFormats.add({
             'url': hdPlayUrl,
@@ -116,21 +137,22 @@ class UniversalExtractorService {
             'quality_order': 1080,
             'quality_badge': '1080p FHD',
             'quality_desc': 'أقصى جودة فائقة 1080p Full HD وبدون أي علامة مائية',
-            'size': (sizeMb * 1.3).toStringAsFixed(1),
-            'size_bytes': (sizeBytes * 1.3).toInt(),
+            'size': hdSizeMb.toStringAsFixed(1),
+            'size_bytes': hdSizeBytes,
             'ext': 'mp4',
             'needs_merge': false,
             'platform': 'tiktok',
           });
         }
 
-        if (playUrl.isNotEmpty) {
+        // 2. جودة عالية 720p HD بدون علامة مائية
+        if (playUrl.isNotEmpty && playUrl != hdPlayUrl) {
           videoFormats.add({
             'url': playUrl,
             'quality_name': 'عالي الدقة 720p HD (بدون علامة مائية)',
             'quality_order': 720,
             'quality_badge': '720p HD',
-            'quality_desc': 'تنزيل سريع وبجودة عالية خالية من العلامة المائية',
+            'quality_desc': 'تنزيل سريع بجودة ممتازة خالية من العلامة المائية',
             'size': sizeMb.toStringAsFixed(1),
             'size_bytes': sizeBytes,
             'ext': 'mp4',
@@ -139,15 +161,16 @@ class UniversalExtractorService {
           });
         }
 
-        if (wmPlayUrl.isNotEmpty && videoFormats.isEmpty) {
+        // 3. جودة الفيديو مع العلامة المائية الأصلية (Watermark)
+        if (wmPlayUrl.isNotEmpty) {
           videoFormats.add({
             'url': wmPlayUrl,
-            'quality_name': 'النسخة الأصلية',
-            'quality_order': 720,
-            'quality_badge': 'أصلي',
-            'quality_desc': 'النسخة المباشرة من تطبيق تيك توك',
-            'size': sizeMb.toStringAsFixed(1),
-            'size_bytes': sizeBytes,
+            'quality_name': 'فيديو مع العلامة المائية (مع لوجو تيك توك)',
+            'quality_order': 576,
+            'quality_badge': 'مع العلامة المائية',
+            'quality_desc': 'النسخة الرسمية الأصلية متضمنة العلامة المائية واسم الحساب',
+            'size': wmSizeMb.toStringAsFixed(1),
+            'size_bytes': wmSizeBytes,
             'ext': 'mp4',
             'needs_merge': false,
             'platform': 'tiktok',
