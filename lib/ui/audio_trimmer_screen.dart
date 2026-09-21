@@ -3,8 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter/return_code.dart';
+import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../services/backend_service.dart';
 
@@ -127,42 +126,18 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
       final ext = isSourceMp3 ? 'mp3' : 'm4a';
       final outPath = '${parentDir.path}/${safeName}_ringtone_${_startSeconds.toInt()}s_${_endSeconds.toInt()}s.$ext';
 
-      final startStr = _startSeconds.toStringAsFixed(1);
-      final durationStr = (_endSeconds - _startSeconds).toStringAsFixed(1);
+      final startMs = (_startSeconds * 1000).toInt();
+      final endMs = (_endSeconds * 1000).toInt();
 
-      // أمر FFmpeg متوافق: إذا كان الملف الأصلي mp3 ننسخ التيار الصوتي بدقة وسرعة، وإذا كان صيغة أخرى نرمز بتيار AAC متوافق مع حاوية m4a
-      final command = isSourceMp3
-          ? '-y -ss $startStr -t $durationStr -i "${widget.file.path}" -vn -c:a copy "$outPath"'
-          : '-y -ss $startStr -t $durationStr -i "${widget.file.path}" -vn -c:a aac -b:a 192k "$outPath"';
+      const muxerChannel = MethodChannel('com.boykta.app/media_muxer');
+      final dynamic res = await muxerChannel.invokeMethod('trimAudio', {
+        'inputPath': widget.file.path,
+        'outputPath': outPath,
+        'startMs': startMs,
+        'endMs': endMs,
+      });
 
-      var session = await FFmpegKit.execute(command);
-      var returnCode = await session.getReturnCode();
-
-      // محاولة بديلة احتياطية في حال تعذر القص المباشر
-      if (!ReturnCode.isSuccess(returnCode) || !await File(outPath).exists()) {
-        final fallbackOut = '${parentDir.path}/${safeName}_ringtone_${_startSeconds.toInt()}s_${_endSeconds.toInt()}s.m4a';
-        final fallbackCmd = '-y -ss $startStr -t $durationStr -i "${widget.file.path}" -vn -c:a aac -b:a 192k "$fallbackOut"';
-        session = await FFmpegKit.execute(fallbackCmd);
-        returnCode = await session.getReturnCode();
-        if (ReturnCode.isSuccess(returnCode) && await File(fallbackOut).exists()) {
-          final resultFile = File(fallbackOut);
-          if (mounted) {
-            setState(() {
-              _isProcessing = false;
-              _trimmedResultFile = resultFile;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('تم إنشاء النغمة بنجاح! 🎵'),
-                backgroundColor: AppColors.cyan,
-              ),
-            );
-          }
-          return;
-        }
-      }
-
-      if (ReturnCode.isSuccess(returnCode) && await File(outPath).exists()) {
+      if (res == true && await File(outPath).exists()) {
         final resultFile = File(outPath);
         if (mounted) {
           setState(() {
@@ -171,13 +146,13 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('تم إنشاء النغمة بنجاح! 🎵'),
+              content: Text('تم إنشاء النغمة بنجاح عبر MediaMuxer! 🎵'),
               backgroundColor: AppColors.cyan,
             ),
           );
         }
       } else {
-        throw Exception('فشل في عملية القص');
+        throw Exception('تعذر قص ملف الصوت');
       }
     } catch (e) {
       if (mounted) {

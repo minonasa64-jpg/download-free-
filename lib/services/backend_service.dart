@@ -7,8 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter/return_code.dart';
+import 'package:flutter/services.dart';
 import 'universal_extractor_service.dart';
 
 class DownloadTask {
@@ -621,44 +620,19 @@ class BackendService {
             streamTag: videoTag,
           );
 
-          onStatusChanged('جاري معالجة وتجهيز ملف MP3...');
-          task.status = 'جاري تحويل وتجهيز MP3...';
-          task.progress = 0.95;
+          onStatusChanged('جاري معالجة وتجهيز ملف الصوت...');
+          task.status = 'جاري حفظ وتجهيز الصوت...';
+          task.progress = 0.98;
           activeDownloads.value = List.from(activeDownloads.value);
 
-          bool mp3Converted = false;
-          try {
-            final session = await FFmpegKit.executeWithArguments([
-              '-y',
-              '-i', tempRawAudio,
-              '-vn',
-              '-c:a', 'libmp3lame',
-              '-b:a', '192k',
-              tempMp3Path,
-            ]);
-            final returnCode = await session.getReturnCode();
-            if (ReturnCode.isSuccess(returnCode) && await File(tempMp3Path).exists()) {
-              final outFile = File(finalOutputPath);
-              if (await outFile.exists()) {
-                try { await outFile.delete(); } catch (_) {}
-              }
-              await File(tempMp3Path).copy(finalOutputPath);
-              try { await File(tempMp3Path).delete(); } catch (_) {}
-              try { await File(tempRawAudio).delete(); } catch (_) {}
-              mp3Converted = true;
+          final rawFile = File(tempRawAudio);
+          if (await rawFile.exists()) {
+            final outFile = File(finalOutputPath);
+            if (await outFile.exists()) {
+              try { await outFile.delete(); } catch (_) {}
             }
-          } catch (_) {}
-
-          if (!mp3Converted) {
-            final rawFile = File(tempRawAudio);
-            if (await rawFile.exists()) {
-              final outFile = File(finalOutputPath);
-              if (await outFile.exists()) {
-                try { await outFile.delete(); } catch (_) {}
-              }
-              await rawFile.copy(finalOutputPath);
-              try { await rawFile.delete(); } catch (_) {}
-            }
+            await rawFile.copy(finalOutputPath);
+            try { await rawFile.delete(); } catch (_) {}
           }
         } else {
           await _downloadFile(
@@ -670,7 +644,7 @@ class BackendService {
           );
         }
       } else {
-        // أسماء مؤقتة آمنة تماماً خالية من أي حروف خاصة أو مسافات لتفادي مشاكل FFmpeg
+        // أسماء مؤقتة آمنة تماماً خالية من أي حروف خاصة أو مسافات لتفادي مشاكل MediaMuxer
         final tempVideoPath = '${tempDir.path}/raw_v_${notifId}.mp4';
         final tempMergedPath = '${tempDir.path}/merged_${notifId}.mp4';
 
@@ -749,8 +723,8 @@ class BackendService {
           streamTag: audioTagToDownload,
         );
 
-        // 3. الدمج الصوتي عالي الدقة عبر FFmpeg مع استراتيجيات متعددة تضمن وجود الصوت 100%
-        onStatusChanged('جاري الدمج النهائي بجودة فائقة...');
+        // 3. الدمج الصوتي فائق السرعة عبر أداة MediaMuxer الأصلية في أندرويد
+        onStatusChanged('جاري دمج الفيديو والصوت عبر MediaMuxer...');
         task.status = 'جاري دمج الفيديو مع الصوت...';
         task.progress = 0.96;
         activeDownloads.value = List.from(activeDownloads.value);
@@ -770,118 +744,31 @@ class BackendService {
         bool mergeSucceeded = false;
         String successfulMergedPath = tempMergedPath;
 
-        final tempMergedMkv = '${tempDir.path}/merged_${notifId}.mkv';
-        try { if (await File(tempMergedMkv).exists()) await File(tempMergedMkv).delete(); } catch (_) {}
-
         debugPrint("حالة ملفات الدمج: فيديو=${vSourceFile.path} ($vSourceSize بايت), صوت=${audioFile.path} ($audioSize بايت)");
 
         if (audioSize > 1024 && await vSourceFile.exists()) {
-          final List<Map<String, dynamic>> ffmpegAttempts = [
-            // محاولة 1: نسخ مباشر لكلا الدفقين فائق السرعة بدون أي فقدان للجودة (يعمل فوراً عند توافق MP4+AAC)
-            {
-              'path': tempMergedPath,
-              'args': [
-                '-y',
-                '-i', tempVideoPath,
-                '-i', tempAudioPath,
-                '-map', '0:v:0',
-                '-map', '1:a:0',
-                '-c:v', 'copy',
-                '-c:a', 'copy',
-                '-movflags', '+faststart',
-                tempMergedPath,
-              ],
-            },
-            // محاولة 2: نسخ الفيديو مع تحويل الصوت إلى AAC 192k عالي التوافق
-            {
-              'path': tempMergedPath,
-              'args': [
-                '-y',
-                '-i', tempVideoPath,
-                '-i', tempAudioPath,
-                '-map', '0:v:0',
-                '-map', '1:a:0',
-                '-c:v', 'copy',
-                '-c:a', 'aac',
-                '-b:a', '192k',
-                '-movflags', '+faststart',
-                tempMergedPath,
-              ],
-            },
-            // محاولة 3: ربط متساهل مع وسم VP9 داخل حاوية MP4 وخيار strict -2
-            {
-              'path': tempMergedPath,
-              'args': [
-                '-y',
-                '-i', tempVideoPath,
-                '-i', tempAudioPath,
-                '-map', '0:v:0',
-                '-map', '1:a:0',
-                '-c:v', 'copy',
-                '-tag:v', 'vp09',
-                '-c:a', 'aac',
-                '-b:a', '192k',
-                '-strict', '-2',
-                '-movflags', '+faststart',
-                tempMergedPath,
-              ],
-            },
-            // محاولة 4: تحويل سريع للغاية ultrafast إلى H.264 لضمان توافق الصوت والصورة 100% لكافة مشغلات أندرويد
-            {
-              'path': tempMergedPath,
-              'args': [
-                '-y',
-                '-i', tempVideoPath,
-                '-i', tempAudioPath,
-                '-map', '0:v:0',
-                '-map', '1:a:0',
-                '-c:v', 'libx264',
-                '-preset', 'ultrafast',
-                '-crf', '20',
-                '-c:a', 'aac',
-                '-b:a', '192k',
-                '-movflags', '+faststart',
-                tempMergedPath,
-              ],
-            },
-            // محاولة 5: حاوية Matroska الفائقة (MKV) التي تقبل أي كودك فيديو مع أي كودك صوت بدون مشاكل
-            {
-              'path': tempMergedMkv,
-              'args': [
-                '-y',
-                '-i', tempVideoPath,
-                '-i', tempAudioPath,
-                '-c', 'copy',
-                tempMergedMkv,
-              ],
-            },
-          ];
+          try {
+            debugPrint("بدء دمج MediaMuxer الأصلي: v=$tempVideoPath, a=$tempAudioPath, out=$tempMergedPath");
+            const muxerChannel = MethodChannel('com.boykta.app/media_muxer');
+            final dynamic res = await muxerChannel.invokeMethod('muxAudioVideo', {
+              'videoPath': tempVideoPath,
+              'audioPath': tempAudioPath,
+              'outputPath': tempMergedPath,
+            });
 
-          for (final attempt in ffmpegAttempts) {
-            final targetPath = attempt['path'] as String;
-            final args = attempt['args'] as List<String>;
-            try {
-              debugPrint("بدء دمج FFmpeg: ${args.join(' ')}");
-              final session = await FFmpegKit.executeWithArguments(args);
-              final returnCode = await session.getReturnCode();
-              final mergedFile = File(targetPath);
-              final bool fileExists = await mergedFile.exists();
-              final int mergedLength = fileExists ? await mergedFile.length() : 0;
+            final mergedFile = File(tempMergedPath);
+            final bool fileExists = await mergedFile.exists();
+            final int mergedLength = fileExists ? await mergedFile.length() : 0;
 
-              if (ReturnCode.isSuccess(returnCode) && fileExists && mergedLength > (vSourceSize * 0.7)) {
-                mergeSucceeded = true;
-                successfulMergedPath = targetPath;
-                debugPrint("تم الدمج الصوتي بنجاح تام! الحجم: $mergedLength بايت");
-                break;
-              } else {
-                final logs = await session.getAllLogsAsString();
-                final failStackTrace = await session.getFailStackTrace();
-                debugPrint("فشلت محاولة الدمج ($returnCode): $logs | stackTrace: $failStackTrace");
-                try { if (fileExists) await mergedFile.delete(); } catch (_) {}
-              }
-            } catch (ffmpegErr) {
-              debugPrint("استثناء أثناء تنفيذ FFmpeg: $ffmpegErr");
+            if (res == true && fileExists && mergedLength > (vSourceSize * 0.7)) {
+              mergeSucceeded = true;
+              successfulMergedPath = tempMergedPath;
+              debugPrint("تم الدمج الصوتي بنجاح تام عبر MediaMuxer! الحجم: $mergedLength بايت");
+            } else {
+              debugPrint("تعذر دمج MediaMuxer أو الحجم الناتج غير كافٍ (نتيجة=$res, الحجم=$mergedLength)");
             }
+          } catch (muxerErr) {
+            debugPrint("استثناء أثناء تنفيذ MediaMuxer: $muxerErr");
           }
         } else {
           debugPrint("تنبيه: حجم ملف الصوت غير كافٍ للدمج ($audioSize بايت)");
@@ -896,12 +783,11 @@ class BackendService {
           onStatusChanged('تم الدمج بنجاح!');
           await File(successfulMergedPath).copy(finalOutputPath);
           try { await File(tempMergedPath).delete(); } catch (_) {}
-          try { await File(tempMergedMkv).delete(); } catch (_) {}
           try { await File(tempVideoPath).delete(); } catch (_) {}
           try { await File(tempAudioPath).delete(); } catch (_) {}
         } else {
           // إذا فشلت محاولات الدمج مع ملف الصوت، نعطي المستخدم خيار الحفظ الاحتياطي مع تنبيه
-          debugPrint('تحذير: تعذر دمج الصوت عبر FFmpeg. حفظ ملف الفيديو المتاح.');
+          debugPrint('تحذير: تعذر دمج الصوت عبر MediaMuxer. حفظ ملف الفيديو المتاح.');
           final vFile = File(tempVideoPath);
           final vPart = File('$tempVideoPath.part');
           if (await vFile.exists() && await vFile.length() > 0) {
@@ -1715,13 +1601,16 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
       String nameWithoutExt = rawName.contains('.') 
           ? rawName.substring(0, rawName.lastIndexOf('.')) 
           : rawName;
-      String outputMp3Path = '${downloadsDir.path}/${nameWithoutExt}_audio.mp3';
+      String outputAudioPath = '${downloadsDir.path}/${nameWithoutExt}_audio.m4a';
 
       onStatus(t('converting'));
-      final session = await FFmpegKit.executeWithArguments(['-y', '-i', videoFile.path, '-vn', '-c:a', 'aac', outputMp3Path]);
-      var returnCode = await session.getReturnCode();
-      
-      if (ReturnCode.isSuccess(returnCode)) {
+      const muxerChannel = MethodChannel('com.boykta.app/media_muxer');
+      final dynamic res = await muxerChannel.invokeMethod('extractAudio', {
+        'videoPath': videoFile.path,
+        'outputPath': outputAudioPath,
+      });
+
+      if (res == true && await File(outputAudioPath).exists()) {
         onStatus(t('converted_success'));
         return true;
       } else {
