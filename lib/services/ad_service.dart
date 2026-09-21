@@ -178,7 +178,7 @@ class AdService {
   }
 }
 
-/// ويدجت شريط البنر الإعلاني لـ Unity Ads مع إعادة المحاولة التلقائية والحماية من الفشل
+/// ويدجت شريط البنر الإعلاني لـ Unity Ads مع منع ظهور الشاشة السوداء، وتبديل المعرفات التلقائي، وإعادة المحاولة الذكية
 class _SmartUnityBanner extends StatefulWidget {
   final VoidCallback? onLoaded;
   final Function(String, dynamic, String)? onFailed;
@@ -190,12 +190,44 @@ class _SmartUnityBanner extends StatefulWidget {
 }
 
 class _SmartUnityBannerState extends State<_SmartUnityBanner> {
+  static const List<String> _candidatePlacements = [
+    AdService.bannerPlacementId, // "BP_Banner_Android"
+    "Banner_Android",            // Standard Unity Ads placement
+    "banner",                    // Common shortcut placement
+    "Banner",
+  ];
+
+  int _placementIndex = 0;
   bool _isBannerLoaded = false;
   Key _bannerKey = UniqueKey();
   int _retryCount = 0;
   Timer? _retryTimer;
 
+  String get _currentPlacement => _candidatePlacements[_placementIndex % _candidatePlacements.length];
+
+  void _handleFailure(String failedId, dynamic error, String errorMessage) {
+    if (!mounted) return;
+
+    if (widget.onFailed != null) {
+      widget.onFailed!(failedId, error, errorMessage);
+    }
+
+    // إذا لم ينجح المعرف الحالي، نجرب المعرف التالي فوراً
+    if (_placementIndex < _candidatePlacements.length - 1) {
+      _placementIndex++;
+      debugPrint("Unity Ads Banner: Switching to candidate placement: $_currentPlacement");
+      setState(() {
+        _isBannerLoaded = false;
+        _bannerKey = UniqueKey();
+      });
+    } else {
+      debugPrint("Unity Ads Banner: All candidate placements failed. Scheduling retry...");
+      _scheduleRetry();
+    }
+  }
+
   void _scheduleRetry() {
+    _placementIndex = 0;
     if (_retryCount < 8 && mounted) {
       _retryCount++;
       _retryTimer?.cancel();
@@ -217,40 +249,68 @@ class _SmartUnityBannerState extends State<_SmartUnityBanner> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      height: _isBannerLoaded ? 50 : 0,
+      margin: EdgeInsets.only(bottom: _isBannerLoaded ? 6 : 0),
       alignment: Alignment.center,
-      width: double.infinity,
-      height: 50,
-      color: Colors.transparent,
-      child: UnityBannerAd(
-        key: _bannerKey,
-        placementId: AdService.bannerPlacementId,
-        size: BannerSize.standard,
-        onLoad: (placementId) {
-          debugPrint("Unity Ads Banner: Ad loaded successfully ($placementId)");
-          if (mounted) {
-            setState(() {
-              _isBannerLoaded = true;
-              _retryCount = 0;
-            });
-            if (widget.onLoaded != null) widget.onLoaded!();
-          }
-        },
-        onClick: (placementId) {
-          debugPrint("Unity Ads Banner: Ad clicked ($placementId)");
-        },
-        onShown: (placementId) {
-          debugPrint("Unity Ads Banner: Ad shown ($placementId)");
-        },
-        onFailed: (placementId, error, errorMessage) {
-          debugPrint("Unity Ads Banner: Load failed ($placementId): $error - $errorMessage");
-          if (mounted) {
-            if (widget.onFailed != null) {
-              widget.onFailed!("banner", error, errorMessage);
-            }
-            _scheduleRetry();
-          }
-        },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          width: 320,
+          height: 50,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // خلفية شفافة نظيفة تمنع ظهور أي لون أسود أو مساحة فارغة
+              Container(
+                width: 320,
+                height: 50,
+                color: Colors.transparent,
+              ),
+
+              // ويدجت الإعلان الرسمي: محجوب الشفافية تماماً حتى ينتهي التحميل بنجاح 100%
+              Opacity(
+                opacity: _isBannerLoaded ? 1.0 : 0.0,
+                child: SizedBox(
+                  width: 320,
+                  height: 50,
+                  child: UnityBannerAd(
+                    key: _bannerKey,
+                    placementId: _currentPlacement,
+                    size: BannerSize.standard,
+                    onLoad: (placementId) {
+                      debugPrint("Unity Ads Banner: Ad loaded successfully ($placementId)");
+                      if (mounted) {
+                        setState(() {
+                          _isBannerLoaded = true;
+                          _retryCount = 0;
+                        });
+                        if (widget.onLoaded != null) widget.onLoaded!();
+                      }
+                    },
+                    onClick: (placementId) {
+                      debugPrint("Unity Ads Banner: Ad clicked ($placementId)");
+                    },
+                    onShown: (placementId) {
+                      debugPrint("Unity Ads Banner: Ad shown ($placementId)");
+                      if (mounted && !_isBannerLoaded) {
+                        setState(() {
+                          _isBannerLoaded = true;
+                        });
+                      }
+                    },
+                    onFailed: (placementId, error, errorMessage) {
+                      debugPrint("Unity Ads Banner: Load failed ($placementId): $error - $errorMessage");
+                      _handleFailure(placementId, error, errorMessage);
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
