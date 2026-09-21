@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../services/backend_service.dart';
@@ -124,20 +126,59 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
       final lowerPath = widget.file.path.toLowerCase();
       final isSourceMp3 = lowerPath.endsWith('.mp3');
       final ext = isSourceMp3 ? 'mp3' : 'm4a';
-      final outPath = '${parentDir.path}/${safeName}_ringtone_${_startSeconds.toInt()}s_${_endSeconds.toInt()}s.$ext';
+      String outPath = '${parentDir.path}/${safeName}_ringtone_${_startSeconds.toInt()}s_${_endSeconds.toInt()}s.$ext';
 
-      final startMs = (_startSeconds * 1000).toInt();
-      final endMs = (_endSeconds * 1000).toInt();
+      final startStr = _startSeconds.toStringAsFixed(2);
+      final durationStr = (_endSeconds - _startSeconds).toStringAsFixed(2);
 
-      const muxerChannel = MethodChannel('com.boykta.app/media_muxer');
-      final dynamic res = await muxerChannel.invokeMethod('trimAudio', {
-        'inputPath': widget.file.path,
-        'outputPath': outPath,
-        'startMs': startMs,
-        'endMs': endMs,
-      });
+      bool trimSucceeded = false;
 
-      if (res == true && await File(outPath).exists()) {
+      // محاولة 1: القص فائق السرعة والدقة عبر FFmpeg
+      try {
+        final List<String> ffmpegArgs = isSourceMp3
+            ? ['-y', '-ss', startStr, '-t', durationStr, '-i', widget.file.path, '-vn', '-c:a', 'copy', outPath]
+            : ['-y', '-ss', startStr, '-t', durationStr, '-i', widget.file.path, '-vn', '-c:a', 'aac', '-b:a', '192k', outPath];
+
+        final session = await FFmpegKit.executeWithArguments(ffmpegArgs);
+        final returnCode = await session.getReturnCode();
+        if (ReturnCode.isSuccess(returnCode) && await File(outPath).exists() && await File(outPath).length() > 0) {
+          trimSucceeded = true;
+        } else {
+          // محاولة ثانية مع إعادة ترميز متوافقة AAC
+          final fallbackOut = '${parentDir.path}/${safeName}_ringtone_${_startSeconds.toInt()}s_${_endSeconds.toInt()}s.m4a';
+          final fallbackSession = await FFmpegKit.executeWithArguments([
+            '-y', '-ss', startStr, '-t', durationStr, '-i', widget.file.path, '-vn', '-c:a', 'aac', '-b:a', '192k', fallbackOut,
+          ]);
+          if (ReturnCode.isSuccess(await fallbackSession.getReturnCode()) && await File(fallbackOut).exists() && await File(fallbackOut).length() > 0) {
+            trimSucceeded = true;
+            outPath = fallbackOut;
+          }
+        }
+      } catch (e) {
+        debugPrint("خطأ في تنفيذ FFmpeg للقص: $e");
+      }
+
+      // محاولة احتياطية عبر MediaMuxer إذا لزم الأمر
+      if (!trimSucceeded) {
+        try {
+          final startMs = (_startSeconds * 1000).toInt();
+          final endMs = (_endSeconds * 1000).toInt();
+          const muxerChannel = MethodChannel('com.boykta.app/media_muxer');
+          final dynamic res = await muxerChannel.invokeMethod('trimAudio', {
+            'inputPath': widget.file.path,
+            'outputPath': outPath,
+            'startMs': startMs,
+            'endMs': endMs,
+          });
+          if (res == true && await File(outPath).exists() && await File(outPath).length() > 0) {
+            trimSucceeded = true;
+          }
+        } catch (e) {
+          debugPrint("خطأ في محاولة MediaMuxer للقص: $e");
+        }
+      }
+
+      if (trimSucceeded && await File(outPath).exists()) {
         final resultFile = File(outPath);
         if (mounted) {
           setState(() {
@@ -146,7 +187,7 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('تم إنشاء النغمة بنجاح عبر MediaMuxer! 🎵'),
+              content: Text('تم إنشاء النغمة بنجاح عبر FFmpeg! 🎵'),
               backgroundColor: AppColors.cyan,
             ),
           );

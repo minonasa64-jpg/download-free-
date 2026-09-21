@@ -476,8 +476,19 @@ jobs:
           '
           find android/app/src/main -name "MainActivity.kt" -exec rm -f {} +
 
-      - name: Apply Gradle and Android Build Fixes
+      - name: Apply FFmpeg Resolution Strategy and Build Fixes
         run: |
+          cat << 'EOF' >> android/build.gradle
+          allprojects {
+              configurations.all {
+                  resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+                      if (details.requested.group == 'com.arthenica' || details.requested.group == 'dev.ffmpegkit-maintained') {
+                          details.useTarget group: 'dev.ffmpegkit-maintained', name: 'ffmpeg-kit-full', version: '8.1.7'
+                      }
+                  }
+              }
+          }
+          EOF
           if [ -f "android/settings.gradle" ]; then
             sed -i -E 's/id "com\.android\.application" version "[0-9.]+"/id "com.android.application" version "7.4.2"/g' android/settings.gradle || true
             sed -i -E 's/id "org\.jetbrains\.kotlin\.android" version "[^"]+"/id "org.jetbrains.kotlin.android" version "2.0.21"/g' android/settings.gradle || true
@@ -517,6 +528,10 @@ jobs:
           -keep class io.flutter.plugins.**  { *; }
           -dontwarn io.flutter.embedding.**
           -keep class io.flutter.plugins.GeneratedPluginRegistrant { *; }
+          -keep class com.arthenica.ffmpegkit.** { *; }
+          -dontwarn com.arthenica.ffmpegkit.**
+          -keep class dev.ffmpegkit.** { *; }
+          -dontwarn dev.ffmpegkit.**
           -keep class * implements io.flutter.embedding.engine.plugins.FlutterPlugin { *; }
           -keep class * implements io.flutter.plugin.common.PluginRegistry$PluginRegistrantCallback { *; }
           -keep class com.unity3d.ads.** { *; }
