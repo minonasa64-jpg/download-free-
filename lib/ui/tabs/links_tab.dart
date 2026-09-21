@@ -1000,9 +1000,10 @@ class _LinksTabState extends State<LinksTab> {
         uniqueFormats[key] = f;
       } else {
         final existing = uniqueFormats[key]!;
-        if (existing['needs_merge'] == true && f['needs_merge'] == false) {
+        // نفضل دائماً صيغة MP4 (H.264) لتفادي أي مشاكل ترميز، ثم الدفق الجاهز مسبقاً
+        if (existing['container'] != 'mp4' && f['container'] == 'mp4') {
           uniqueFormats[key] = f;
-        } else if (existing['container'] != 'mp4' && f['container'] == 'mp4') {
+        } else if (existing['needs_merge'] == true && f['needs_merge'] == false && (existing['container'] == f['container'])) {
           uniqueFormats[key] = f;
         }
       }

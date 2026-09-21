@@ -10,8 +10,8 @@ class AdService {
 
   // معرّفات إعلانات Unity Ads (Android Game ID & Placements)
   static const String gameId = "800377154";
-  static const String bannerPlacementId = "BP_Banner_Android34ab2d22-4cb2-45e9-bc8e-61fa749fbb8d";
-  static const String interstitialPlacementId = "BP_Interstitial_Android34ab2d22-4cb2-45e9-bc8e-61fa749fbb8d";
+  static const String bannerPlacementId = "BP_Banner_Android";
+  static const String interstitialPlacementId = "BP_Interstitial_Android";
 
   bool _isInitialized = false;
   final ValueNotifier<bool> isInitializedNotifier = ValueNotifier<bool>(false);

@@ -335,6 +335,12 @@ class BackendService {
         int orderA = a['quality_order'] is int ? a['quality_order'] : 0;
         int orderB = b['quality_order'] is int ? b['quality_order'] : 0;
         if (orderA != orderB) return orderB.compareTo(orderA);
+        // نفضل صيغة MP4 (H.264) على WebM لضمان التوافق التام 100% وسرعة وجودة دمج الصوت
+        bool isMp4A = (a['container'] ?? 'mp4') == 'mp4';
+        bool isMp4B = (b['container'] ?? 'mp4') == 'mp4';
+        if (isMp4A != isMp4B) {
+          return isMp4A ? -1 : 1;
+        }
         int sizeA = a['size_bytes'] is int ? a['size_bytes'] : 0;
         int sizeB = b['size_bytes'] is int ? b['size_bytes'] : 0;
         return sizeB.compareTo(sizeA);
@@ -771,7 +777,22 @@ class BackendService {
 
         if (audioSize > 1024 && await vSourceFile.exists()) {
           final List<Map<String, dynamic>> ffmpegAttempts = [
-            // محاولة 1: تحويل الصوت إلى AAC 192k عالي التوافق مع نسخ الفيديو الأصلي (أضمن طريقة تعمل على جميع أجهزة أندرويد)
+            // محاولة 1: نسخ مباشر لكلا الدفقين فائق السرعة بدون أي فقدان للجودة (يعمل فوراً عند توافق MP4+AAC)
+            {
+              'path': tempMergedPath,
+              'args': [
+                '-y',
+                '-i', tempVideoPath,
+                '-i', tempAudioPath,
+                '-map', '0:v:0',
+                '-map', '1:a:0',
+                '-c:v', 'copy',
+                '-c:a', 'copy',
+                '-movflags', '+faststart',
+                tempMergedPath,
+              ],
+            },
+            // محاولة 2: نسخ الفيديو مع تحويل الصوت إلى AAC 192k عالي التوافق
             {
               'path': tempMergedPath,
               'args': [
@@ -787,33 +808,43 @@ class BackendService {
                 tempMergedPath,
               ],
             },
-            // محاولة 2: نسخ مباشر عالي السرعة لكلا الدفقين
+            // محاولة 3: ربط متساهل مع وسم VP9 داخل حاوية MP4 وخيار strict -2
             {
               'path': tempMergedPath,
               'args': [
                 '-y',
                 '-i', tempVideoPath,
                 '-i', tempAudioPath,
+                '-map', '0:v:0',
+                '-map', '1:a:0',
                 '-c:v', 'copy',
-                '-c:a', 'copy',
+                '-tag:v', 'vp09',
+                '-c:a', 'aac',
+                '-b:a', '192k',
+                '-strict', '-2',
                 '-movflags', '+faststart',
                 tempMergedPath,
               ],
             },
-            // محاولة 3: ربط متساهل مع ترميز aac وخيار strict -2
+            // محاولة 4: تحويل سريع للغاية ultrafast إلى H.264 لضمان توافق الصوت والصورة 100% لكافة مشغلات أندرويد
             {
               'path': tempMergedPath,
               'args': [
                 '-y',
                 '-i', tempVideoPath,
                 '-i', tempAudioPath,
-                '-c:v', 'copy',
+                '-map', '0:v:0',
+                '-map', '1:a:0',
+                '-c:v', 'libx264',
+                '-preset', 'ultrafast',
+                '-crf', '20',
                 '-c:a', 'aac',
-                '-strict', '-2',
+                '-b:a', '192k',
+                '-movflags', '+faststart',
                 tempMergedPath,
               ],
             },
-            // محاولة 4: حاوية Matroska الفائقة (MKV) التي تقبل أي كودك فيديو مع أي كودك صوت بدون مشاكل
+            // محاولة 5: حاوية Matroska الفائقة (MKV) التي تقبل أي كودك فيديو مع أي كودك صوت بدون مشاكل
             {
               'path': tempMergedMkv,
               'args': [

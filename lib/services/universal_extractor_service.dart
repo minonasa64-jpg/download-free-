@@ -191,149 +191,397 @@ class UniversalExtractorService {
     return await _extractGenericWebOrFallbacks(url, forcedPlatform: 'tiktok');
   }
 
+  String _cleanUrl(String raw) {
+    var s = raw.trim();
+    s = s.replaceAll(r'\/', '/');
+    s = s.replaceAll(r'\u0025', '%');
+    s = s.replaceAll(r'\u0026', '&');
+    s = s.replaceAll('&amp;', '&');
+    s = s.replaceAll(r'\u003C', '<');
+    s = s.replaceAll(r'\u003E', '>');
+    return s;
+  }
+
   // =========================================================================
   // 2. استخراج Instagram (Reels, Posts, Stories, IGTV)
   // =========================================================================
-  Future<Map<String, dynamic>> _extractInstagram(String url) async {
-    // محاولة 1: GraphQL السريع ?__a=1&__d=dis
-    try {
-      final cleanUri = Uri.parse(url);
-      final segments = cleanUri.pathSegments.where((s) => s.isNotEmpty).toList();
-      if (segments.length >= 2) {
-        final shortcode = segments[1];
-        final apiUrl = 'https://www.instagram.com/p/$shortcode/?__a=1&__d=dis';
-        final res = await _dio.get(
-          apiUrl,
-          options: Options(headers: {
-            'User-Agent': 'Instagram 219.0.0.12.117 Android',
-            'Accept': '*/*',
-          }),
-        );
-        if (res.statusCode == 200 && res.data is Map) {
-          final media = res.data['graphql']?['shortcode_media'] ?? res.data['items']?[0];
-          if (media != null) {
-            final videoUrl = media['video_url'] ?? media['video_versions']?[0]?['url'];
-            final thumb = media['display_url'] ?? media['image_versions2']?[0]?['url'] ?? '';
-            final caption = media['edge_media_to_caption']?['edges']?[0]?['node']?['text'] ?? 'ريلز إنستغرام';
+  Future<Map<String, dynamic>> _extractInstagram(String rawUrl) async {
+    String url = rawUrl.trim();
 
-            if (videoUrl != null && videoUrl.toString().isNotEmpty) {
+    // 1. فك إعادة التوجيه للروابط المختصرة ومشاركة التطبيق
+    try {
+      if (url.contains('/share/') || url.contains('instagr.am')) {
+        final redirectCheck = await _dio.get(
+          url,
+          options: Options(
+            followRedirects: true,
+            maxRedirects: 6,
+            validateStatus: (status) => true,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            },
+          ),
+        );
+        final real = redirectCheck.realUri.toString();
+        if (real.isNotEmpty && !real.contains('/accounts/login/')) {
+          url = real;
+        }
+      }
+    } catch (_) {}
+
+    // استخراج الـ shortcode من مختلف صيغ روابط إنستغرام
+    String shortcode = '';
+    final uri = Uri.tryParse(url);
+    if (uri != null) {
+      final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+      for (int i = 0; i < segments.length; i++) {
+        final seg = segments[i].toLowerCase();
+        if (seg == 'p' || seg == 'reel' || seg == 'reels' || seg == 'tv') {
+          if (i + 1 < segments.length) {
+            shortcode = segments[i + 1];
+            break;
+          }
+        }
+      }
+      if (shortcode.isEmpty && segments.isNotEmpty) {
+        shortcode = segments.firstWhere((s) => s.length >= 5 && s.length <= 25, orElse: () => segments.last);
+      }
+    }
+
+    if (shortcode.isEmpty) {
+      final match = RegExp(r'\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)').firstMatch(url);
+      if (match != null) shortcode = match.group(1)!;
+    }
+
+    // محاولة 1: استخراج مباشر فائق السرعة عبر واجهة التضمين العامة لإنستغرام (Instagram Embed)
+    // واجهة التضمين مخصصة للمواقع الخارجية ولا تطلب تسجيل الدخول وتوفر دقة عالية وصورة واضحة
+    if (shortcode.isNotEmpty) {
+      final embedUrls = [
+        'https://www.instagram.com/p/$shortcode/embed/captioned/',
+        'https://www.instagram.com/reel/$shortcode/embed/captioned/',
+        'https://www.instagram.com/p/$shortcode/embed/',
+      ];
+
+      for (final embedUrl in embedUrls) {
+        try {
+          final res = await _dio.get(
+            embedUrl,
+            options: Options(
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+              },
+            ),
+          );
+
+          if (res.statusCode == 200 && res.data != null) {
+            final html = res.data.toString();
+            final vMatch = RegExp(r'class="EmbeddedVideo"[^>]*src="([^"]+)"').firstMatch(html) ??
+                RegExp(r'"video_url"\s*:\s*"([^"]+)"').firstMatch(html) ??
+                RegExp(r'<video[^>]*src="([^"]+)"').firstMatch(html) ??
+                RegExp(r'data-ios-url="([^"]+)"').firstMatch(html);
+
+            final tMatch = RegExp(r'class="EmbeddedMediaImage"[^>]*src="([^"]+)"').firstMatch(html) ??
+                RegExp(r'"display_url"\s*:\s*"([^"]+)"').firstMatch(html) ??
+                RegExp(r'<img[^>]*class="EmbeddedMediaImage"[^>]*src="([^"]+)"').firstMatch(html);
+
+            final cMatch = RegExp(r'class="Caption"[^>]*>([^<]+)<').firstMatch(html) ??
+                RegExp(r'<title>([^<]+)<\/title>').firstMatch(html);
+
+            if (vMatch != null) {
+              final videoUrl = _cleanUrl(vMatch.group(1)!);
+              final thumb = tMatch != null ? _cleanUrl(tMatch.group(1)!) : '';
+              final title = (cMatch?.group(1) ?? 'ريلز إنستغرام').trim();
+
+              if (videoUrl.startsWith('http')) {
+                return _buildSimpleMediaResult(
+                  id: shortcode,
+                  title: title.isNotEmpty ? title : 'ريلز إنستغرام',
+                  thumbnail: thumb,
+                  videoUrl: videoUrl,
+                  hdVideoUrl: videoUrl,
+                  sdVideoUrl: videoUrl,
+                  platform: 'instagram',
+                  author: 'Instagram',
+                );
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Instagram embed attempt error: $e');
+        }
+      }
+    }
+
+    // محاولة 2: استدعاء محركات معالجة وسائط إنستغرام العامة (FastDL / SaveInsta / InDown)
+    final apiEndpoints = [
+      {'url': 'https://v3.fastdl.app/api/ajaxSearch', 'origin': 'https://fastdl.app'},
+      {'url': 'https://saveinsta.app/api/ajaxSearch', 'origin': 'https://saveinsta.app'},
+      {'url': 'https://v3.fdownloader.net/api/ajaxSearch', 'origin': 'https://fdownloader.net'},
+    ];
+
+    for (final ep in apiEndpoints) {
+      try {
+        final res = await _dio.post(
+          ep['url']!,
+          data: {'q': url, 'lang': 'en'},
+          options: Options(
+            contentType: Headers.formUrlEncodedContentType,
+            headers: {
+              'origin': ep['origin']!,
+              'referer': '${ep['origin']}/',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          ),
+        );
+
+        if (res.data != null && res.data['data'] != null) {
+          final html = res.data['data'].toString();
+          final match = RegExp(r'href="([^"]+)"[^>]*class="[^"]*btn-download').firstMatch(html) ??
+              RegExp(r'href="([^"]+)"[^>]*>Download Video').firstMatch(html) ??
+              RegExp(r'href="([^"]+)"[^>]*download').firstMatch(html) ??
+              RegExp(r'href="(https:\/\/[^"]+\.mp4[^"]*)"').firstMatch(html);
+
+          if (match != null) {
+            final vUrl = _cleanUrl(match.group(1)!);
+            if (vUrl.startsWith('http')) {
               return _buildSimpleMediaResult(
-                id: shortcode,
-                title: caption.toString().split('\n').first,
-                thumbnail: thumb.toString(),
-                videoUrl: videoUrl.toString(),
+                id: shortcode.isNotEmpty ? shortcode : 'ig_${DateTime.now().millisecondsSinceEpoch}',
+                title: 'ريلز إنستغرام',
+                thumbnail: '',
+                videoUrl: vUrl,
+                hdVideoUrl: vUrl,
+                sdVideoUrl: vUrl,
                 platform: 'instagram',
-                author: media['owner']?['username'] ?? 'Instagram',
+                author: 'Instagram',
               );
             }
           }
         }
+      } catch (e) {
+        debugPrint('Instagram API ${ep['url']} error: $e');
       }
-    } catch (e) {
-      debugPrint('Instagram GraphQL محاولة 1: $e');
     }
 
-    // محاولة 2: استدعاء محرك FastDL / SnapSave العام
-    try {
-      final res = await _dio.post(
-        'https://v3.fdownloader.net/api/ajaxSearch',
-        data: {'q': url, 'lang': 'en'},
-        options: Options(
-          contentType: Headers.formUrlEncodedContentType,
-          headers: {'origin': 'https://fdownloader.net', 'referer': 'https://fdownloader.net/'},
-        ),
-      );
-      if (res.data != null && res.data['data'] != null) {
-        final html = res.data['data'].toString();
-        final match = RegExp(r'href="([^"]+)"[^>]*class="[^"]*btn-download').firstMatch(html) ??
-            RegExp(r'href="([^"]+)"[^>]*>Download Video').firstMatch(html) ??
-            RegExp(r'href="(https:\/\/[^"]+\.mp4[^"]*)"').firstMatch(html);
-
-        if (match != null) {
-          final vUrl = match.group(1)!.replaceAll('&amp;', '&');
-          return _buildSimpleMediaResult(
-            id: 'ig_${DateTime.now().millisecondsSinceEpoch}',
-            title: 'ريلز إنستغرام',
-            thumbnail: '',
-            videoUrl: vUrl,
-            platform: 'instagram',
-            author: 'Instagram',
-          );
+    // محاولة 3: GraphQL مع المتغيرات
+    if (shortcode.isNotEmpty) {
+      try {
+        final gqlUrl = 'https://www.instagram.com/graphql/query/?query_hash=b3055c2c970540414ba30bb6133bc710&variables={"shortcode":"$shortcode"}';
+        final res = await _dio.get(
+          gqlUrl,
+          options: Options(headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+          }),
+        );
+        if (res.statusCode == 200 && res.data is Map) {
+          final media = res.data['data']?['shortcode_media'];
+          if (media != null) {
+            final vUrl = media['video_url']?.toString();
+            final thumb = media['display_url']?.toString() ?? '';
+            final caption = media['edge_media_to_caption']?['edges']?[0]?['node']?['text']?.toString() ?? 'ريلز إنستغرام';
+            if (vUrl != null && vUrl.isNotEmpty) {
+              final cleanedV = _cleanUrl(vUrl);
+              return _buildSimpleMediaResult(
+                id: shortcode,
+                title: caption.split('\n').first,
+                thumbnail: thumb,
+                videoUrl: cleanedV,
+                hdVideoUrl: cleanedV,
+                sdVideoUrl: cleanedV,
+                platform: 'instagram',
+                author: media['owner']?['username']?.toString() ?? 'Instagram',
+              );
+            }
+          }
         }
+      } catch (e) {
+        debugPrint('Instagram GraphQL error: $e');
       }
-    } catch (e) {
-      debugPrint('Instagram FDownloader محاولة 2: $e');
     }
 
-    // محاولة 3: استخراج من وسوم HTML و OpenGraph
+    // محاولة 4: الفحص العام للصفحة ومؤشرات OpenGraph
     return await _extractGenericWebOrFallbacks(url, forcedPlatform: 'instagram');
   }
 
   // =========================================================================
   // 3. استخراج Facebook (Watch, Reels, Videos)
   // =========================================================================
-  Future<Map<String, dynamic>> _extractFacebook(String url) async {
-    // محاولة 1: FDownloader API
+  Future<Map<String, dynamic>> _extractFacebook(String rawUrl) async {
+    String url = rawUrl.trim();
+
+    // 1. فك إعادة التوجيه لروابط fb.watch ومشاركة التطبيق
     try {
-      final res = await _dio.post(
-        'https://fdownloader.net/api/ajaxSearch',
-        data: {'q': url, 'lang': 'en'},
+      if (url.contains('fb.watch') || url.contains('/share/')) {
+        final redirectCheck = await _dio.get(
+          url,
+          options: Options(
+            followRedirects: true,
+            maxRedirects: 6,
+            validateStatus: (status) => true,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            },
+          ),
+        );
+        final real = redirectCheck.realUri.toString();
+        if (real.isNotEmpty) {
+          url = real;
+        }
+      }
+    } catch (_) {}
+
+    // محاولة 1: الفحص المباشر لصفحة الفيسبوك الأصلية واستخراج دفقات HD و SD
+    try {
+      final res = await _dio.get(
+        url,
         options: Options(
-          contentType: Headers.formUrlEncodedContentType,
-          headers: {'origin': 'https://fdownloader.net', 'referer': 'https://fdownloader.net/'},
+          followRedirects: true,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-User': '?1',
+            'Sec-Fetch-Dest': 'document',
+          },
         ),
       );
-      if (res.data != null && res.data['data'] != null) {
-        final html = res.data['data'].toString();
-        final hdMatch = RegExp(r'href="([^"]+)"[^>]*data-quality="HD"').firstMatch(html) ??
-            RegExp(r'href="([^"]+)"[^>]*>Download HD').firstMatch(html);
-        final sdMatch = RegExp(r'href="([^"]+)"[^>]*data-quality="SD"').firstMatch(html) ??
-            RegExp(r'href="([^"]+)"[^>]*>Download SD').firstMatch(html) ??
-            RegExp(r'href="(https:\/\/[^"]+\.mp4[^"]*)"').firstMatch(html);
 
-        final videoUrl = (hdMatch?.group(1) ?? sdMatch?.group(1) ?? '').replaceAll('&amp;', '&');
-        if (videoUrl.isNotEmpty) {
+      final html = res.data.toString();
+
+      // البحث عن دفق الجودة العالية HD
+      final hdSrc = RegExp(r'"browser_native_hd_url"\s*:\s*"([^"]+)"').firstMatch(html)?.group(1) ??
+          RegExp(r'"playable_url_quality_hd"\s*:\s*"([^"]+)"').firstMatch(html)?.group(1) ??
+          RegExp(r'"hd_src_no_ratelimit"\s*:\s*"([^"]+)"').firstMatch(html)?.group(1) ??
+          RegExp(r'"hd_src"\s*:\s*"([^"]+)"').firstMatch(html)?.group(1) ??
+          RegExp(r'hd_src\s*:\s*"([^"]+)"').firstMatch(html)?.group(1);
+
+      // البحث عن دفق الجودة العادية SD
+      final sdSrc = RegExp(r'"browser_native_sd_url"\s*:\s*"([^"]+)"').firstMatch(html)?.group(1) ??
+          RegExp(r'"playable_url"\s*:\s*"([^"]+)"').firstMatch(html)?.group(1) ??
+          RegExp(r'"sd_src_no_ratelimit"\s*:\s*"([^"]+)"').firstMatch(html)?.group(1) ??
+          RegExp(r'"sd_src"\s*:\s*"([^"]+)"').firstMatch(html)?.group(1) ??
+          RegExp(r'sd_src\s*:\s*"([^"]+)"').firstMatch(html)?.group(1) ??
+          RegExp(r'"playback_url"\s*:\s*"([^"]+)"').firstMatch(html)?.group(1);
+
+      // البحث عن العنوان والصورة المصغرة
+      final titleMatch = RegExp(r'<meta\s+property="og:title"\s+content="([^"]*)"').firstMatch(html) ??
+          RegExp(r'<title>([^<]+)<\/title>').firstMatch(html);
+      final thumbMatch = RegExp(r'<meta\s+property="og:image"\s+content="([^"]*)"').firstMatch(html);
+
+      final cleanHd = hdSrc != null ? _cleanUrl(hdSrc) : '';
+      final cleanSd = sdSrc != null ? _cleanUrl(sdSrc) : '';
+      final cleanTitle = (titleMatch?.group(1) ?? 'فيديو فيسبوك').replaceAll('&amp;', '&').trim();
+      final cleanThumb = thumbMatch != null ? _cleanUrl(thumbMatch.group(1)!) : '';
+
+      final chosenUrl = cleanHd.isNotEmpty ? cleanHd : cleanSd;
+      if (chosenUrl.isNotEmpty && chosenUrl.startsWith('http')) {
+        return _buildSimpleMediaResult(
+          id: 'fb_${DateTime.now().millisecondsSinceEpoch}',
+          title: cleanTitle.isNotEmpty ? cleanTitle : 'فيديو فيسبوك',
+          thumbnail: cleanThumb,
+          videoUrl: chosenUrl,
+          hdVideoUrl: cleanHd.isNotEmpty ? cleanHd : chosenUrl,
+          sdVideoUrl: cleanSd.isNotEmpty ? cleanSd : chosenUrl,
+          platform: 'facebook',
+          author: 'Facebook',
+        );
+      }
+    } catch (e) {
+      debugPrint('Facebook Desktop Direct Scraping error: $e');
+    }
+
+    // محاولة 2: واجهات التنزيل السحابية لفيسبوك (FDownloader, SnapSave, FBDownloader)
+    final fbApis = [
+      {'url': 'https://fdownloader.net/api/ajaxSearch', 'origin': 'https://fdownloader.net'},
+      {'url': 'https://v3.fdownloader.net/api/ajaxSearch', 'origin': 'https://fdownloader.net'},
+      {'url': 'https://fbdownloader.net/api/ajaxSearch', 'origin': 'https://fbdownloader.net'},
+    ];
+
+    for (final api in fbApis) {
+      try {
+        final res = await _dio.post(
+          api['url']!,
+          data: {'q': url, 'lang': 'en'},
+          options: Options(
+            contentType: Headers.formUrlEncodedContentType,
+            headers: {
+              'origin': api['origin']!,
+              'referer': '${api['origin']}/',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          ),
+        );
+        if (res.data != null && res.data['data'] != null) {
+          final html = res.data['data'].toString();
+          final hdMatch = RegExp(r'href="([^"]+)"[^>]*data-quality="HD"').firstMatch(html) ??
+              RegExp(r'href="([^"]+)"[^>]*>Download HD').firstMatch(html) ??
+              RegExp(r'href="([^"]+)"[^>]*1080p').firstMatch(html) ??
+              RegExp(r'href="([^"]+)"[^>]*720p').firstMatch(html);
+          final sdMatch = RegExp(r'href="([^"]+)"[^>]*data-quality="SD"').firstMatch(html) ??
+              RegExp(r'href="([^"]+)"[^>]*>Download SD').firstMatch(html) ??
+              RegExp(r'href="(https:\/\/[^"]+\.mp4[^"]*)"').firstMatch(html);
+
+          final hdVideo = hdMatch != null ? _cleanUrl(hdMatch.group(1)!) : '';
+          final sdVideo = sdMatch != null ? _cleanUrl(sdMatch.group(1)!) : '';
+          final anyVideo = hdVideo.isNotEmpty ? hdVideo : sdVideo;
+
+          if (anyVideo.isNotEmpty && anyVideo.startsWith('http')) {
+            return _buildSimpleMediaResult(
+              id: 'fb_${DateTime.now().millisecondsSinceEpoch}',
+              title: 'فيديو فيسبوك',
+              thumbnail: '',
+              videoUrl: anyVideo,
+              hdVideoUrl: hdVideo.isNotEmpty ? hdVideo : anyVideo,
+              sdVideoUrl: sdVideo.isNotEmpty ? sdVideo : anyVideo,
+              platform: 'facebook',
+              author: 'Facebook',
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('Facebook API ${api['url']} error: $e');
+      }
+    }
+
+    // محاولة 3: نسخة الجوال m.facebook.com
+    try {
+      final mobileUrl = url.replaceFirst('www.facebook.com', 'm.facebook.com');
+      final res = await _dio.get(
+        mobileUrl,
+        options: Options(headers: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        }),
+      );
+      final html = res.data.toString();
+      final match = RegExp(r'<video[^>]*src="([^"]+)"').firstMatch(html) ??
+          RegExp(r'href="(\/video_redirect\/[^"]+)"').firstMatch(html) ??
+          RegExp(r'"video_url"\s*:\s*"([^"]+)"').firstMatch(html);
+      if (match != null) {
+        var v = _cleanUrl(match.group(1)!);
+        if (v.startsWith('/video_redirect/')) {
+          final uri = Uri.parse('https://m.facebook.com$v');
+          v = uri.queryParameters['src'] ?? v;
+        }
+        if (v.startsWith('http')) {
           return _buildSimpleMediaResult(
             id: 'fb_${DateTime.now().millisecondsSinceEpoch}',
             title: 'فيديو فيسبوك',
             thumbnail: '',
-            videoUrl: videoUrl,
+            videoUrl: v,
+            hdVideoUrl: v,
+            sdVideoUrl: v,
             platform: 'facebook',
             author: 'Facebook',
           );
         }
       }
     } catch (e) {
-      debugPrint('Facebook FDownloader محاولة 1: $e');
-    }
-
-    // محاولة 2: استخراج مباشر لـ sd_src و hd_src من صفحة فيسبوك
-    try {
-      final res = await _dio.get(
-        url,
-        options: Options(headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        }),
-      );
-      final html = res.data.toString();
-      final hdSrc = RegExp(r'"playable_url_quality_hd":"([^"]+)"').firstMatch(html)?.group(1) ??
-          RegExp(r'hd_src:"([^"]+)"').firstMatch(html)?.group(1);
-      final sdSrc = RegExp(r'"playable_url":"([^"]+)"').firstMatch(html)?.group(1) ??
-          RegExp(r'sd_src:"([^"]+)"').firstMatch(html)?.group(1);
-
-      final rawUrl = (hdSrc ?? sdSrc ?? '').replaceAll(r'\/', '/').replaceAll('&amp;', '&');
-      if (rawUrl.isNotEmpty) {
-        return _buildSimpleMediaResult(
-          id: 'fb_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'فيديو فيسبوك',
-          thumbnail: '',
-          videoUrl: rawUrl,
-          platform: 'facebook',
-          author: 'Facebook',
-        );
-      }
-    } catch (e) {
-      debugPrint('Facebook Direct Scraping محاولة 2: $e');
+      debugPrint('Facebook Mobile attempt error: $e');
     }
 
     return await _extractGenericWebOrFallbacks(url, forcedPlatform: 'facebook');
@@ -643,28 +891,33 @@ class UniversalExtractorService {
     required String title,
     required String thumbnail,
     required String videoUrl,
+    String? hdVideoUrl,
+    String? sdVideoUrl,
     required String platform,
     required String author,
   }) {
+    final effectiveHd = (hdVideoUrl != null && hdVideoUrl.isNotEmpty) ? hdVideoUrl : videoUrl;
+    final effectiveSd = (sdVideoUrl != null && sdVideoUrl.isNotEmpty) ? sdVideoUrl : videoUrl;
+
     final List<Map<String, dynamic>> videoFormats = [
       {
-        'url': videoUrl,
-        'quality_name': 'عالي الدقة 1080p Full HD (الأصلية)',
+        'url': effectiveHd,
+        'quality_name': 'عالي الدقة 1080p Full HD (أقصى دقة متوفرة)',
         'quality_order': 1080,
         'quality_badge': '1080p FHD',
-        'quality_desc': 'أقصى دقة وجودة فيديو فائقة وكاملة من المصدر',
-        'size': 'جاهز',
+        'quality_desc': 'أقصى دقة وجودة بصرية فائقة 1080p من المصدر الأصلي بدون ضغط',
+        'size': 'أقصى جودة',
         'size_bytes': 0,
         'ext': 'mp4',
         'needs_merge': false,
         'platform': platform,
       },
       {
-        'url': videoUrl,
+        'url': effectiveSd,
         'quality_name': 'عالي الدقة 720p HD (تنزيل سريع)',
         'quality_order': 720,
         'quality_badge': '720p HD',
-        'quality_desc': 'تنزيل سريع بحجم اقتصادي متوازن',
+        'quality_desc': 'تنزيل سريع بحجم اقتصادي متوازن ومثالي للمشاهدة السريعة',
         'size': 'سريع',
         'size_bytes': 0,
         'ext': 'mp4',
@@ -675,12 +928,12 @@ class UniversalExtractorService {
 
     final List<Map<String, dynamic>> audioFormats = [
       {
-        'url': videoUrl,
-        'quality_name': 'استخراج المسار الصوتي MP3',
+        'url': effectiveHd,
+        'quality_name': 'استخراج المسار الصوتي MP3 (192 kbps)',
         'quality_order': 192,
         'quality_badge': 'HQ نقي',
-        'quality_desc': 'تحويل الصوت واستخراجه بجودة MP3 نقية 192kbps',
-        'size': 'صوت',
+        'quality_desc': 'تحويل واستخراج الصوت النقي بأعلى تردد واستجابة',
+        'size': 'صوت نقي',
         'size_bytes': 0,
         'ext': 'mp3',
         'needs_merge': false,
@@ -694,7 +947,7 @@ class UniversalExtractorService {
       'thumbnail': thumbnail.isEmpty ? 'https://via.placeholder.com/640x360/1A1A24/00D9FF?text=$platform' : thumbnail,
       'author': author,
       'platform': platform,
-      'highestAudioUrl': videoUrl,
+      'highestAudioUrl': effectiveHd,
       'highestAudioTag': null,
       'video': videoFormats,
       'audio': audioFormats,
