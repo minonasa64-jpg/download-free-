@@ -67,6 +67,8 @@ jobs:
           if app is not None:
               app.set('{http://schemas.android.com/apk/res/android}largeHeap', 'true')
               app.set('{http://schemas.android.com/apk/res/android}requestLegacyExternalStorage', 'true')
+              app.set('{http://schemas.android.com/apk/res/android}usesCleartextTraffic', 'true')
+              app.set('{http://schemas.android.com/apk/res/android}hardwareAccelerated', 'true')
 
               for act in app.findall('activity'):
                   if '{http://schemas.android.com/apk/res/android}taskAffinity' in act.attrib:
@@ -538,6 +540,8 @@ jobs:
           -keep class com.unity3d.services.** { *; }
           -dontwarn com.unity3d.ads.**
           -dontwarn com.unity3d.services.**
+          -keep class com.rebeloid.unity_ads_plugin.** { *; }
+          -dontwarn com.rebeloid.unity_ads_plugin.**
           EOF
 
       - name: Install Dependencies
@@ -559,19 +563,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v1.3.4"
-          RELEASE_TITLE="Boykta Pro v1.3.4 - ترقية وتفعيل جودة الفيديو إلى 1080p Full HD كخيار أساسي فائق الدقة"
+          TAG="v1.3.5"
+          RELEASE_TITLE="Boykta Pro v1.3.5 - إصلاح ظهور إعلانات البنر Unity Ads وإضافة أدوات التحكم والتشخيص"
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           
-          NOTES="🚀 **Boykta Pro v1.3.4** - رفع دقة التحميل إلى أقصى جودة ممكنة (1080p Full HD) عبر الرابط!
+          NOTES="🚀 **Boykta Pro v1.3.5** - إصلاح شامل لإعلانات البنر (Unity Ads Banner) مع إضافة لوحة تحكم وتشخيص كاملة بالإعدادات!
 
-          ### ✨ أبرز ما في هذا التحديث:
-          - 💎 **ترقية جودة الفيديو إلى 1080p Full HD:** تمكين وتفعيل أعلى جودة متاحة 1080p FHD ووضعها في أعلى قائمة الخيارات وتحديدها تلقائياً عند لصق الرابط.
-          - 🎯 **اختيار ذكي وفوري:** ترتيب الجودات تنازلياً بحيث تظهر 1080p Full HD فوراً للمستخدم بدون الحاجة للبحث، مع تمييزها بشارة FHD المضيئة.
-          - ⚡ **دعم التنزيل الدفعي بدقة 1080p:** تحديث التنزيل الدفعي وقوائم التشغيل لاختيار 1080p FHD افتراضياً بدلاً من التقيد بـ 720p.
-          - 🎬 **تطوير محرك دمج الصوت والصورة:** دعم مسارات 1080p المدمجة عالية النقاء بتوافق تام مع مشغلات الأندرويد واستديو الصور.
-          - 🎮 **نظام إعلانات Unity Ads:** استمرار العمل الكامل لإعلانات Unity Ads الرسمية.
-          - 🛡️ **الحفاظ على كافة الميزات السابقة:** الخزنة الآمنة، متصفح ملء الشاشة، مشغل PiP، ووضع التوربو.
+          ### ✨ أبرز ما تم إنجازه في هذا الإصدار:
+          - 🎯 **حل مشكلة عدم ظهور بنر Unity Ads نهائياً:**
+            * إزالة قيد الارتفاع الصفري (Height: 0) الذي كان يتسبب في حظر قياس ورسم منصة Android Native PlatformView وإفشال تحميل الإعلان في Unity Ads SDK.
+            * تثبيت أبعاد شريط البنر الرسمية (320x50 Standard Banner) لضمان استجابة وتوافق تام مع منصة الأندرويد.
+            * إضافة مهلة ذكية (Debounce Timeout) عند التبديل بين المعرفات البديلة لمنع حظر الطلبات السريعة.
+            * تفعيل خيارات حركة المرور والوسائط \`usesCleartextTraffic\` و \`hardwareAccelerated\` لتفادي الشاشات السوداء في إعلانات Unity.
+          - ⚙️ **إضافة قسم إعلانات Unity Ads في صفحة الإعدادات:**
+            * مؤشر حالة لحظي يعرض حالة الاتصال بالسيرفر وجاهزية الإعلانات.
+            * زر تبديل وضع الإعلانات التجريبية (Test Mode) لتجربة ظهور الإعلانات فوراً على أي جهاز.
+            * زر تحديث وتحضير الإعلانات عند الطلب بدون الحاجة لإعادة تشغيل التطبيق.
+          - 💎 **الحفاظ التام على ميزة 1080p Full HD:** استمرار دعم أعلى دقة 1080p FHD لتنزيل فيديوهات تيك توك، يوتيوب، وفيسبوك، مع إمكانية التحميل بالعلامة المائية أو بدونها.
+          - 🛡️ **استقرار كافة الميزات السابقة:** الخزنة الآمنة، متصفح ملء الشاشة، مشاركة Wi-Fi، ومشغل PiP.
           
           📲 **التثبيت المباشر:** قم بتحميل ملف \`app-release.apk\` المرفق أدناه وتثبيته مباشرة على هاتفك الأندرويد."
 

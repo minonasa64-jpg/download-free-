@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unity_ads_plugin/unity_ads_plugin.dart';
 
 class AdService {
@@ -15,29 +16,47 @@ class AdService {
 
   bool _isInitialized = false;
   final ValueNotifier<bool> isInitializedNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<String> adStatusNotifier = ValueNotifier<String>('جاري التهيئة...');
 
-  bool _isTestMode = false;
+  bool _isTestMode = true;
   bool _isInterstitialLoaded = false;
   bool _isInterstitialLoading = false;
   int _interstitialRetryCount = 0;
+  int _interstitialPlacementIndex = 0;
   Timer? _interstitialRetryTimer;
+
+  static const List<String> _candidateInterstitialPlacements = [
+    interstitialPlacementId, // "BP_Interstitial_Android"
+    "Interstitial_Android",
+    "video",
+    "Interstitial",
+  ];
 
   bool get isInitialized => _isInitialized;
   bool get isInterstitialLoaded => _isInterstitialLoaded;
+  bool get isTestMode => _isTestMode;
+  String get currentInterstitialPlacement =>
+      _candidateInterstitialPlacements[_interstitialPlacementIndex % _candidateInterstitialPlacements.length];
 
-  // تهيئة نظام إعلانات Unity Ads
-  static Future<void> init({bool testMode = false}) async {
+  // تهيئة نظام إعلانات Unity Ads مع قراءة التفضيلات المحفوظة
+  static Future<void> init({bool? testMode}) async {
     try {
-      debugPrint("Unity Ads: Initializing with Game ID: $gameId (testMode: $testMode)");
-      _instance._isTestMode = testMode;
+      final prefs = await SharedPreferences.getInstance();
+      final savedTestMode = prefs.getBool('unity_ads_test_mode');
+      final effectiveTestMode = testMode ?? savedTestMode ?? true; // الافتراضي هو تفعيل وضع الاختبار لضمان الظهور الفوري
+      _instance._isTestMode = effectiveTestMode;
+
+      debugPrint("Unity Ads: Initializing with Game ID: $gameId (testMode: $effectiveTestMode)");
+      _instance.adStatusNotifier.value = 'جاري الاتصال بـ Unity Ads...';
 
       await UnityAds.init(
         gameId: gameId,
-        testMode: testMode,
+        testMode: effectiveTestMode,
         onComplete: () {
           debugPrint("Unity Ads: Initialized successfully!");
           _instance._isInitialized = true;
           _instance.isInitializedNotifier.value = true;
+          _instance.adStatusNotifier.value = effectiveTestMode ? 'متصل (وضع الاختبار نشط)' : 'متصل وجاهز (إعلانات حقيقية)';
           // بدء تحميل الإعلان البيني ليكون جاهزاً للاستخدام فوراً
           _instance.loadInterstitialAd();
         },
@@ -45,6 +64,7 @@ class AdService {
           debugPrint("Unity Ads Init Error ($error): $message");
           _instance._isInitialized = false;
           _instance.isInitializedNotifier.value = false;
+          _instance.adStatusNotifier.value = 'تعذر الاتصال ($error)';
           // محاولة إعادة التهيئة لاحقاً بعد ثوانٍ قليلة في حال عدم استقرار الاتصال
           _instance._scheduleInitRetry();
         },
@@ -53,6 +73,7 @@ class AdService {
       debugPrint("Unity Ads Init Exception: $e");
       _instance._isInitialized = false;
       _instance.isInitializedNotifier.value = false;
+      _instance.adStatusNotifier.value = 'خطأ في التهيئة';
       _instance._scheduleInitRetry();
     }
   }
@@ -66,32 +87,56 @@ class AdService {
     });
   }
 
-  /// تبديل وضع الإعلانات (اختبار أو إعلانات حقيقية)
+  /// تبديل وضع الإعلانات وحفظه في الذاكرة
   Future<void> setTestMode(bool enabled) async {
     _isTestMode = enabled;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('unity_ads_test_mode', enabled);
+    } catch (_) {}
     await init(testMode: enabled);
   }
 
-  // تحميل الإعلان البيني مسبقاً في الخلفية مع إعادة محاولة ذكية
+  /// إعادة تحميل الإعلانات البينية والبنر فوراً
+  Future<void> reloadAds() async {
+    _isInterstitialLoaded = false;
+    _isInterstitialLoading = false;
+    _interstitialRetryCount = 0;
+    _interstitialPlacementIndex = 0;
+    await init(testMode: _isTestMode);
+    loadInterstitialAd();
+  }
+
+  // تحميل الإعلان البيني مسبقاً في الخلفية مع دعم المعرفات البديلة
   void loadInterstitialAd() {
     if (_isInterstitialLoading || _isInterstitialLoaded) return;
     _isInterstitialLoading = true;
 
+    final targetPlacement = currentInterstitialPlacement;
+
     try {
-      debugPrint("Unity Ads: Loading interstitial ad for placement: $interstitialPlacementId (attempt ${_interstitialRetryCount + 1})...");
+      debugPrint("Unity Ads: Loading interstitial ad for placement: $targetPlacement (attempt ${_interstitialRetryCount + 1})...");
       UnityAds.load(
-        placementId: interstitialPlacementId,
+        placementId: targetPlacement,
         onComplete: (placementId) {
           debugPrint("Unity Ads: Interstitial ad loaded successfully and ready! ($placementId)");
           _isInterstitialLoaded = true;
           _isInterstitialLoading = false;
           _interstitialRetryCount = 0;
+          adStatusNotifier.value = _isTestMode ? 'متصل (إعلان بيني وبنر جاهزان)' : 'متصل وجاهز';
         },
         onFailed: (placementId, error, message) {
           debugPrint("Unity Ads: Interstitial ad failed to load ($placementId): $error - $message");
           _isInterstitialLoaded = false;
           _isInterstitialLoading = false;
-          _scheduleInterstitialRetry();
+          // تجربة المعرف البديل التالي
+          if (_interstitialPlacementIndex < _candidateInterstitialPlacements.length - 1) {
+            _interstitialPlacementIndex++;
+            debugPrint("Unity Ads: Switching to candidate interstitial placement: $currentInterstitialPlacement");
+            Timer(const Duration(milliseconds: 600), () => loadInterstitialAd());
+          } else {
+            _scheduleInterstitialRetry();
+          }
         },
       );
     } catch (e) {
@@ -103,6 +148,7 @@ class AdService {
   }
 
   void _scheduleInterstitialRetry() {
+    _interstitialPlacementIndex = 0;
     if (_interstitialRetryCount < 6) {
       _interstitialRetryCount++;
       _interstitialRetryTimer?.cancel();
@@ -123,12 +169,14 @@ class AdService {
       return;
     }
 
+    final targetPlacement = currentInterstitialPlacement;
+
     try {
-      debugPrint("Unity Ads: Showing interstitial video ad...");
+      debugPrint("Unity Ads: Showing interstitial video ad ($targetPlacement)...");
       _isInterstitialLoaded = false;
 
       UnityAds.showVideoAd(
-        placementId: interstitialPlacementId,
+        placementId: targetPlacement,
         onStart: (placementId) {
           debugPrint("Unity Ads: Interstitial ad started: $placementId");
         },
@@ -178,7 +226,7 @@ class AdService {
   }
 }
 
-/// ويدجت شريط البنر الإعلاني لـ Unity Ads مع منع ظهور الشاشة السوداء، وتبديل المعرفات التلقائي، وإعادة المحاولة الذكية
+/// ويدجت شريط البنر الإعلاني لـ Unity Ads بحجم ثابت 320x50 يمنع أخطاء القياس ويضمن ظهور الإعلان
 class _SmartUnityBanner extends StatefulWidget {
   final VoidCallback? onLoaded;
   final Function(String, dynamic, String)? onFailed;
@@ -212,13 +260,17 @@ class _SmartUnityBannerState extends State<_SmartUnityBanner> {
       widget.onFailed!(failedId, error, errorMessage);
     }
 
-    // إذا لم ينجح المعرف الحالي، نجرب المعرف التالي فوراً
+    // إذا لم ينجح المعرف الحالي، نجرب المعرف التالي بعد مهلة قصيرة لتفادي حظر الطلبات السريعة
     if (_placementIndex < _candidatePlacements.length - 1) {
       _placementIndex++;
       debugPrint("Unity Ads Banner: Switching to candidate placement: $_currentPlacement");
-      setState(() {
-        _isBannerLoaded = false;
-        _bannerKey = UniqueKey();
+      Timer(const Duration(milliseconds: 600), () {
+        if (mounted) {
+          setState(() {
+            _isBannerLoaded = false;
+            _bannerKey = UniqueKey();
+          });
+        }
       });
     } else {
       debugPrint("Unity Ads Banner: All candidate placements failed. Scheduling retry...");
@@ -249,12 +301,15 @@ class _SmartUnityBannerState extends State<_SmartUnityBanner> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-      height: _isBannerLoaded ? 50 : 0,
-      margin: EdgeInsets.only(bottom: _isBannerLoaded ? 6 : 0),
+    return Container(
+      width: 320,
+      height: 50,
+      margin: const EdgeInsets.only(bottom: 6),
       alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: _isBannerLoaded ? Colors.transparent : Colors.black.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: SizedBox(
@@ -263,49 +318,69 @@ class _SmartUnityBannerState extends State<_SmartUnityBanner> {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // خلفية شفافة نظيفة تمنع ظهور أي لون أسود أو مساحة فارغة
-              Container(
-                width: 320,
-                height: 50,
-                color: Colors.transparent,
-              ),
-
-              // ويدجت الإعلان الرسمي: محجوب الشفافية تماماً حتى ينتهي التحميل بنجاح 100%
-              Opacity(
-                opacity: _isBannerLoaded ? 1.0 : 0.0,
-                child: SizedBox(
+              // مؤشر خفيف يظهر أثناء انتظار رد السيرفر ويختفي تلقائياً عند ظهور الإعلان
+              if (!_isBannerLoaded)
+                Container(
                   width: 320,
                   height: 50,
-                  child: UnityBannerAd(
-                    key: _bannerKey,
-                    placementId: _currentPlacement,
-                    size: BannerSize.standard,
-                    onLoad: (placementId) {
-                      debugPrint("Unity Ads Banner: Ad loaded successfully ($placementId)");
-                      if (mounted) {
-                        setState(() {
-                          _isBannerLoaded = true;
-                          _retryCount = 0;
-                        });
-                        if (widget.onLoaded != null) widget.onLoaded!();
-                      }
-                    },
-                    onClick: (placementId) {
-                      debugPrint("Unity Ads Banner: Ad clicked ($placementId)");
-                    },
-                    onShown: (placementId) {
-                      debugPrint("Unity Ads Banner: Ad shown ($placementId)");
-                      if (mounted && !_isBannerLoaded) {
-                        setState(() {
-                          _isBannerLoaded = true;
-                        });
-                      }
-                    },
-                    onFailed: (placementId, error, errorMessage) {
-                      debugPrint("Unity Ads Banner: Load failed ($placementId): $error - $errorMessage");
-                      _handleFailure(placementId, error, errorMessage);
-                    },
+                  color: Colors.transparent,
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: Colors.cyan.withOpacity(0.6),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'إعلان Unity Ads...',
+                        style: TextStyle(
+                          color: Colors.grey.withOpacity(0.7),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+
+              // ويدجت الإعلان الرسمي من Unity: قياس ثابت 320x50 يضمن قبول SDK للأبعاد
+              SizedBox(
+                width: 320,
+                height: 50,
+                child: UnityBannerAd(
+                  key: _bannerKey,
+                  placementId: _currentPlacement,
+                  size: BannerSize.standard,
+                  onLoad: (placementId) {
+                    debugPrint("Unity Ads Banner: Ad loaded successfully ($placementId)");
+                    if (mounted) {
+                      setState(() {
+                        _isBannerLoaded = true;
+                        _retryCount = 0;
+                      });
+                      if (widget.onLoaded != null) widget.onLoaded!();
+                    }
+                  },
+                  onClick: (placementId) {
+                    debugPrint("Unity Ads Banner: Ad clicked ($placementId)");
+                  },
+                  onShown: (placementId) {
+                    debugPrint("Unity Ads Banner: Ad shown ($placementId)");
+                    if (mounted && !_isBannerLoaded) {
+                      setState(() {
+                        _isBannerLoaded = true;
+                      });
+                    }
+                  },
+                  onFailed: (placementId, error, errorMessage) {
+                    debugPrint("Unity Ads Banner: Load failed ($placementId): $error - $errorMessage");
+                    _handleFailure(placementId, error, errorMessage);
+                  },
                 ),
               ),
             ],

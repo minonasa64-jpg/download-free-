@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
 import '../../services/biometric_service.dart';
+import '../../services/ad_service.dart';
 import '../vault_screen.dart';
 import '../calculator_vault_screen.dart';
 import '../web_share_screen.dart';
@@ -24,6 +25,7 @@ class _SettingsTabState extends State<SettingsTab> {
   bool _multiThreadDownload = true;
   int _downloadThreads = 8;
   bool _hasVaultPin = false;
+  bool _adTestMode = true;
 
   @override
   void initState() {
@@ -50,7 +52,38 @@ class _SettingsTabState extends State<SettingsTab> {
         _calculatorDisguise = disguise;
         _biometricEnabled = bioEnabled;
         _hasVaultPin = hasPin;
+        _adTestMode = AdService().isTestMode;
       });
+    }
+  }
+
+  Future<void> _toggleAdTestMode(bool val) async {
+    setState(() => _adTestMode = val);
+    await AdService().setTestMode(val);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            val ? 'تم تفعيل وضع الإعلانات التجريبية (Test Mode)' : 'تم تفعيل وضع الإعلانات الحقيقية (Production Mode)',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: AppColors.cyan,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _reloadAds() async {
+    await AdService().reloadAds();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إرسال طلب إعادة تحميل وتحضير الإعلانات بنجاح', style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: AppColors.cyan,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -471,12 +504,61 @@ class _SettingsTabState extends State<SettingsTab> {
           ),
           const SizedBox(height: 15),
 
+          // قسم إعلانات Unity Ads
+          _buildSectionHeader('إعلانات التطبيق (Unity Ads)'),
+          ValueListenableBuilder<String>(
+            valueListenable: AdService().adStatusNotifier,
+            builder: (context, status, _) {
+              return _buildGlassTile(
+                context,
+                icon: Icons.ads_click_rounded,
+                title: 'حالة شبكة إعلانات Unity Ads',
+                subtitle: status,
+                textColor: textColor,
+                subtitleColor: subtitleColor,
+                surfaceColor: surfaceColor,
+                trailing: IconButton(
+                  icon: const Icon(Icons.refresh_rounded, color: AppColors.cyan, size: 22),
+                  tooltip: 'إعادة تحميل',
+                  onPressed: _reloadAds,
+                ),
+                onTap: _reloadAds,
+              );
+            },
+          ),
+          _buildGlassTile(
+            context,
+            icon: Icons.bug_report_rounded,
+            title: 'وضع الإعلانات التجريبية (Test Mode)',
+            subtitle: _adTestMode ? 'مفعل (يضمن ظهور البنر والإعلانات فوراً على جهازك)' : 'معطل (طلب إعلانات إنتاجية حقيقية)',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: Switch(
+              value: _adTestMode,
+              activeColor: AppColors.cyan,
+              onChanged: _toggleAdTestMode,
+            ),
+          ),
+          _buildGlassTile(
+            context,
+            icon: Icons.sync_rounded,
+            title: 'تحديث وتحضير الإعلانات الآن',
+            subtitle: 'معرف اللعبة: ${AdService.gameId} | بنر: ${AdService.bannerPlacementId}',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: const Icon(Icons.touch_app_rounded, color: AppColors.cyan, size: 20),
+            onTap: _reloadAds,
+          ),
+          const SizedBox(height: 15),
+
           _buildSectionHeader(_backend.t('more_tools')),
           _buildGlassTile(
             context,
             icon: Icons.info_outline_rounded,
             title: _backend.t('about'),
-            subtitle: 'Boykta Pro v1.2.0 (إصدار متكامل فائق السرعة)',
+            subtitle: 'Boykta Pro v1.3.5 (إصدار متكامل فائق السرعة بدقة 1080p FHD)',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -784,7 +866,7 @@ class _SettingsTabState extends State<SettingsTab> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('الإصدار 1.2.0', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)),
+            Text('الإصدار 1.3.5', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(
               'تطبيق تنزيل ومشاهدة الوسائط بأعلى جودة مع دعم التوربو المتعدد، دمج الصوت والصورة بدون فقد، الخزنة المشفرة، والمشاركة عبر الشبكة المحلية.',

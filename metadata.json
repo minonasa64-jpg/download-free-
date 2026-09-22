@@ -1,0 +1,6 @@
+{
+  "name": "Boykta Pro Downloader",
+  "description": "Boykta Pro Downloader & Media Suite for Android with automated CI/CD builds and APK releases.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
