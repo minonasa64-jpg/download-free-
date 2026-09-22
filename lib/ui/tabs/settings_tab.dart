@@ -4,9 +4,13 @@ import '../../core/app_colors.dart';
 import '../../services/backend_service.dart';
 import '../../services/biometric_service.dart';
 import '../../services/ad_service.dart';
+import '../../core/theme_service.dart';
+import '../../services/data_usage_service.dart';
 import '../vault_screen.dart';
 import '../calculator_vault_screen.dart';
 import '../web_share_screen.dart';
+import '../sheets/theme_station_sheet.dart';
+import '../sheets/data_usage_sheet.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -110,9 +114,91 @@ class _SettingsTabState extends State<SettingsTab> {
     if (!mounted) return;
     if (!hasPin) {
       _showSetVaultPinDialog();
-    } else {
+      return;
+    }
+
+    if (_biometricEnabled) {
+      final authenticated = await BiometricService().authenticate(
+        reason: 'تأكيد البصمة للدخول الفوري إلى الخزنة الآمنة',
+      );
+      if (authenticated && mounted) {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const VaultScreen()));
+        return;
+      }
+    }
+
+    if (mounted) {
       _showEnterVaultPinDialog();
     }
+  }
+
+  void _showSetDecoyPinDialog() {
+    final pinCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.security_update_warning_rounded, color: AppColors.orange, size: 24),
+            const SizedBox(width: 8),
+            const Text('رمز الخزنة الوهمية (Decoy)', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'إذا أجبرت على فتح الخزنة، أدخل هذا الرمز ليفتح خزنة وهمية فارغة ونظيفة تماماً دون كشف ملفاتك الحقيقية.',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: pinCtrl,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white, letterSpacing: 8, fontSize: 20),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: '••••',
+                hintStyle: const TextStyle(color: Colors.white38, letterSpacing: 8),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.orange),
+            onPressed: () async {
+              final pin = pinCtrl.text.trim();
+              if (pin.length == 4) {
+                await _backend.setDecoyPin(pin);
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('تم تفعيل رمز الخزنة الوهمية بنجاح 🛡️'),
+                      backgroundColor: AppColors.cyan,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('حفظ الرمز', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showSetVaultPinDialog({bool isChanging = false}) {
@@ -231,7 +317,17 @@ class _SettingsTabState extends State<SettingsTab> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
             onPressed: () async {
-              final isCorrect = await _backend.verifyVaultPin(pinCtrl.text.trim());
+              final enteredPin = pinCtrl.text.trim();
+              final isDecoy = await _backend.isDecoyPin(enteredPin);
+              if (isDecoy) {
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const VaultScreen(isDecoy: true)));
+                }
+                return;
+              }
+
+              final isCorrect = await _backend.verifyVaultPin(enteredPin);
               if (isCorrect) {
                 if (mounted) {
                   Navigator.pop(ctx);
@@ -289,7 +385,7 @@ class _SettingsTabState extends State<SettingsTab> {
             trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
             onTap: _openVault,
           ),
-          if (_hasVaultPin)
+          if (_hasVaultPin) ...[
             _buildGlassTile(
               context,
               icon: Icons.password_rounded,
@@ -301,6 +397,18 @@ class _SettingsTabState extends State<SettingsTab> {
               trailing: const Icon(Icons.edit_rounded, color: AppColors.cyan, size: 18),
               onTap: () => _showSetVaultPinDialog(isChanging: true),
             ),
+            _buildGlassTile(
+              context,
+              icon: Icons.security_update_warning_rounded,
+              title: _backend.t('decoy_pin'),
+              subtitle: _backend.t('decoy_pin_desc'),
+              textColor: textColor,
+              subtitleColor: subtitleColor,
+              surfaceColor: surfaceColor,
+              trailing: const Icon(Icons.edit_rounded, color: AppColors.orange, size: 18),
+              onTap: _showSetDecoyPinDialog,
+            ),
+          ],
           _buildGlassTile(
             context,
             icon: Icons.fingerprint_rounded,
@@ -440,14 +548,39 @@ class _SettingsTabState extends State<SettingsTab> {
           _buildSectionHeader(_backend.t('general')),
           _buildGlassTile(
             context,
-            icon: Icons.palette_outlined,
-            title: _backend.t('theme'),
-            subtitle: _backend.themeNotifier.value == ThemeMode.dark ? 'داكن (Dark Mode)' : 'فاتح (Light Mode)',
+            icon: Icons.color_lens_rounded,
+            title: _backend.t('theme_station'),
+            subtitle: _backend.t('theme_station_desc'),
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
             trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
-            onTap: () => _showThemeDialog(context),
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const ThemeStationSheet(),
+              );
+            },
+          ),
+          _buildGlassTile(
+            context,
+            icon: Icons.data_usage_rounded,
+            title: _backend.t('data_usage'),
+            subtitle: _backend.t('data_usage_desc'),
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const DataUsageSheet(),
+              );
+            },
           ),
           _buildGlassTile(
             context,
@@ -459,6 +592,17 @@ class _SettingsTabState extends State<SettingsTab> {
             surfaceColor: surfaceColor,
             trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
             onTap: () => _showLanguageDialog(context),
+          ),
+          _buildGlassTile(
+            context,
+            icon: Icons.palette_outlined,
+            title: _backend.t('theme'),
+            subtitle: _backend.themeNotifier.value == ThemeMode.dark ? 'داكن (Dark Mode)' : 'فاتح (Light Mode)',
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            surfaceColor: surfaceColor,
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
+            onTap: () => _showThemeDialog(context),
           ),
           _buildGlassTile(
             context,

@@ -11,6 +11,7 @@ import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:flutter/services.dart';
 import 'universal_extractor_service.dart';
+import 'data_usage_service.dart';
 
 class DownloadTask {
   final int id;
@@ -72,6 +73,12 @@ class BackendService {
     } catch (e) {
       debugPrint('Failed to initialize notifications: $e');
     }
+
+    try {
+      await DataUsageService().init();
+    } catch (e) {
+      debugPrint('Failed to initialize data usage: $e');
+    }
   }
 
   Future<void> changeLanguage(String lang) async {
@@ -116,6 +123,11 @@ class BackendService {
       'wifi_warning': 'تنبيه: تم إيقاف التحميل لأن خيار (Wi-Fi فقط) مفعل',
       'auto_retry_active': 'الاستئناف التلقائي مفعل', 'retrying_download': 'جاري إعادة محاولة التحميل...',
       'web_share': 'مشاركة الـ Wi-Fi للكمبيوتر', 'audio_trimmer': 'صانع النغمات وقص الصوت', 'calculator_disguise': 'تمويه الخزنة كآلة حاسبة', 'calculator_disguise_desc': 'إظهار آلة حاسبة حقيقية تفتح بالرمز السري', 'subtitles': 'الترجمات (SRT)', 'download_subtitles': 'تحميل الترجمة', 'playlist': 'قائمة تشغيل', 'download_all_video': 'تحميل الكل فيديو (MP4)', 'download_all_audio': 'تحميل الكل صوت (MP3)', 'schedule_download': 'جدولة التنزيل', 'quick_platforms': 'منصات سريعة مدعومة', 'clipboard_detected': 'تم رصد رابط في الحافظة! اضغط للصق والفحص', 'browser': 'المتصفح', 'biometric_auth': 'البصمة الحيوية', 'biometric_desc': 'فتح الخزنة ببصمة الإصبع أو الوجه السريعة',
+      'theme_station': 'محطة الثيمات اللونية', 'theme_station_desc': 'تغيير المظهر، الألوان، وأنماط العرض الفاخرة',
+      'data_usage': 'إحصائيات استهلاك البيانات', 'data_usage_desc': 'مراقبة حجم التحميل وتوفير باقة الإنترنت',
+      'today_usage': 'استهلاك اليوم', 'total_usage': 'إجمالي الاستهلاك', 'saved_data': 'بيانات تم توفيرها',
+      'decoy_pin': 'رمز الخزنة المزيفة (Decoy)', 'decoy_pin_desc': 'رمز بديل يفتح خزنة وهمية لحماية سرية ملفاتك عند الإجبار',
+      'vault_settings': 'إعدادات وأمان الخزنة',
     };
     final en = {
       'youtube': 'YouTube', 'link': 'Links', 'downloads': 'Downloads', 'settings': 'Settings',
@@ -146,6 +158,11 @@ class BackendService {
       'wifi_warning': 'Download paused: Wi-Fi Only option is enabled',
       'auto_retry_active': 'Auto-Resume & Retry Active', 'retrying_download': 'Retrying download...',
       'web_share': 'Wi-Fi PC Share', 'audio_trimmer': 'Ringtone & Audio Trimmer', 'calculator_disguise': 'Calculator Vault Disguise', 'calculator_disguise_desc': 'Display real calculator unlocked by PIN', 'subtitles': 'Subtitles (SRT)', 'download_subtitles': 'Download Subtitle', 'playlist': 'Playlist', 'download_all_video': 'Download All Video (MP4)', 'download_all_audio': 'Download All Audio (MP3)', 'schedule_download': 'Schedule Download', 'quick_platforms': 'Quick Platforms', 'clipboard_detected': 'Link found in clipboard! Tap to analyze', 'browser': 'Browser', 'biometric_auth': 'Biometrics', 'biometric_desc': 'Unlock vault using Fingerprint or Face ID',
+      'theme_station': 'Theme Color Station', 'theme_station_desc': 'Switch themes, colors, and premium display styles',
+      'data_usage': 'Data Usage Statistics', 'data_usage_desc': 'Monitor bandwidth usage and data savings',
+      'today_usage': 'Today Usage', 'total_usage': 'Total Usage', 'saved_data': 'Bandwidth Saved',
+      'decoy_pin': 'Decoy Fake Vault PIN', 'decoy_pin_desc': 'Alternative PIN opening a clean fake vault when forced',
+      'vault_settings': 'Vault Security & Options',
     };
     final fr = {
       'youtube': 'YouTube', 'link': 'Liens', 'downloads': 'Téléchargements', 'settings': 'Paramètres',
@@ -176,6 +193,11 @@ class BackendService {
       'wifi_warning': 'Téléchargement suspendu: Wi-Fi uniquement activé',
       'auto_retry_active': 'Reprise automatique active', 'retrying_download': 'Nouvelle tentative en cours...',
       'web_share': 'Partage Wi-Fi PC', 'audio_trimmer': 'Découpeur Audio & Sonneries', 'calculator_disguise': 'Déguisement Calculatrice', 'calculator_disguise_desc': 'Afficher une vraie calculatrice déverrouillée par PIN', 'subtitles': 'Sous-titres (SRT)', 'download_subtitles': 'Télécharger sous-titre', 'playlist': 'Playlist', 'download_all_video': 'Tout télécharger Vidéo (MP4)', 'download_all_audio': 'Tout télécharger Audio (MP3)', 'schedule_download': 'Planifier téléchargement', 'quick_platforms': 'Plateformes rapides', 'clipboard_detected': 'Lien détecté dans le presse-papiers !', 'browser': 'Navigateur', 'biometric_auth': 'Biométrie', 'biometric_desc': 'Déverrouiller le coffre-fort avec empreinte ou visage',
+      'theme_station': 'Station de Thèmes', 'theme_station_desc': 'Changer l\'apparence, couleurs et styles',
+      'data_usage': 'Statistiques de Données', 'data_usage_desc': 'Surveiller la consommation et l\'économie',
+      'today_usage': 'Aujourd\'hui', 'total_usage': 'Utilisation totale', 'saved_data': 'Données économisées',
+      'decoy_pin': 'Code PIN Leurre (Decoy)', 'decoy_pin_desc': 'Code alternatif ouvrant un faux coffre en cas de contrainte',
+      'vault_settings': 'Sécurité du Coffre',
     };
     
     if (langNotifier.value == 'en') return en[key] ?? key;
@@ -1429,6 +1451,16 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
     }
     onReceiveProgress(downloadedBytes, totalBytes > 0 ? totalBytes : downloadedBytes);
     debugPrint("تم التنزيل بنجاح 100% بحجم $downloadedBytes بايت وحفظه في $savePath");
+
+    try {
+      final isAudio = savePath.toLowerCase().endsWith('.mp3') ||
+          savePath.toLowerCase().endsWith('.m4a') ||
+          savePath.toLowerCase().endsWith('.opus') ||
+          savePath.toLowerCase().endsWith('.wav');
+      DataUsageService().recordDownload(bytes: downloadedBytes, isAudio: isAudio);
+    } catch (e) {
+      debugPrint("Error recording data usage: $e");
+    }
   }
 
   // =========================================================================
@@ -1633,6 +1665,26 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
     final prefs = await SharedPreferences.getInstance();
     final savedPin = prefs.getString('vault_pin');
     return savedPin == pin;
+  }
+
+  Future<bool> isDecoyPin(String pin) async {
+    final prefs = await SharedPreferences.getInstance();
+    final decoy = prefs.getString('vault_decoy_pin');
+    return decoy != null && decoy.isNotEmpty && decoy == pin;
+  }
+
+  Future<void> setDecoyPin(String? pin) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (pin == null || pin.isEmpty) {
+      await prefs.remove('vault_decoy_pin');
+    } else {
+      await prefs.setString('vault_decoy_pin', pin);
+    }
+  }
+
+  Future<String?> getDecoyPin() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('vault_decoy_pin');
   }
 
   Future<void> setVaultPin(String pin) async {

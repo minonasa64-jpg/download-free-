@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'core/app_colors.dart';
+import 'core/theme_service.dart';
 import 'services/backend_service.dart';
 import 'services/ad_service.dart';
 import 'ui/main_navigation.dart';
@@ -14,6 +15,12 @@ void main() async {
     await BackendService().initBackend();
   } catch (e) {
     debugPrint('Backend Init Error: $e');
+  }
+
+  try {
+    await ThemeService().init();
+  } catch (e) {
+    debugPrint('Theme Init Error: $e');
   }
 
   try {
@@ -32,22 +39,26 @@ class BoyktaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: BackendService().themeNotifier,
-      builder: (context, currentMode, child) {
-        return MaterialApp(
-          title: 'Boykta',
-          debugShowCheckedModeBanner: false,
-          themeMode: currentMode,
-          theme: ThemeData.light().copyWith(
-            scaffoldBackgroundColor: const Color(0xFFF5F5FA),
-            primaryColor: AppColors.cyan,
-          ),
-          darkTheme: ThemeData.dark().copyWith(
-            scaffoldBackgroundColor: AppColors.background,
-            primaryColor: AppColors.cyan,
-          ),
-          home: const SplashScreen(),
+    return ValueListenableBuilder<ThemeConfig>(
+      valueListenable: ThemeService().currentTheme,
+      builder: (context, themeConfig, child) {
+        return ValueListenableBuilder<String>(
+          valueListenable: BackendService().langNotifier,
+          builder: (context, currentLang, _) {
+            final isRtl = currentLang == 'ar';
+            return MaterialApp(
+              title: 'Boykta',
+              debugShowCheckedModeBanner: false,
+              theme: ThemeService().getThemeData(),
+              builder: (context, child) {
+                return Directionality(
+                  textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+                  child: child!,
+                );
+              },
+              home: const SplashScreen(),
+            );
+          },
         );
       },
     );
