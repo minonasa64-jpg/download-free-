@@ -11,7 +11,6 @@ import '../../services/biometric_service.dart';
 import '../local_video_player_screen.dart'; 
 import '../vault_screen.dart';
 import '../audio_trimmer_screen.dart';
-import '../calculator_vault_screen.dart';
 import '../web_share_screen.dart'; 
 import '../fullscreen_music_player_screen.dart';
 import '../../services/thumbnail_service.dart';
@@ -113,15 +112,6 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
   }
 
   void _openVault() async {
-    final isDisguise = await _backend.isCalculatorDisguiseEnabled();
-    if (isDisguise && mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const CalculatorVaultScreen()),
-      ).then((_) => _loadFiles());
-      return;
-    }
-
     final bioService = BiometricService();
     if (await bioService.isBiometricEnabled() && await bioService.isBiometricSupported()) {
       final authenticated = await bioService.authenticate();

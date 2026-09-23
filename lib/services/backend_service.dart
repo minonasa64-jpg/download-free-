@@ -46,7 +46,6 @@ class BackendService {
   final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
   
   final ValueNotifier<List<DownloadTask>> activeDownloads = ValueNotifier([]);
-  final ValueNotifier<bool> isBrowserExpanded = ValueNotifier<bool>(false);
 
   final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
   
@@ -1789,7 +1788,7 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
     required Function(int, int) onReceiveProgress,
     int? customThreads,
   }) async {
-    int effectiveParts = 8;
+    int effectiveParts = 16;
     try {
       final configuredThreads = customThreads ?? await getDownloadThreads();
       effectiveParts = configuredThreads.clamp(2, 16);
@@ -2227,15 +2226,5 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
     } catch (e) {
       throw Exception('فشل في جلب قائمة التشغيل: $e');
     }
-  }
-
-  Future<bool> isCalculatorDisguiseEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('calculator_disguise') ?? false;
-  }
-
-  Future<void> setCalculatorDisguise(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('calculator_disguise', enabled);
   }
 }

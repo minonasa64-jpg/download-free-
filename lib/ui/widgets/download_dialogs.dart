@@ -37,7 +37,7 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
   bool _hasError = false;
   String _errorMessage = "";
   bool _isMultiThreaded = true;
-  int _threadsCount = 8;
+  int _threadsCount = 16;
 
   @override
   void initState() {

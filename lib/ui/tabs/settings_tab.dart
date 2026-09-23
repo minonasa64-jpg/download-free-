@@ -7,7 +7,6 @@ import '../../services/ad_service.dart';
 import '../../core/theme_service.dart';
 import '../../services/data_usage_service.dart';
 import '../vault_screen.dart';
-import '../calculator_vault_screen.dart';
 import '../web_share_screen.dart';
 import '../sheets/theme_station_sheet.dart';
 import '../sheets/data_usage_sheet.dart';
@@ -24,10 +23,7 @@ class _SettingsTabState extends State<SettingsTab> {
   String _downloadPath = 'مسار Boykta العام';
   bool _completeNotif = true;
   bool _wifiOnly = false;
-  bool _calculatorDisguise = false;
   bool _biometricEnabled = false;
-  bool _multiThreadDownload = true;
-  int _downloadThreads = 8;
   bool _hasVaultPin = false;
 
   @override
@@ -39,9 +35,6 @@ class _SettingsTabState extends State<SettingsTab> {
   Future<void> _loadSettings() async {
     final dl = await _backend.getDownloadSettings();
     final notif = await _backend.getNotificationSettings();
-    final mt = await _backend.isMultiThreadDownloadEnabled();
-    final th = await _backend.getDownloadThreads();
-    final disguise = await _backend.isCalculatorDisguiseEnabled();
     final bioEnabled = await BiometricService().isBiometricEnabled();
     final hasPin = await _backend.isVaultPinSet();
 
@@ -50,9 +43,6 @@ class _SettingsTabState extends State<SettingsTab> {
         _downloadPath = dl['download_path'] ?? 'مسار Boykta العام';
         _wifiOnly = dl['wifi_only'] ?? false;
         _completeNotif = notif['n_comp'] ?? true;
-        _multiThreadDownload = mt;
-        _downloadThreads = th;
-        _calculatorDisguise = disguise;
         _biometricEnabled = bioEnabled;
         _hasVaultPin = hasPin;
       });
@@ -70,14 +60,6 @@ class _SettingsTabState extends State<SettingsTab> {
   }
 
   void _openVault() async {
-    if (_calculatorDisguise) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const CalculatorVaultScreen()),
-      );
-      return;
-    }
-
     final hasPin = await _backend.isVaultPinSet();
     if (!mounted) return;
     if (!hasPin) {
@@ -418,31 +400,6 @@ class _SettingsTabState extends State<SettingsTab> {
               },
             ),
           ),
-          _buildGlassTile(
-            context,
-            icon: Icons.calculate_outlined,
-            title: 'تمويه الخزنة كآلة حاسبة',
-            subtitle: 'إظهار آلة حاسبة حقيقية تفتح الخزنة تلقائياً عند كتابة رمز PIN والضغط على =',
-            textColor: textColor,
-            subtitleColor: subtitleColor,
-            surfaceColor: surfaceColor,
-            trailing: Switch(
-              value: _calculatorDisguise,
-              activeColor: AppColors.cyan,
-              onChanged: (val) async {
-                await _backend.setCalculatorDisguise(val);
-                setState(() => _calculatorDisguise = val);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(val ? 'تم تفعيل تمويه الآلة الحاسبة 🧮' : 'تم إلغاء تفعيل تمويه الخزنة'),
-                      backgroundColor: AppColors.cyan,
-                    ),
-                  );
-                }
-              },
-            ),
-          ),
           const SizedBox(height: 15),
 
           // قسم إعدادات التنزيل والسرعة
@@ -450,30 +407,12 @@ class _SettingsTabState extends State<SettingsTab> {
           _buildGlassTile(
             context,
             icon: Icons.bolt_rounded,
-            title: 'التحميل المتسارع (Turbo Multi-Threading)',
-            subtitle: 'تنزيل الملفات عبر عدة اتصالات متزامنة لمضاعفة سرعة التحميل',
+            title: 'التحميل التوربو فائق السرعة (Turbo Multi-Threading)',
+            subtitle: 'يعمل دائماً بأقصى طاقة مسارات متزامنة (16 مسار) لتسريع التنزيل لأقصى حد ممكن',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
-            trailing: Switch(
-              value: _multiThreadDownload,
-              activeColor: AppColors.cyan,
-              onChanged: (val) async {
-                await _backend.setMultiThreadDownloadEnabled(val);
-                setState(() => _multiThreadDownload = val);
-              },
-            ),
-          ),
-          _buildGlassTile(
-            context,
-            icon: Icons.alt_route_rounded,
-            title: 'عدد مسارات التنزيل المتزامنة',
-            subtitle: '$_downloadThreads مسارات متزامنة للتحميل فائق السرعة',
-            textColor: textColor,
-            subtitleColor: subtitleColor,
-            surfaceColor: surfaceColor,
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
-            onTap: () => _showThreadsCountDialog(context),
+            trailing: const Icon(Icons.flash_on_rounded, color: AppColors.cyan, size: 22),
           ),
           _buildGlassTile(
             context,
@@ -713,39 +652,6 @@ class _SettingsTabState extends State<SettingsTab> {
         ),
       );
     }
-  }
-
-  void _showThreadsCountDialog(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? AppColors.surface : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('عدد مسارات التنزيل المتزامنة', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildThreadOption(ctx, count: 4, label: '4 مسارات (عادي - موفر للبيانات)', isDark: isDark),
-            _buildThreadOption(ctx, count: 8, label: '8 مسارات (سريع - الخيار المستحسن)', isDark: isDark),
-            _buildThreadOption(ctx, count: 16, label: '16 مسار (توربو أقصى سرعة خارقة)', isDark: isDark),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildThreadOption(BuildContext ctx, {required int count, required String label, required bool isDark}) {
-    final isSelected = _downloadThreads == count;
-    return ListTile(
-      title: Text(label, style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
-      onTap: () async {
-        await _backend.setDownloadThreads(count);
-        setState(() => _downloadThreads = count);
-        if (mounted) Navigator.pop(ctx);
-      },
-    );
   }
 
   void _showStoragePathDialog(BuildContext context) {
