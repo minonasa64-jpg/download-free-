@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
@@ -17,6 +18,9 @@ class _YoutubeTabState extends State<YoutubeTab> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final yt.YoutubeExplode _yt = yt.YoutubeExplode();
+  Timer? _debounceTimer;
+
+  static List<yt.Video> _feedMemoryCache = [];
   
   List<yt.Video> _searchResults = [];
   List<String> _searchSuggestions = [];
@@ -26,12 +30,23 @@ class _YoutubeTabState extends State<YoutubeTab> {
   bool _isLoadingMore = false;
   bool _hasSearchedOnce = false; 
   bool _showSuggestions = false;
+  String _selectedCategory = 'الكل';
+
+  final List<Map<String, String>> _categories = [
+    {'name': 'الكل', 'query': 'trending 2025'},
+    {'name': 'موسيقى', 'query': 'top music hits'},
+    {'name': 'ألعاب', 'query': 'trending gaming'},
+    {'name': 'تقنية', 'query': 'technology news reviews'},
+    {'name': 'بودكاست', 'query': 'best podcast episodes'},
+    {'name': 'كوميديا', 'query': 'comedy skits funny'},
+    {'name': 'أخبار', 'query': 'world news live'},
+  ];
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300) {
         _loadMore();
       }
     });
@@ -40,12 +55,24 @@ class _YoutubeTabState extends State<YoutubeTab> {
     _loadInitialFeed();
   }
 
-  Future<void> _loadInitialFeed() async {
+  Future<void> _loadInitialFeed({String? customQuery}) async {
+    final query = customQuery ?? (_selectedCategory == 'الكل' ? 'trending' : _categories.firstWhere((c) => c['name'] == _selectedCategory, orElse: () => {'query': 'trending'})['query']!);
+    
+    // If we have cached items and it's default feed, show them immediately
+    if (customQuery == null && _selectedCategory == 'الكل' && _feedMemoryCache.isNotEmpty) {
+      setState(() {
+        _searchResults = List.from(_feedMemoryCache);
+        _hasSearchedOnce = true;
+        _isSearching = false;
+      });
+      return;
+    }
+
     setState(() {
       _isSearching = true;
     });
     try {
-      final results = await _yt.search.search('trending');
+      final results = await _yt.search.search(query).timeout(const Duration(seconds: 12));
       final list = results.whereType<yt.Video>().toList();
       if (mounted) {
         setState(() {
@@ -53,6 +80,9 @@ class _YoutubeTabState extends State<YoutubeTab> {
           _searchResults = list;
           _hasSearchedOnce = true;
           _isSearching = false;
+          if (customQuery == null && _selectedCategory == 'الكل') {
+            _feedMemoryCache = list;
+          }
         });
       }
     } catch (_) {
@@ -60,26 +90,29 @@ class _YoutubeTabState extends State<YoutubeTab> {
     }
   }
 
-  void _onSearchChanged() async {
-    final query = _searchController.text.trim();
-    if (query.isNotEmpty) {
-      try {
-        final suggestions = await _yt.search.getQuerySuggestions(query);
+  void _onSearchChanged() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      final query = _searchController.text.trim();
+      if (query.isNotEmpty) {
+        try {
+          final suggestions = await _yt.search.getQuerySuggestions(query);
+          if (mounted) {
+            setState(() {
+              _searchSuggestions = suggestions;
+              _showSuggestions = true;
+            });
+          }
+        } catch (_) {}
+      } else {
         if (mounted) {
           setState(() {
-            _searchSuggestions = suggestions;
-            _showSuggestions = true;
+            _searchSuggestions.clear();
+            _showSuggestions = false;
           });
         }
-      } catch (_) {}
-    } else {
-      if (mounted) {
-        setState(() {
-          _searchSuggestions.clear();
-          _showSuggestions = false;
-        });
       }
-    }
+    });
   }
 
   Future<void> _performSearch([String? suggestionQuery]) async {
@@ -101,7 +134,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
     });
 
     try {
-      final results = await _yt.search.search(query);
+      final results = await _yt.search.search(query).timeout(const Duration(seconds: 12));
       final list = results.whereType<yt.Video>().toList();
       
       if (mounted) {
@@ -130,7 +163,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
     setState(() => _isLoadingMore = true);
     
     try {
-      final nextPage = await _currentSearchPage!.nextPage();
+      final nextPage = await _currentSearchPage!.nextPage().timeout(const Duration(seconds: 10));
       if (nextPage != null) {
         final newVideos = nextPage.whereType<yt.Video>().toList();
         if (mounted) {
@@ -149,6 +182,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     _yt.close();
@@ -163,6 +197,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
           Column(
             children: [
               _buildHeader(),
+              _buildCategoryBar(),
               Expanded(
                 child: _buildBodyContent(),
               ),
@@ -210,6 +245,63 @@ class _YoutubeTabState extends State<YoutubeTab> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryBar() {
+    return Container(
+      height: 42,
+      margin: const EdgeInsets.only(bottom: 6),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: _categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final cat = _categories[index];
+          final isSelected = cat['name'] == _selectedCategory;
+          return GestureDetector(
+            onTap: () {
+              if (isSelected) return;
+              setState(() {
+                _selectedCategory = cat['name']!;
+                _searchController.clear();
+              });
+              _loadInitialFeed(customQuery: cat['query']);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.cyan : AppColors.surfaceLight.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? AppColors.cyan : Colors.white.withOpacity(0.08),
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.cyan.withOpacity(0.35),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        )
+                      ]
+                    : null,
+              ),
+              child: Center(
+                child: Text(
+                  cat['name']!,
+                  style: TextStyle(
+                    color: isSelected ? Colors.black : AppColors.textPrimary,
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

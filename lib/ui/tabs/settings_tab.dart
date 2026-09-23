@@ -29,7 +29,6 @@ class _SettingsTabState extends State<SettingsTab> {
   bool _multiThreadDownload = true;
   int _downloadThreads = 8;
   bool _hasVaultPin = false;
-  bool _adTestMode = true;
 
   @override
   void initState() {
@@ -56,38 +55,7 @@ class _SettingsTabState extends State<SettingsTab> {
         _calculatorDisguise = disguise;
         _biometricEnabled = bioEnabled;
         _hasVaultPin = hasPin;
-        _adTestMode = AdService().isTestMode;
       });
-    }
-  }
-
-  Future<void> _toggleAdTestMode(bool val) async {
-    setState(() => _adTestMode = val);
-    await AdService().setTestMode(val);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            val ? 'تم تفعيل وضع الإعلانات التجريبية (Test Mode)' : 'تم تفعيل وضع الإعلانات الحقيقية (Production Mode)',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          backgroundColor: AppColors.cyan,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  Future<void> _reloadAds() async {
-    await AdService().reloadAds();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم إرسال طلب إعادة تحميل وتحضير الإعلانات بنجاح', style: TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: AppColors.cyan,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     }
   }
 
@@ -621,12 +589,12 @@ class _SettingsTabState extends State<SettingsTab> {
           const SizedBox(height: 15),
 
           // قسم الصيانة والأدوات
-          _buildSectionHeader('الصيانة والأدوات'),
+          _buildSectionHeader(_backend.t('storage_maintenance')),
           _buildGlassTile(
             context,
             icon: Icons.cleaning_services_rounded,
-            title: 'تنظيف الملفات المؤقتة والكاش',
-            subtitle: 'حذف أجزاء التنزيل غير المكتملة (.part) وتحرير مساحة التخزين',
+            title: _backend.t('clear_cache_title'),
+            subtitle: _backend.t('clear_cache_desc'),
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -636,8 +604,8 @@ class _SettingsTabState extends State<SettingsTab> {
           _buildGlassTile(
             context,
             icon: Icons.wifi_tethering_rounded,
-            title: 'خادم المشاركة عبر الـ Wi-Fi',
-            subtitle: 'مشاركة الملفات وتنزيلها مباشرة إلى الكمبيوتر بدون كابل عبر المتصفح',
+            title: _backend.t('web_share'),
+            subtitle: _backend.t('web_share_desc'),
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -645,55 +613,6 @@ class _SettingsTabState extends State<SettingsTab> {
             onTap: () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const WebShareScreen()));
             },
-          ),
-          const SizedBox(height: 15),
-
-          // قسم إعلانات Unity Ads
-          _buildSectionHeader('إعلانات التطبيق (Unity Ads)'),
-          ValueListenableBuilder<String>(
-            valueListenable: AdService().adStatusNotifier,
-            builder: (context, status, _) {
-              return _buildGlassTile(
-                context,
-                icon: Icons.ads_click_rounded,
-                title: 'حالة شبكة إعلانات Unity Ads',
-                subtitle: status,
-                textColor: textColor,
-                subtitleColor: subtitleColor,
-                surfaceColor: surfaceColor,
-                trailing: IconButton(
-                  icon: const Icon(Icons.refresh_rounded, color: AppColors.cyan, size: 22),
-                  tooltip: 'إعادة تحميل',
-                  onPressed: _reloadAds,
-                ),
-                onTap: _reloadAds,
-              );
-            },
-          ),
-          _buildGlassTile(
-            context,
-            icon: Icons.bug_report_rounded,
-            title: 'وضع الإعلانات التجريبية (Test Mode)',
-            subtitle: _adTestMode ? 'مفعل (يضمن ظهور البنر والإعلانات فوراً على جهازك)' : 'معطل (طلب إعلانات إنتاجية حقيقية)',
-            textColor: textColor,
-            subtitleColor: subtitleColor,
-            surfaceColor: surfaceColor,
-            trailing: Switch(
-              value: _adTestMode,
-              activeColor: AppColors.cyan,
-              onChanged: _toggleAdTestMode,
-            ),
-          ),
-          _buildGlassTile(
-            context,
-            icon: Icons.sync_rounded,
-            title: 'تحديث وتحضير الإعلانات الآن',
-            subtitle: 'معرف اللعبة: ${AdService.gameId} | بنر: ${AdService.bannerPlacementId}',
-            textColor: textColor,
-            subtitleColor: subtitleColor,
-            surfaceColor: surfaceColor,
-            trailing: const Icon(Icons.touch_app_rounded, color: AppColors.cyan, size: 20),
-            onTap: _reloadAds,
           ),
           const SizedBox(height: 15),
 
@@ -946,40 +865,49 @@ class _SettingsTabState extends State<SettingsTab> {
 
   void _showLanguageDialog(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final languages = [
+      {'code': 'ar', 'name': 'العربية (Arabic)', 'flag': '🇸🇦'},
+      {'code': 'en', 'name': 'English', 'flag': '🇺🇸'},
+      {'code': 'fr', 'name': 'Français (French)', 'flag': '🇫🇷'},
+      {'code': 'es', 'name': 'Español (Spanish)', 'flag': '🇪🇸'},
+      {'code': 'tr', 'name': 'Türkçe (Turkish)', 'flag': '🇹🇷'},
+      {'code': 'de', 'name': 'Deutsch (German)', 'flag': '🇩🇪'},
+      {'code': 'ru', 'name': 'Русский (Russian)', 'flag': '🇷🇺'},
+    ];
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: isDark ? AppColors.surface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(_backend.t('language'), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text('العربية', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-              trailing: _backend.langNotifier.value == 'ar' ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
-              onTap: () async {
-                await _backend.changeLanguage('ar');
-                if (mounted) Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: Text('English', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-              trailing: _backend.langNotifier.value == 'en' ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
-              onTap: () async {
-                await _backend.changeLanguage('en');
-                if (mounted) Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: Text('Français', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-              trailing: _backend.langNotifier.value == 'fr' ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
-              onTap: () async {
-                await _backend.changeLanguage('fr');
-                if (mounted) Navigator.pop(context);
-              },
-            ),
-          ],
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: languages.length,
+            separatorBuilder: (_, __) => Divider(color: Colors.white.withOpacity(0.06), height: 1),
+            itemBuilder: (context, index) {
+              final item = languages[index];
+              final code = item['code']!;
+              final isSelected = _backend.langNotifier.value == code;
+              return ListTile(
+                leading: Text(item['flag']!, style: const TextStyle(fontSize: 22)),
+                title: Text(
+                  item['name']!,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
+                onTap: () async {
+                  await _backend.changeLanguage(code);
+                  if (mounted) Navigator.pop(context);
+                },
+              );
+            },
+          ),
         ),
       ),
     );

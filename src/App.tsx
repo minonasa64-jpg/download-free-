@@ -169,13 +169,13 @@ export default function App() {
               </a>
 
               <a
-                href="https://github.com/minonasa64-jpg/download-free-/releases/tag/v1.3.6"
+                href="https://github.com/minonasa64-jpg/download-free-/releases/tag/v1.3.7"
                 target="_blank"
                 rel="noreferrer"
                 className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium transition shadow-lg shadow-cyan-600/20"
               >
                 <Download className="w-4 h-4" />
-                تحميل APK المباشر (v1.3.6)
+                تحميل APK المباشر (v1.3.7)
               </a>
             </div>
           </div>
