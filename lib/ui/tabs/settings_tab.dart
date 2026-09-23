@@ -457,7 +457,7 @@ class _SettingsTabState extends State<SettingsTab> {
             context,
             icon: Icons.color_lens_rounded,
             title: _backend.t('theme_station'),
-            subtitle: _backend.t('theme_station_desc'),
+            subtitle: '${ThemeService().currentTheme.value.nameAr} • ${_backend.t('theme_station_desc')}',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -493,23 +493,24 @@ class _SettingsTabState extends State<SettingsTab> {
             context,
             icon: Icons.language_rounded,
             title: _backend.t('language'),
-            subtitle: _backend.langNotifier.value == 'ar' ? 'العربية' : (_backend.langNotifier.value == 'fr' ? 'Français' : 'English'),
+            subtitle: _backend.langNotifier.value == 'ar'
+                ? 'العربية 🇸🇦'
+                : (_backend.langNotifier.value == 'en'
+                    ? 'English 🇺🇸'
+                    : (_backend.langNotifier.value == 'fr'
+                        ? 'Français 🇫🇷'
+                        : (_backend.langNotifier.value == 'es'
+                            ? 'Español 🇪🇸'
+                            : (_backend.langNotifier.value == 'tr'
+                                ? 'Türkçe 🇹🇷'
+                                : (_backend.langNotifier.value == 'de'
+                                    ? 'Deutsch 🇩🇪'
+                                    : 'Русский 🇷🇺'))))),
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
             trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
             onTap: () => _showLanguageDialog(context),
-          ),
-          _buildGlassTile(
-            context,
-            icon: Icons.palette_outlined,
-            title: _backend.t('theme'),
-            subtitle: _backend.themeNotifier.value == ThemeMode.dark ? 'داكن (Dark Mode)' : 'فاتح (Light Mode)',
-            textColor: textColor,
-            subtitleColor: subtitleColor,
-            surfaceColor: surfaceColor,
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
-            onTap: () => _showThemeDialog(context),
           ),
           _buildGlassTile(
             context,
@@ -560,7 +561,7 @@ class _SettingsTabState extends State<SettingsTab> {
             context,
             icon: Icons.info_outline_rounded,
             title: _backend.t('about'),
-            subtitle: 'Boykta Pro v1.3.5 (إصدار متكامل فائق السرعة بدقة 1080p FHD)',
+            subtitle: 'Boykta Pro v1.3.9 (إصدار متكامل فائق السرعة بدقة 1080p FHD)',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,

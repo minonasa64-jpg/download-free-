@@ -47,6 +47,7 @@ class BoyktaApp extends StatelessWidget {
           builder: (context, currentLang, _) {
             final isRtl = currentLang == 'ar';
             return MaterialApp(
+              key: ValueKey('boykta_app_${themeConfig.id}_$currentLang'),
               title: 'Boykta',
               debugShowCheckedModeBanner: false,
               theme: ThemeService().getThemeData(),

@@ -276,8 +276,109 @@ class UniversalExtractorService {
       if (match != null) shortcode = match.group(1)!;
     }
 
-    // محاولة 1: استخراج مباشر فائق السرعة عبر واجهة التضمين العامة لإنستغرام (Instagram Embed)
-    // واجهة التضمين مخصصة للمواقع الخارجية ولا تطلب تسجيل الدخول وتوفر دقة عالية وصورة واضحة
+    // محاولة 1: Cobalt API و InDown و SnapInsta APIs
+    final cleanIgUrl = shortcode.isNotEmpty ? 'https://www.instagram.com/reel/$shortcode/' : url;
+    
+    // Cobalt Direct API
+    try {
+      final cobaltRes = await _dio.post(
+        'https://api.cobalt.tools/api/json',
+        data: {'url': cleanIgUrl},
+        options: Options(
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+      if (cobaltRes.statusCode == 200 && cobaltRes.data is Map) {
+        final cUrl = cobaltRes.data['url']?.toString();
+        if (cUrl != null && cUrl.startsWith('http')) {
+          return _buildSimpleMediaResult(
+            id: shortcode.isNotEmpty ? shortcode : 'ig_${DateTime.now().millisecondsSinceEpoch}',
+            title: 'ريلز إنستغرام (Instagram Reel)',
+            thumbnail: '',
+            videoUrl: cUrl,
+            hdVideoUrl: cUrl,
+            sdVideoUrl: cUrl,
+            platform: 'instagram',
+            author: 'Instagram',
+          );
+        }
+      }
+    } catch (_) {}
+
+    // محاولة 2: استدعاء محركات استخراج وسائط إنستغرام المتخصصة (SnapInsta, FastDL, SaveInsta, InDown)
+    final apiEndpoints = [
+      {
+        'url': 'https://snapinsta.to/api/ajaxSearch',
+        'origin': 'https://snapinsta.to',
+        'headers': {'origin': 'https://snapinsta.to', 'referer': 'https://snapinsta.to/'},
+      },
+      {
+        'url': 'https://v3.fastdl.app/api/ajaxSearch',
+        'origin': 'https://fastdl.app',
+        'headers': {'origin': 'https://fastdl.app', 'referer': 'https://fastdl.app/'},
+      },
+      {
+        'url': 'https://saveinsta.app/api/ajaxSearch',
+        'origin': 'https://saveinsta.app',
+        'headers': {'origin': 'https://saveinsta.app', 'referer': 'https://saveinsta.app/'},
+      },
+      {
+        'url': 'https://v3.fdownloader.net/api/ajaxSearch',
+        'origin': 'https://fdownloader.net',
+        'headers': {'origin': 'https://fdownloader.net', 'referer': 'https://fdownloader.net/'},
+      },
+    ];
+
+    for (final ep in apiEndpoints) {
+      try {
+        final res = await _dio.post(
+          ep['url'] as String,
+          data: {'q': cleanIgUrl, 'lang': 'en', 'cftoken': ''},
+          options: Options(
+            contentType: Headers.formUrlEncodedContentType,
+            headers: {
+              ...(ep['headers'] as Map<String, dynamic>),
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              'Accept': '*/*',
+            },
+          ),
+        );
+
+        if (res.data != null) {
+          final dataString = res.data is Map ? (res.data['data'] ?? res.data.toString()) : res.data.toString();
+          final html = dataString.toString();
+          
+          final match = RegExp(r'href="([^"]+)"[^>]*class="[^"]*btn-download').firstMatch(html) ??
+              RegExp(r'href="([^"]+)"[^>]*>Download Video').firstMatch(html) ??
+              RegExp(r'href="([^"]+)"[^>]*download').firstMatch(html) ??
+              RegExp(r'href="([^"]+)"[^>]*class="[^"]*download-bottom').firstMatch(html) ??
+              RegExp(r'href="(https:\/\/[^"]+\.mp4[^"]*)"').firstMatch(html);
+
+          if (match != null) {
+            final vUrl = _cleanUrl(match.group(1)!);
+            if (vUrl.startsWith('http')) {
+              return _buildSimpleMediaResult(
+                id: shortcode.isNotEmpty ? shortcode : 'ig_${DateTime.now().millisecondsSinceEpoch}',
+                title: 'ريلز إنستغرام',
+                thumbnail: '',
+                videoUrl: vUrl,
+                hdVideoUrl: vUrl,
+                sdVideoUrl: vUrl,
+                platform: 'instagram',
+                author: 'Instagram',
+              );
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Instagram API ${ep['url']} error: $e');
+      }
+    }
+
+    // محاولة 3: استخراج مباشر عبر واجهة التضمين العامة لإنستغرام (Instagram Embed)
     if (shortcode.isNotEmpty) {
       final embedUrls = [
         'https://www.instagram.com/p/$shortcode/embed/captioned/',
@@ -337,57 +438,7 @@ class UniversalExtractorService {
       }
     }
 
-    // محاولة 2: استدعاء محركات معالجة وسائط إنستغرام العامة (FastDL / SaveInsta / InDown)
-    final apiEndpoints = [
-      {'url': 'https://v3.fastdl.app/api/ajaxSearch', 'origin': 'https://fastdl.app'},
-      {'url': 'https://saveinsta.app/api/ajaxSearch', 'origin': 'https://saveinsta.app'},
-      {'url': 'https://v3.fdownloader.net/api/ajaxSearch', 'origin': 'https://fdownloader.net'},
-    ];
-
-    for (final ep in apiEndpoints) {
-      try {
-        final res = await _dio.post(
-          ep['url']!,
-          data: {'q': url, 'lang': 'en'},
-          options: Options(
-            contentType: Headers.formUrlEncodedContentType,
-            headers: {
-              'origin': ep['origin']!,
-              'referer': '${ep['origin']}/',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            },
-          ),
-        );
-
-        if (res.data != null && res.data['data'] != null) {
-          final html = res.data['data'].toString();
-          final match = RegExp(r'href="([^"]+)"[^>]*class="[^"]*btn-download').firstMatch(html) ??
-              RegExp(r'href="([^"]+)"[^>]*>Download Video').firstMatch(html) ??
-              RegExp(r'href="([^"]+)"[^>]*download').firstMatch(html) ??
-              RegExp(r'href="(https:\/\/[^"]+\.mp4[^"]*)"').firstMatch(html);
-
-          if (match != null) {
-            final vUrl = _cleanUrl(match.group(1)!);
-            if (vUrl.startsWith('http')) {
-              return _buildSimpleMediaResult(
-                id: shortcode.isNotEmpty ? shortcode : 'ig_${DateTime.now().millisecondsSinceEpoch}',
-                title: 'ريلز إنستغرام',
-                thumbnail: '',
-                videoUrl: vUrl,
-                hdVideoUrl: vUrl,
-                sdVideoUrl: vUrl,
-                platform: 'instagram',
-                author: 'Instagram',
-              );
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('Instagram API ${ep['url']} error: $e');
-      }
-    }
-
-    // محاولة 3: GraphQL مع المتغيرات
+    // محاولة 4: GraphQL مع المتغيرات
     if (shortcode.isNotEmpty) {
       try {
         final gqlUrl = 'https://www.instagram.com/graphql/query/?query_hash=b3055c2c970540414ba30bb6133bc710&variables={"shortcode":"$shortcode"}';
@@ -424,7 +475,7 @@ class UniversalExtractorService {
       }
     }
 
-    // محاولة 4: الفحص العام للصفحة ومؤشرات OpenGraph
+    // محاولة 5: الفحص العام للصفحة ومؤشرات OpenGraph
     return await _extractGenericWebOrFallbacks(url, forcedPlatform: 'instagram');
   }
 
