@@ -116,7 +116,7 @@ class _LocalVideoPlayerScreenState extends State<LocalVideoPlayerScreen> {
                 const SizedBox(height: 10),
                 ...speeds.map((s) => ListTile(
                       title: Text('${s}x', style: const TextStyle(color: Colors.white)),
-                      trailing: _playbackSpeed == s ? const Icon(Icons.check_rounded, color: AppColors.cyan) : null,
+                      trailing: _playbackSpeed == s ? Icon(Icons.check_rounded, color: AppColors.cyan) : null,
                       onTap: () {
                         setState(() => _playbackSpeed = s);
                         _videoPlayerController.setPlaybackSpeed(s);
@@ -153,7 +153,7 @@ class _LocalVideoPlayerScreenState extends State<LocalVideoPlayerScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.picture_in_picture_alt_rounded, color: AppColors.cyan, size: 50),
+                  Icon(Icons.picture_in_picture_alt_rounded, color: AppColors.cyan, size: 50),
                   const SizedBox(height: 15),
                   const Text('الفيديو يعمل حالياً في نافذة عائمة', style: TextStyle(color: Colors.white, fontSize: 16)),
                   const SizedBox(height: 20),
@@ -284,7 +284,7 @@ class _LocalVideoPlayerScreenState extends State<LocalVideoPlayerScreen> {
           ),
           // زر النافذة العائمة (Picture-in-Picture)
           IconButton(
-            icon: const Icon(Icons.picture_in_picture_alt_rounded, color: AppColors.cyan),
+            icon: Icon(Icons.picture_in_picture_alt_rounded, color: AppColors.cyan),
             tooltip: 'وضع صورة في صورة (PiP)',
             onPressed: _enterSystemPiP,
           ),
@@ -305,12 +305,12 @@ class _LocalVideoPlayerScreenState extends State<LocalVideoPlayerScreen> {
                   const SizedBox(height: 15),
                   const Text('تعذر تشغيل هذا الملف', style: TextStyle(color: Colors.white, fontSize: 16)),
                   const SizedBox(height: 5),
-                  const Text('قد يكون الملف تالفاً أو بصيغة غير مدعومة', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  Text('قد يكون الملف تالفاً أو بصيغة غير مدعومة', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
                 ],
               )
             : _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
                 ? Chewie(controller: _chewieController!)
-                : const CircularProgressIndicator(color: AppColors.cyan),
+                : CircularProgressIndicator(color: AppColors.cyan),
       ),
     );
   }

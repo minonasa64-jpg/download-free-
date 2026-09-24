@@ -351,7 +351,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Row(
+                Row(
                   children: [
                     Icon(Icons.history_rounded, color: AppColors.cyan, size: 18),
                     SizedBox(width: 8),
@@ -381,10 +381,10 @@ class _YoutubeTabState extends State<YoutubeTab> {
                 final item = _recentSearches[index];
                 return ListTile(
                   dense: true,
-                  leading: const Icon(Icons.history, color: AppColors.textMuted, size: 18),
-                  title: Text(item, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+                  leading: Icon(Icons.history, color: AppColors.textMuted, size: 18),
+                  title: Text(item, style: TextStyle(color: AppColors.textPrimary, fontSize: 13)),
                   trailing: IconButton(
-                    icon: const Icon(Icons.close, color: AppColors.textMuted, size: 16),
+                    icon: Icon(Icons.close, color: AppColors.textMuted, size: 16),
                     onPressed: () => _removeRecentSearch(item),
                   ),
                   onTap: () => _performSearch(item),
@@ -404,9 +404,9 @@ class _YoutubeTabState extends State<YoutubeTab> {
         final suggestion = _searchSuggestions[index];
         return ListTile(
           dense: true,
-          leading: const Icon(Icons.search_rounded, color: AppColors.cyan, size: 18),
-          title: Text(suggestion, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
-          trailing: const Icon(Icons.north_west_rounded, color: AppColors.textMuted, size: 14),
+          leading: Icon(Icons.search_rounded, color: AppColors.cyan, size: 18),
+          title: Text(suggestion, style: TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+          trailing: Icon(Icons.north_west_rounded, color: AppColors.textMuted, size: 14),
           onTap: () => _performSearch(suggestion),
         );
       },
@@ -430,7 +430,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
               });
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: SearchSortFilter.relevance,
                 child: Row(
                   children: [
@@ -440,7 +440,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: SearchSortFilter.uploadDate,
                 child: Row(
                   children: [
@@ -450,7 +450,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: SearchSortFilter.viewCount,
                 child: Row(
                   children: [
@@ -471,13 +471,13 @@ class _YoutubeTabState extends State<YoutubeTab> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.sort_rounded, color: AppColors.cyan, size: 16),
+                  Icon(Icons.sort_rounded, color: AppColors.cyan, size: 16),
                   const SizedBox(width: 5),
                   Text(
                     _getFilterLabel(),
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 11, fontWeight: FontWeight.bold),
+                    style: TextStyle(color: AppColors.textPrimary, fontSize: 11, fontWeight: FontWeight.bold),
                   ),
-                  const Icon(Icons.arrow_drop_down, color: AppColors.textMuted, size: 16),
+                  Icon(Icons.arrow_drop_down, color: AppColors.textMuted, size: 16),
                 ],
               ),
             ),
@@ -486,7 +486,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
           if (_searchResults.isNotEmpty)
             Text(
               '${_searchResults.length} فيديو متوفر',
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+              style: TextStyle(color: AppColors.textMuted, fontSize: 11),
             ),
         ],
       ),
@@ -581,22 +581,22 @@ class _YoutubeTabState extends State<YoutubeTab> {
             child: Row(
               children: [
                 const SizedBox(width: 8),
-                const Icon(Icons.search, color: AppColors.cyan, size: 20),
+                Icon(Icons.search, color: AppColors.cyan, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
                     controller: _searchController,
                     focusNode: _searchFocusNode,
-                    style: const TextStyle(color: AppColors.textPrimary),
+                    style: TextStyle(color: AppColors.textPrimary),
                     textInputAction: TextInputAction.search,
                     onSubmitted: (value) => _performSearch(),
                     decoration: InputDecoration(
                       hintText: _backend.t('search_hint'),
-                      hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                      hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
                       border: InputBorder.none,
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear, color: AppColors.textMuted, size: 18),
+                              icon: Icon(Icons.clear, color: AppColors.textMuted, size: 18),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() {
@@ -659,9 +659,9 @@ class _YoutubeTabState extends State<YoutubeTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.search_off_rounded, color: AppColors.textMuted, size: 60),
+            Icon(Icons.search_off_rounded, color: AppColors.textMuted, size: 60),
             const SizedBox(height: 15),
-            Text(_backend.t('no_results'), style: const TextStyle(color: AppColors.textMuted, fontSize: 16)),
+            Text(_backend.t('no_results'), style: TextStyle(color: AppColors.textMuted, fontSize: 16)),
           ],
         ),
       );
@@ -680,7 +680,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
         itemCount: _searchResults.length + (_isLoadingMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (index == _searchResults.length) {
-            return const Padding(
+            return Padding(
               padding: EdgeInsets.all(20.0),
               child: Center(child: CircularProgressIndicator(color: AppColors.cyan)),
             );
@@ -728,7 +728,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
                       errorBuilder: (context, error, stackTrace) => Container(
                         height: 200,
                         color: AppColors.surfaceLight,
-                        child: const Icon(Icons.broken_image, color: AppColors.textMuted),
+                        child: Icon(Icons.broken_image, color: AppColors.textMuted),
                       ),
                     ),
                     Positioned.fill(
@@ -799,19 +799,19 @@ class _YoutubeTabState extends State<YoutubeTab> {
                       video.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.bold, height: 1.3),
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.bold, height: 1.3),
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(Icons.person_outline, size: 16, color: AppColors.textMuted),
+                        Icon(Icons.person_outline, size: 16, color: AppColors.textMuted),
                         const SizedBox(width: 5),
                         Expanded(
                           child: Text(
                             video.author,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                           ),
                         ),
                         Container(
@@ -858,7 +858,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
           Container(
             width: double.infinity,
             height: 200,
-            decoration: const BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+            decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
           ),
           Padding(
             padding: const EdgeInsets.all(15),

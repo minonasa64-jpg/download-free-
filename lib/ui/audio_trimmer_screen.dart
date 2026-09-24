@@ -186,7 +186,7 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
             _trimmedResultFile = resultFile;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text('تم إنشاء النغمة بنجاح عبر FFmpeg! 🎵'),
               backgroundColor: AppColors.cyan,
             ),
@@ -226,7 +226,7 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.content_cut_rounded, color: AppColors.magenta, size: 22),
             SizedBox(width: 8),
@@ -260,7 +260,7 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
                         color: AppColors.magenta.withOpacity(0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.music_note_rounded, color: AppColors.magenta, size: 28),
+                      child: Icon(Icons.music_note_rounded, color: AppColors.magenta, size: 28),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -276,7 +276,7 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
                           const SizedBox(height: 4),
                           Text(
                             'المدة الإجمالية: ${_formatDuration(maxDuration)}',
-                            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                           ),
                         ],
                       ),
@@ -312,7 +312,7 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
                             const SizedBox(height: 4),
                             Text(
                               '${_formatDuration(_startSeconds)} ➔ ${_formatDuration(_endSeconds)}',
-                              style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 16),
+                              style: TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                           ],
                         ),
@@ -325,7 +325,7 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
                           ),
                           child: Text(
                             'المدة: ${clipDuration.toStringAsFixed(1)} ثانية',
-                            style: const TextStyle(color: AppColors.magenta, fontWeight: FontWeight.bold, fontSize: 12),
+                            style: TextStyle(color: AppColors.magenta, fontWeight: FontWeight.bold, fontSize: 12),
                           ),
                         ),
                       ],
@@ -442,7 +442,7 @@ class _AudioTrimmerScreenState extends State<AudioTrimmerScreen> {
                 Center(
                   child: Column(
                     children: [
-                      const CircularProgressIndicator(color: AppColors.magenta),
+                      CircularProgressIndicator(color: AppColors.magenta),
                       const SizedBox(height: 12),
                       Text(_processStatus, style: const TextStyle(color: Colors.white70, fontSize: 13)),
                     ],

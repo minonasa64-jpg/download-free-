@@ -166,7 +166,7 @@ class _LinksTabState extends State<LinksTab> {
                   decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
                 ),
                 const SizedBox(height: 18),
-                const Row(
+                Row(
                   children: [
                     Icon(Icons.schedule_rounded, color: AppColors.cyan, size: 22),
                     SizedBox(width: 8),
@@ -218,10 +218,10 @@ class _LinksTabState extends State<LinksTab> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(10)),
-        child: const Icon(Icons.timer_outlined, color: AppColors.cyan, size: 20),
+        child: Icon(Icons.timer_outlined, color: AppColors.cyan, size: 20),
       ),
       title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-      subtitle: Text(subtitle, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+      subtitle: Text(subtitle, style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
       onTap: () {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -300,12 +300,12 @@ class _LinksTabState extends State<LinksTab> {
                 color: AppColors.magenta.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.link, size: 50, color: AppColors.magenta),
+              child: Icon(Icons.link, size: 50, color: AppColors.magenta),
             ),
             const SizedBox(height: 15),
             Text(
               _backend.t('have_link'),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
@@ -350,17 +350,17 @@ class _LinksTabState extends State<LinksTab> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.auto_awesome, color: AppColors.cyan, size: 18),
+                    Icon(Icons.auto_awesome, color: AppColors.cyan, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _backend.t('clipboard_detected'),
-                        style: const TextStyle(color: AppColors.cyan, fontSize: 12, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: AppColors.cyan, fontSize: 12, fontWeight: FontWeight.bold),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 12),
+                    Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 12),
                   ],
                 ),
               ),
@@ -386,8 +386,8 @@ class _LinksTabState extends State<LinksTab> {
                       ),
                       child: TextField(
                         controller: _urlController,
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-                        decoration: const InputDecoration(
+                        style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                        decoration: InputDecoration(
                           hintText: 'ضع رابط أي فيديو (YouTube, TikTok, Insta, FB, X, أو أي موقع)...',
                           hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
                           border: InputBorder.none,
@@ -511,14 +511,14 @@ class _LinksTabState extends State<LinksTab> {
     return Column(
       key: const ValueKey('loading'),
       children: [
-        const CircularProgressIndicator(
+        CircularProgressIndicator(
           color: AppColors.cyan,
           strokeWidth: 3,
         ),
         const SizedBox(height: 15),
         Text(
           _backend.t('extracting'),
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
         )
       ],
     );
@@ -574,12 +574,12 @@ class _LinksTabState extends State<LinksTab> {
                         color: AppColors.cyan.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Text('قائمة تشغيل يوتيوب', style: TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: Text('قائمة تشغيل يوتيوب', style: TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       '${videos.length} مقطع',
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                     ),
                   ],
                 ),
@@ -588,17 +588,17 @@ class _LinksTabState extends State<LinksTab> {
                   title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   author,
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
               ],
             ),
           ),
-          const Divider(color: AppColors.surfaceLight, height: 1),
+          Divider(color: AppColors.surfaceLight, height: 1),
 
           // شريط تحديد الكل
           Padding(
@@ -624,7 +624,7 @@ class _LinksTabState extends State<LinksTab> {
                   icon: Icon(isAllSelected ? Icons.deselect : Icons.select_all, size: 16, color: AppColors.cyan),
                   label: Text(
                     isAllSelected ? 'إلغاء التحديد' : 'تحديد الكل',
-                    style: const TextStyle(color: AppColors.cyan, fontSize: 12),
+                    style: TextStyle(color: AppColors.cyan, fontSize: 12),
                   ),
                 ),
               ],
@@ -657,7 +657,7 @@ class _LinksTabState extends State<LinksTab> {
                   ),
                   subtitle: Text(
                     '${v['duration'] ?? ''} • ${v['author'] ?? ''}',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 11),
                   ),
                   onChanged: (val) {
                     setState(() {
@@ -761,14 +761,14 @@ class _LinksTabState extends State<LinksTab> {
               title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          const Divider(color: AppColors.surfaceLight, height: 1),
+          Divider(color: AppColors.surfaceLight, height: 1),
           DefaultTabController(
             length: 3,
             child: Column(
@@ -843,7 +843,7 @@ class _LinksTabState extends State<LinksTab> {
                             SnackBar(
                               content: Row(
                                 children: [
-                                  const Icon(Icons.downloading_rounded, color: AppColors.cyan, size: 20),
+                                  Icon(Icons.downloading_rounded, color: AppColors.cyan, size: 20),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
@@ -882,7 +882,7 @@ class _LinksTabState extends State<LinksTab> {
                       border: Border.all(color: Colors.white12),
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.schedule_rounded, color: AppColors.cyan, size: 24),
+                      icon: Icon(Icons.schedule_rounded, color: AppColors.cyan, size: 24),
                       onPressed: _showSchedulePicker,
                       tooltip: 'جدولة التنزيل',
                       padding: const EdgeInsets.all(14),
@@ -899,7 +899,7 @@ class _LinksTabState extends State<LinksTab> {
   // قائمة الترجمات المتاحة
   Widget _buildSubtitlesList(List<Map<String, dynamic>> subtitles, String videoTitle) {
     if (subtitles.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -930,7 +930,7 @@ class _LinksTabState extends State<LinksTab> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.closed_caption_rounded, color: AppColors.cyan, size: 22),
+              Icon(Icons.closed_caption_rounded, color: AppColors.cyan, size: 22),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -942,7 +942,7 @@ class _LinksTabState extends State<LinksTab> {
                     ),
                     Text(
                       '${code.toString().toUpperCase()} ${isAuto ? '• ترجمة تلقائية' : '• ترجمة رسمية'}',
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 11),
                     ),
                   ],
                 ),
@@ -1031,7 +1031,7 @@ class _LinksTabState extends State<LinksTab> {
 
   Widget _buildFormatList(List<Map<String, dynamic>> formats, IconData icon) {
     if (formats.isEmpty) {
-      return const Center(
+      return Center(
         child: Text('هذه الصيغة غير متوفرة', style: TextStyle(color: AppColors.textMuted)),
       );
     }
@@ -1113,7 +1113,7 @@ class _LinksTabState extends State<LinksTab> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   if (isHighDef && !isWatermark) ...[
-                                    const Icon(Icons.star_rounded, color: AppColors.cyan, size: 11),
+                                    Icon(Icons.star_rounded, color: AppColors.cyan, size: 11),
                                     const SizedBox(width: 2),
                                   ] else if (isWatermark) ...[
                                     const Icon(Icons.branding_watermark_rounded, color: Colors.amber, size: 11),
@@ -1150,7 +1150,7 @@ class _LinksTabState extends State<LinksTab> {
                       const SizedBox(height: 3),
                       Text(
                         'الحجم: ${format['size']} MB',
-                        style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                        style: TextStyle(color: AppColors.textMuted, fontSize: 11),
                       ),
                     ],
                   ),
@@ -1167,7 +1167,7 @@ class _LinksTabState extends State<LinksTab> {
                       ),
                       child: Text(
                         format['ext'].toString().toUpperCase(),
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold),
                       ),
                     ),
                     if (format['needs_merge'] == true) ...[

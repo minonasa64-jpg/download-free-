@@ -55,7 +55,7 @@ class _WebShareScreenState extends State<WebShareScreen> {
   void _copyUrl() {
     Clipboard.setData(ClipboardData(text: _serverUrl));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text('تم نسخ رابط المشاركة إلى الحافظة 📋'),
         backgroundColor: AppColors.cyan,
       ),
@@ -80,7 +80,7 @@ class _WebShareScreenState extends State<WebShareScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.wifi_tethering_rounded, color: AppColors.cyan, size: 22),
             SizedBox(width: 8),
@@ -152,11 +152,11 @@ class _WebShareScreenState extends State<WebShareScreen> {
                                   ? 'يمكنك الآن الدخول من أي جهاز متصل بنفس شبكة الـ Wi-Fi'
                                   : 'قم بتشغيل الخادم لبدء مشاركة وتنزيل الملفات على الكمبيوتر',
                               textAlign: TextAlign.center,
-                              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                             ),
                             const SizedBox(height: 18),
                             _isStarting
-                                ? const CircularProgressIndicator(color: AppColors.cyan)
+                                ? CircularProgressIndicator(color: AppColors.cyan)
                                 : SwitchListTile(
                                     contentPadding: EdgeInsets.zero,
                                     title: const Text(
@@ -192,7 +192,7 @@ class _WebShareScreenState extends State<WebShareScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           children: [
                             Icon(Icons.computer_rounded, color: AppColors.cyan, size: 20),
                             SizedBox(width: 8),
@@ -215,7 +215,7 @@ class _WebShareScreenState extends State<WebShareScreen> {
                               Expanded(
                                 child: SelectableText(
                                   _serverUrl,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: AppColors.cyan,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
@@ -224,7 +224,7 @@ class _WebShareScreenState extends State<WebShareScreen> {
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.copy_rounded, color: AppColors.cyan, size: 20),
+                                icon: Icon(Icons.copy_rounded, color: AppColors.cyan, size: 20),
                                 onPressed: _copyUrl,
                                 tooltip: 'نسخ',
                               ),
@@ -333,7 +333,7 @@ class _WebShareScreenState extends State<WebShareScreen> {
           alignment: Alignment.center,
           child: Text(
             num,
-            style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 11),
+            style: TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 11),
           ),
         ),
         const SizedBox(width: 10),

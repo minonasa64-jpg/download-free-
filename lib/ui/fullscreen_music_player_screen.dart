@@ -196,7 +196,7 @@ class _FullscreenMusicPlayerScreenState extends State<FullscreenMusicPlayerScree
                           children: [
                             Text(
                               _backend.t('audio').toUpperCase(),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.cyan,
                                 fontSize: 11,
                                 letterSpacing: 2,
@@ -233,7 +233,7 @@ class _FullscreenMusicPlayerScreenState extends State<FullscreenMusicPlayerScree
                               value: 'trim',
                               child: Row(
                                 children: [
-                                  const Icon(Icons.content_cut_rounded, color: AppColors.magenta, size: 20),
+                                  Icon(Icons.content_cut_rounded, color: AppColors.magenta, size: 20),
                                   const SizedBox(width: 10),
                                   Text(_backend.t('audio_trimmer'), style: const TextStyle(color: Colors.white, fontSize: 13)),
                                 ],
@@ -243,7 +243,7 @@ class _FullscreenMusicPlayerScreenState extends State<FullscreenMusicPlayerScree
                               value: 'share',
                               child: Row(
                                 children: [
-                                  const Icon(Icons.share_rounded, color: AppColors.cyan, size: 20),
+                                  Icon(Icons.share_rounded, color: AppColors.cyan, size: 20),
                                   const SizedBox(width: 10),
                                   Text(_backend.t('share'), style: const TextStyle(color: Colors.white, fontSize: 13)),
                                 ],
@@ -351,11 +351,11 @@ class _FullscreenMusicPlayerScreenState extends State<FullscreenMusicPlayerScree
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.graphic_eq_rounded, color: AppColors.cyan, size: 14),
+                              Icon(Icons.graphic_eq_rounded, color: AppColors.cyan, size: 14),
                               const SizedBox(width: 6),
                               Text(
                                 '${_position.inSeconds > 0 ? "HQ Audio" : "Pure Audio"} • ${_playbackSpeed}x',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: AppColors.cyan,
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,

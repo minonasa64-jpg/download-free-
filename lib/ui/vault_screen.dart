@@ -96,7 +96,7 @@ class _VaultScreenState extends State<VaultScreen> {
       if (mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text('تم تشفير الملف وإضافته إلى الخزنة بنجاح 🔒'),
               backgroundColor: AppColors.cyan,
             ),
@@ -168,7 +168,7 @@ class _VaultScreenState extends State<VaultScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.password_rounded, color: AppColors.cyan, size: 24),
+            Icon(Icons.password_rounded, color: AppColors.cyan, size: 24),
             const SizedBox(width: 8),
             Text(_backend.t('set_pin'), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
           ],

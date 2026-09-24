@@ -317,7 +317,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.picture_in_picture_alt_rounded, color: AppColors.cyan, size: 50),
+                  Icon(Icons.picture_in_picture_alt_rounded, color: AppColors.cyan, size: 50),
                   const SizedBox(height: 15),
                   const Text('الفيديو يعمل حالياً في نافذة عائمة', style: TextStyle(color: Colors.white, fontSize: 16)),
                   const SizedBox(height: 20),
@@ -445,7 +445,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
             onPressed: _toggleBackgroundAudio,
           ),
           IconButton(
-            icon: const Icon(Icons.picture_in_picture_alt_rounded, color: AppColors.cyan),
+            icon: Icon(Icons.picture_in_picture_alt_rounded, color: AppColors.cyan),
             tooltip: 'وضع صورة في صورة (PiP)',
             onPressed: _enterSystemPiP,
           ),
@@ -461,7 +461,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
             child: AspectRatio(
               aspectRatio: 16 / 9,
               child: _isLoadingPlayer
-                  ? const Center(
+                  ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -507,7 +507,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                       : _chewieController != null &&
                               _chewieController!.videoPlayerController.value.isInitialized
                           ? Chewie(controller: _chewieController!)
-                          : const Center(
+                          : Center(
                               child: CircularProgressIndicator(color: AppColors.cyan),
                             ),
             ),
@@ -528,14 +528,14 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                       children: [
                         Text(
                           _currentVideo.title,
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(Icons.person_outline, size: 16, color: AppColors.textMuted),
+                            Icon(Icons.person_outline, size: 16, color: AppColors.textMuted),
                             const SizedBox(width: 5),
-                            Text(_currentVideo.author, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                            Text(_currentVideo.author, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
                           ],
                         ),
                         const SizedBox(height: 20),
@@ -576,7 +576,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                           ),
                         ),
                         const SizedBox(height: 25),
-                        const Text(
+                        Text(
                           'فيديوهات ذات صلة',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                         ),
@@ -587,7 +587,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
 
                 if (index == _relatedVideos.length + 1) {
                   return _isLoadingMoreRelated
-                      ? const Padding(
+                      ? Padding(
                           padding: EdgeInsets.all(20),
                           child: Center(child: CircularProgressIndicator(color: AppColors.cyan)),
                         )
@@ -625,7 +625,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                       width: 120,
                       height: 70,
                       color: AppColors.surfaceLight,
-                      child: const Icon(Icons.video_library, color: AppColors.textMuted),
+                      child: Icon(Icons.video_library, color: AppColors.textMuted),
                     ),
                   ),
                 ),
@@ -656,12 +656,12 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                     video.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     video.author,
-                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                   ),
                 ],
               ),
@@ -742,7 +742,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.downloading_rounded, color: AppColors.cyan),
+            Icon(Icons.downloading_rounded, color: AppColors.cyan),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -795,7 +795,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                     style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),
-                const TabBar(
+                TabBar(
                   indicatorColor: AppColors.cyan,
                   labelColor: AppColors.cyan,
                   unselectedLabelColor: AppColors.textMuted,
@@ -846,7 +846,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
   }
 
   Widget _buildList(List<Map<String, dynamic>> formats) {
-    if (formats.isEmpty) return const Center(child: Text('غير متوفر', style: TextStyle(color: AppColors.textMuted)));
+    if (formats.isEmpty) return Center(child: Text('غير متوفر', style: TextStyle(color: AppColors.textMuted)));
 
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
@@ -920,7 +920,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
                       const SizedBox(height: 3),
                       Text(
                         '${format['size']} MB • ${format['ext'].toString().toUpperCase()}',
-                        style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                        style: TextStyle(color: AppColors.textMuted, fontSize: 11),
                       ),
                     ],
                   ),

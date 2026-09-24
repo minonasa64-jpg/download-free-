@@ -129,7 +129,7 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                   const SizedBox(height: 15),
                   const Text('حدث خطأ', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
-                  Text(_errorMessage, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                  Text(_errorMessage, textAlign: TextAlign.center, style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
                   const SizedBox(height: 20),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -152,7 +152,7 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                   const SizedBox(height: 15),
                   const Text('اكتمل التنزيل بنجاح! 🎉', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 5),
-                  const Text('الملف متوفر الآن في مجلد التنزيلات بجهازك.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  Text('الملف متوفر الآن في مجلد التنزيلات بجهازك.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
                   const SizedBox(height: 20),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -165,7 +165,7 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                     child: const Text('رائع', style: TextStyle(fontWeight: FontWeight.bold)),
                   )
                 ] else ...[
-                  const CircularProgressIndicator(color: AppColors.cyan),
+                  CircularProgressIndicator(color: AppColors.cyan),
                   const SizedBox(height: 16),
                   if (_isMultiThreaded)
                     Container(
@@ -179,11 +179,11 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.speed_rounded, color: AppColors.cyan, size: 14),
+                          Icon(Icons.speed_rounded, color: AppColors.cyan, size: 14),
                           const SizedBox(width: 5),
                           Text(
                             'تنزيل متعدد الخطوط: $_threadsCount قنوات متزامنة ⚡',
-                            style: const TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -201,7 +201,7 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                         value: _progress,
                         minHeight: 10,
                         backgroundColor: Colors.black.withOpacity(0.5),
-                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.cyan),
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.cyan),
                       ),
                     ),
                     if (_isMultiThreaded) ...[
@@ -225,14 +225,14 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                     const SizedBox(height: 12),
                     Text(
                       '${(_progress * 100).toStringAsFixed(1)}%',
-                      style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ],
                   const SizedBox(height: 20),
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.cyan,
-                      side: const BorderSide(color: AppColors.cyan, width: 1.2),
+                      side: BorderSide(color: AppColors.cyan, width: 1.2),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     ),
@@ -244,7 +244,7 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                     onPressed: () {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
+                        SnackBar(
                           content: Text('يستمر التحميل الآن في الخلفية... يمكنك متابعة تقدمه من الإشعارات أو تبويب التنزيلات.'),
                           backgroundColor: AppColors.surface,
                           duration: Duration(seconds: 3),
@@ -435,7 +435,7 @@ class _BatchDownloadProgressDialogState extends State<BatchDownloadProgressDialo
                   const SizedBox(height: 8),
                   Text(
                     'تم تحميل $_successCount من إجمالي $totalCount ملف بنجاح',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                   ),
                   if (_failCount > 0)
                     Text(
@@ -479,7 +479,7 @@ class _BatchDownloadProgressDialogState extends State<BatchDownloadProgressDialo
                             ),
                             Text(
                               widget.isAudio ? 'تحويل وحفظ MP3' : 'تحميل وحفظ MP4',
-                              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                             ),
                           ],
                         ),
@@ -502,10 +502,10 @@ class _BatchDownloadProgressDialogState extends State<BatchDownloadProgressDialo
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('التقدم الإجمالي:', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                          Text('التقدم الإجمالي:', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
                           Text(
                             '${(overallProgress * 100).toStringAsFixed(0)}%',
-                            style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 12),
+                            style: TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 12),
                           ),
                         ],
                       ),
@@ -516,7 +516,7 @@ class _BatchDownloadProgressDialogState extends State<BatchDownloadProgressDialo
                           value: overallProgress,
                           minHeight: 8,
                           backgroundColor: Colors.black.withOpacity(0.4),
-                          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.cyan),
+                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.cyan),
                         ),
                       ),
                     ],
@@ -528,7 +528,7 @@ class _BatchDownloadProgressDialogState extends State<BatchDownloadProgressDialo
                       OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.cyan,
-                          side: const BorderSide(color: AppColors.cyan),
+                          side: BorderSide(color: AppColors.cyan),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         ),
@@ -537,7 +537,7 @@ class _BatchDownloadProgressDialogState extends State<BatchDownloadProgressDialo
                         onPressed: () {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            SnackBar(
                               content: Text('يستمر التحميل الدُفعي في الخلفية...'),
                               backgroundColor: AppColors.surface,
                               duration: Duration(seconds: 3),

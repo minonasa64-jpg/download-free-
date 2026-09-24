@@ -136,7 +136,7 @@ class _SettingsTabState extends State<SettingsTab> {
                 if (mounted) {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
+                    SnackBar(
                       content: Text('تم تفعيل رمز الخزنة الوهمية بنجاح 🛡️'),
                       backgroundColor: AppColors.cyan,
                     ),
@@ -160,7 +160,7 @@ class _SettingsTabState extends State<SettingsTab> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.shield_rounded, color: AppColors.cyan, size: 24),
+            Icon(Icons.shield_rounded, color: AppColors.cyan, size: 24),
             const SizedBox(width: 8),
             Text(
               isChanging ? 'تغيير رمز PIN' : _backend.t('set_pin'),
@@ -234,7 +234,7 @@ class _SettingsTabState extends State<SettingsTab> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.lock_rounded, color: AppColors.cyan, size: 24),
+            Icon(Icons.lock_rounded, color: AppColors.cyan, size: 24),
             const SizedBox(width: 8),
             Text(_backend.t('enter_pin'), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
           ],
@@ -332,7 +332,7 @@ class _SettingsTabState extends State<SettingsTab> {
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
+            trailing: Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
             onTap: _openVault,
           ),
           if (_hasVaultPin) ...[
@@ -344,7 +344,7 @@ class _SettingsTabState extends State<SettingsTab> {
               textColor: textColor,
               subtitleColor: subtitleColor,
               surfaceColor: surfaceColor,
-              trailing: const Icon(Icons.edit_rounded, color: AppColors.cyan, size: 18),
+              trailing: Icon(Icons.edit_rounded, color: AppColors.cyan, size: 18),
               onTap: () => _showSetVaultPinDialog(isChanging: true),
             ),
             _buildGlassTile(
@@ -412,7 +412,7 @@ class _SettingsTabState extends State<SettingsTab> {
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
-            trailing: const Icon(Icons.flash_on_rounded, color: AppColors.cyan, size: 22),
+            trailing: Icon(Icons.flash_on_rounded, color: AppColors.cyan, size: 22),
           ),
           _buildGlassTile(
             context,
@@ -422,7 +422,7 @@ class _SettingsTabState extends State<SettingsTab> {
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
+            trailing: Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
             onTap: () => _showStoragePathDialog(context),
           ),
           _buildGlassTile(
@@ -447,7 +447,7 @@ class _SettingsTabState extends State<SettingsTab> {
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
-            trailing: const Icon(Icons.check_circle_rounded, color: AppColors.cyan, size: 20),
+            trailing: Icon(Icons.check_circle_rounded, color: AppColors.cyan, size: 20),
           ),
           const SizedBox(height: 15),
 
@@ -461,7 +461,7 @@ class _SettingsTabState extends State<SettingsTab> {
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
+            trailing: Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
             onTap: () {
               showModalBottomSheet(
                 context: context,
@@ -479,7 +479,7 @@ class _SettingsTabState extends State<SettingsTab> {
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
+            trailing: Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
             onTap: () {
               showModalBottomSheet(
                 context: context,
@@ -509,7 +509,7 @@ class _SettingsTabState extends State<SettingsTab> {
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
+            trailing: Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
             onTap: () => _showLanguageDialog(context),
           ),
           _buildGlassTile(
@@ -538,7 +538,7 @@ class _SettingsTabState extends State<SettingsTab> {
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
-            trailing: const Icon(Icons.delete_sweep_rounded, color: AppColors.cyan, size: 20),
+            trailing: Icon(Icons.delete_sweep_rounded, color: AppColors.cyan, size: 20),
             onTap: _clearCache,
           ),
           _buildGlassTile(
@@ -549,7 +549,7 @@ class _SettingsTabState extends State<SettingsTab> {
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
+            trailing: Icon(Icons.arrow_forward_ios_rounded, color: AppColors.cyan, size: 16),
             onTap: () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const WebShareScreen()));
             },
@@ -577,7 +577,7 @@ class _SettingsTabState extends State<SettingsTab> {
       padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 8),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.cyan,
           fontSize: 13,
           fontWeight: FontWeight.bold,
@@ -634,7 +634,7 @@ class _SettingsTabState extends State<SettingsTab> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const Center(
+      builder: (ctx) => Center(
         child: CircularProgressIndicator(color: AppColors.cyan),
       ),
     );
@@ -728,8 +728,8 @@ class _SettingsTabState extends State<SettingsTab> {
       dense: true,
       contentPadding: EdgeInsets.zero,
       title: Text(title, style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-      subtitle: Text(path, style: const TextStyle(color: AppColors.cyan, fontSize: 11)),
-      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan, size: 18) : null,
+      subtitle: Text(path, style: TextStyle(color: AppColors.cyan, fontSize: 11)),
+      trailing: isSelected ? Icon(Icons.check_circle_rounded, color: AppColors.cyan, size: 18) : null,
       onTap: () {
         _updateDownload('download_path', path);
         Navigator.pop(ctx);
@@ -750,7 +750,7 @@ class _SettingsTabState extends State<SettingsTab> {
           children: [
             ListTile(
               title: Text('داكن (Dark Mode)', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-              trailing: _backend.themeNotifier.value == ThemeMode.dark ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
+              trailing: _backend.themeNotifier.value == ThemeMode.dark ? Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
               onTap: () async {
                 await _backend.changeTheme('dark');
                 if (mounted) Navigator.pop(context);
@@ -758,7 +758,7 @@ class _SettingsTabState extends State<SettingsTab> {
             ),
             ListTile(
               title: Text('فاتح (Light Mode)', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-              trailing: _backend.themeNotifier.value == ThemeMode.light ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
+              trailing: _backend.themeNotifier.value == ThemeMode.light ? Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
               onTap: () async {
                 await _backend.changeTheme('light');
                 if (mounted) Navigator.pop(context);
@@ -807,7 +807,7 @@ class _SettingsTabState extends State<SettingsTab> {
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
-                trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
+                trailing: isSelected ? Icon(Icons.check_circle_rounded, color: AppColors.cyan) : null,
                 onTap: () async {
                   await _backend.changeLanguage(code);
                   if (mounted) Navigator.pop(context);
@@ -835,7 +835,7 @@ class _SettingsTabState extends State<SettingsTab> {
                 color: AppColors.cyan.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.download_rounded, color: AppColors.cyan, size: 24),
+              child: Icon(Icons.download_rounded, color: AppColors.cyan, size: 24),
             ),
             const SizedBox(width: 10),
             Text('Boykta Pro', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),

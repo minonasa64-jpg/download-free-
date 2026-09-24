@@ -151,7 +151,7 @@ class _MainNavigationState extends State<MainNavigation> {
               const SizedBox(height: 3),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.cyan,
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
