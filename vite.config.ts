@@ -37,13 +37,13 @@ function apiPlugin(): Plugin {
         res.end(JSON.stringify({
           success: true,
           latestRun: {
-            id: 35977297528,
-            status: 'completed',
-            conclusion: 'success',
-            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/35977297528',
+            id: 36139899301,
+            status: 'in_progress',
+            conclusion: null,
+            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36139899301',
             head_commit: {
-              id: 'd1983ec',
-              message: 'feat(v1.4.1): Target SDK 34, YouTube safe feed, Background Audio & Instagram fix'
+              id: '98ea89c',
+              message: 'feat(v1.4.1): Target SDK 34, YouTube safe feed & fast playback, background audio outside app, Instagram multi-strategy downloader, full localization'
             }
           },
           runs: []

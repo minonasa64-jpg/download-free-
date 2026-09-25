@@ -30,14 +30,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 35977297528,
-    status: 'completed',
-    conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/35977297528',
-    head_sha: 'd1983ec',
+    id: 36139899301,
+    status: 'in_progress',
+    conclusion: null,
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36139899301',
+    head_sha: '98ea89c',
     head_commit: {
-      id: 'd1983ec',
-      message: 'feat(v1.4.1): Target SDK 34, YouTube safe feed, Background Audio & Instagram fix'
+      id: '98ea89c',
+      message: 'feat(v1.4.1): Target SDK 34, YouTube safe feed & fast playback, background audio outside app, Instagram multi-strategy downloader, full localization'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
