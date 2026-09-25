@@ -240,6 +240,8 @@ class UniversalExtractorService {
             followRedirects: true,
             maxRedirects: 6,
             validateStatus: (status) => true,
+            sendTimeout: const Duration(seconds: 4),
+            receiveTimeout: const Duration(seconds: 4),
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             },
@@ -254,93 +256,109 @@ class UniversalExtractorService {
 
     // استخراج الـ shortcode من مختلف صيغ روابط إنستغرام
     String shortcode = '';
-    final uri = Uri.tryParse(url);
-    if (uri != null) {
-      final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
-      for (int i = 0; i < segments.length; i++) {
-        final seg = segments[i].toLowerCase();
-        if (seg == 'p' || seg == 'reel' || seg == 'reels' || seg == 'tv') {
-          if (i + 1 < segments.length) {
-            shortcode = segments[i + 1];
-            break;
+    final cleanUrlForShortcode = url.split('?').first.split('#').first;
+    final match = RegExp(r'\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)').firstMatch(cleanUrlForShortcode);
+    if (match != null) {
+      shortcode = match.group(1)!;
+    } else {
+      final uri = Uri.tryParse(url);
+      if (uri != null) {
+        final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+        for (int i = 0; i < segments.length; i++) {
+          final seg = segments[i].toLowerCase();
+          if (seg == 'p' || seg == 'reel' || seg == 'reels' || seg == 'tv') {
+            if (i + 1 < segments.length) {
+              shortcode = segments[i + 1];
+              break;
+            }
           }
         }
-      }
-      if (shortcode.isEmpty && segments.isNotEmpty) {
-        shortcode = segments.firstWhere((s) => s.length >= 5 && s.length <= 25, orElse: () => segments.last);
-      }
-    }
-
-    if (shortcode.isEmpty) {
-      final match = RegExp(r'\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)').firstMatch(url);
-      if (match != null) shortcode = match.group(1)!;
-    }
-
-    // محاولة 1: Cobalt API و InDown و SnapInsta APIs
-    final cleanIgUrl = shortcode.isNotEmpty ? 'https://www.instagram.com/reel/$shortcode/' : url;
-    
-    // Cobalt Direct API
-    try {
-      final cobaltRes = await _dio.post(
-        'https://api.cobalt.tools/api/json',
-        data: {'url': cleanIgUrl},
-        options: Options(
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-        ),
-      );
-      if (cobaltRes.statusCode == 200 && cobaltRes.data is Map) {
-        final cUrl = cobaltRes.data['url']?.toString();
-        if (cUrl != null && cUrl.startsWith('http')) {
-          return _buildSimpleMediaResult(
-            id: shortcode.isNotEmpty ? shortcode : 'ig_${DateTime.now().millisecondsSinceEpoch}',
-            title: 'ريلز إنستغرام (Instagram Reel)',
-            thumbnail: '',
-            videoUrl: cUrl,
-            hdVideoUrl: cUrl,
-            sdVideoUrl: cUrl,
-            platform: 'instagram',
-            author: 'Instagram',
-          );
+        if (shortcode.isEmpty && segments.isNotEmpty) {
+          shortcode = segments.firstWhere((s) => s.length >= 5 && s.length <= 25, orElse: () => segments.last);
         }
       }
-    } catch (_) {}
+    }
 
-    // محاولة 2: استدعاء محركات استخراج وسائط إنستغرام المتخصصة (SnapInsta, FastDL, SaveInsta, InDown)
+    final cleanIgUrl = shortcode.isNotEmpty ? 'https://www.instagram.com/reel/$shortcode/' : url;
+
+    // استراتيجية 1: واجهة Instagram Mobile App الرسمية برأس تطبيق أندرويد
+    if (shortcode.isNotEmpty) {
+      try {
+        final igAppUrl = 'https://www.instagram.com/reel/$shortcode/?__a=1&__d=dis';
+        final res = await _dio.get(
+          igAppUrl,
+          options: Options(
+            sendTimeout: const Duration(seconds: 4),
+            receiveTimeout: const Duration(seconds: 4),
+            validateStatus: (status) => true,
+            headers: {
+              'User-Agent': 'Instagram 219.0.0.12.117 Android',
+              'X-IG-App-ID': '936619743392459',
+              'Accept': '*/*',
+            },
+          ),
+        );
+        if (res.statusCode == 200 && res.data != null) {
+          Map<String, dynamic>? dataMap;
+          if (res.data is Map) {
+            dataMap = Map<String, dynamic>.from(res.data as Map);
+          }
+          if (dataMap != null) {
+            final items = dataMap['items'] as List?;
+            if (items != null && items.isNotEmpty) {
+              final item = items[0] as Map;
+              final videoVersions = item['video_versions'] as List?;
+              if (videoVersions != null && videoVersions.isNotEmpty) {
+                final vUrl = videoVersions[0]['url']?.toString();
+                if (vUrl != null && vUrl.startsWith('http')) {
+                  final cleanV = _cleanUrl(vUrl);
+                  return _buildSimpleMediaResult(
+                    id: shortcode,
+                    title: item['caption']?['text']?.toString()?.split('\n')?.first ?? 'ريلز إنستغرام',
+                    thumbnail: item['image_versions2']?['candidates']?[0]?['url']?.toString() ?? '',
+                    videoUrl: cleanV,
+                    hdVideoUrl: cleanV,
+                    sdVideoUrl: cleanV,
+                    platform: 'instagram',
+                    author: item['user']?['username']?.toString() ?? 'Instagram',
+                  );
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // استراتيجية 2: استدعاء محركات استخراج وسائط إنستغرام المتخصصة بتوقيت استجابة سريع
     final apiEndpoints = [
-      {
-        'url': 'https://snapinsta.to/api/ajaxSearch',
-        'origin': 'https://snapinsta.to',
-        'headers': {'origin': 'https://snapinsta.to', 'referer': 'https://snapinsta.to/'},
-      },
       {
         'url': 'https://v3.fastdl.app/api/ajaxSearch',
         'origin': 'https://fastdl.app',
-        'headers': {'origin': 'https://fastdl.app', 'referer': 'https://fastdl.app/'},
       },
       {
-        'url': 'https://saveinsta.app/api/ajaxSearch',
-        'origin': 'https://saveinsta.app',
-        'headers': {'origin': 'https://saveinsta.app', 'referer': 'https://saveinsta.app/'},
+        'url': 'https://saveig.app/api/ajaxSearch',
+        'origin': 'https://saveig.app',
       },
       {
-        'url': 'https://v3.fdownloader.net/api/ajaxSearch',
-        'origin': 'https://fdownloader.net',
-        'headers': {'origin': 'https://fdownloader.net', 'referer': 'https://fdownloader.net/'},
+        'url': 'https://snapinsta.to/api/ajaxSearch',
+        'origin': 'https://snapinsta.to',
       },
     ];
 
     for (final ep in apiEndpoints) {
       try {
+        final origin = ep['origin'] as String;
         final res = await _dio.post(
           ep['url'] as String,
           data: {'q': cleanIgUrl, 'lang': 'en', 'cftoken': ''},
           options: Options(
             contentType: Headers.formUrlEncodedContentType,
+            sendTimeout: const Duration(seconds: 4),
+            receiveTimeout: const Duration(seconds: 4),
             headers: {
-              ...(ep['headers'] as Map<String, dynamic>),
+              'origin': origin,
+              'referer': '$origin/',
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
               'Accept': '*/*',
             },
@@ -354,7 +372,6 @@ class UniversalExtractorService {
           final match = RegExp(r'href="([^"]+)"[^>]*class="[^"]*btn-download').firstMatch(html) ??
               RegExp(r'href="([^"]+)"[^>]*>Download Video').firstMatch(html) ??
               RegExp(r'href="([^"]+)"[^>]*download').firstMatch(html) ??
-              RegExp(r'href="([^"]+)"[^>]*class="[^"]*download-bottom').firstMatch(html) ??
               RegExp(r'href="(https:\/\/[^"]+\.mp4[^"]*)"').firstMatch(html);
 
           if (match != null) {
@@ -373,17 +390,14 @@ class UniversalExtractorService {
             }
           }
         }
-      } catch (e) {
-        debugPrint('Instagram API ${ep['url']} error: $e');
-      }
+      } catch (_) {}
     }
 
-    // محاولة 3: استخراج مباشر عبر واجهة التضمين العامة لإنستغرام (Instagram Embed)
+    // استراتيجية 3: استخراج مباشر عبر واجهة التضمين العامة لإنستغرام (Instagram Embed)
     if (shortcode.isNotEmpty) {
       final embedUrls = [
-        'https://www.instagram.com/p/$shortcode/embed/captioned/',
         'https://www.instagram.com/reel/$shortcode/embed/captioned/',
-        'https://www.instagram.com/p/$shortcode/embed/',
+        'https://www.instagram.com/p/$shortcode/embed/captioned/',
       ];
 
       for (final embedUrl in embedUrls) {
@@ -391,38 +405,29 @@ class UniversalExtractorService {
           final res = await _dio.get(
             embedUrl,
             options: Options(
+              sendTimeout: const Duration(seconds: 4),
+              receiveTimeout: const Duration(seconds: 4),
               headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
               },
             ),
           );
 
           if (res.statusCode == 200 && res.data != null) {
             final html = res.data.toString();
-            final vMatch = RegExp(r'class="EmbeddedVideo"[^>]*src="([^"]+)"').firstMatch(html) ??
-                RegExp(r'"video_url"\s*:\s*"([^"]+)"').firstMatch(html) ??
+            final vMatch = RegExp(r'"video_url"\s*:\s*"([^"]+)"').firstMatch(html) ??
+                RegExp(r'class="EmbeddedVideo"[^>]*src="([^"]+)"').firstMatch(html) ??
                 RegExp(r'<video[^>]*src="([^"]+)"').firstMatch(html) ??
-                RegExp(r'data-ios-url="([^"]+)"').firstMatch(html);
-
-            final tMatch = RegExp(r'class="EmbeddedMediaImage"[^>]*src="([^"]+)"').firstMatch(html) ??
-                RegExp(r'"display_url"\s*:\s*"([^"]+)"').firstMatch(html) ??
-                RegExp(r'<img[^>]*class="EmbeddedMediaImage"[^>]*src="([^"]+)"').firstMatch(html);
-
-            final cMatch = RegExp(r'class="Caption"[^>]*>([^<]+)<').firstMatch(html) ??
-                RegExp(r'<title>([^<]+)<\/title>').firstMatch(html);
+                RegExp(r'https:[^\"\'\s<>\\]*\.mp4[^\"\'\s<>\\]*').firstMatch(html);
 
             if (vMatch != null) {
-              final videoUrl = _cleanUrl(vMatch.group(1)!);
-              final thumb = tMatch != null ? _cleanUrl(tMatch.group(1)!) : '';
-              final title = (cMatch?.group(1) ?? 'ريلز إنستغرام').trim();
-
+              final videoUrl = _cleanUrl(vMatch.group(1) ?? vMatch.group(0)!);
               if (videoUrl.startsWith('http')) {
                 return _buildSimpleMediaResult(
                   id: shortcode,
-                  title: title.isNotEmpty ? title : 'ريلز إنستغرام',
-                  thumbnail: thumb,
+                  title: 'ريلز إنستغرام',
+                  thumbnail: '',
                   videoUrl: videoUrl,
                   hdVideoUrl: videoUrl,
                   sdVideoUrl: videoUrl,
@@ -432,48 +437,43 @@ class UniversalExtractorService {
               }
             }
           }
-        } catch (e) {
-          debugPrint('Instagram embed attempt error: $e');
-        }
+        } catch (_) {}
       }
     }
 
-    // محاولة 4: GraphQL مع المتغيرات
-    if (shortcode.isNotEmpty) {
-      try {
-        final gqlUrl = 'https://www.instagram.com/graphql/query/?query_hash=b3055c2c970540414ba30bb6133bc710&variables={"shortcode":"$shortcode"}';
-        final res = await _dio.get(
-          gqlUrl,
-          options: Options(headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Accept': '*/*',
-          }),
-        );
-        if (res.statusCode == 200 && res.data is Map) {
-          final media = res.data['data']?['shortcode_media'];
-          if (media != null) {
-            final vUrl = media['video_url']?.toString();
-            final thumb = media['display_url']?.toString() ?? '';
-            final caption = media['edge_media_to_caption']?['edges']?[0]?['node']?['text']?.toString() ?? 'ريلز إنستغرام';
-            if (vUrl != null && vUrl.isNotEmpty) {
-              final cleanedV = _cleanUrl(vUrl);
+    // استراتيجية 4: المحاولة عبر خادم VKRDownloader ومحرك البحث العام
+    try {
+      final vkrRes = await _dio.get(
+        'https://api.vkrdownloader.com/server?vkr=$cleanIgUrl',
+        options: Options(
+          sendTimeout: const Duration(seconds: 4),
+          receiveTimeout: const Duration(seconds: 4),
+          headers: {'User-Agent': 'Mozilla/5.0'},
+        ),
+      );
+      if (vkrRes.statusCode == 200 && vkrRes.data is Map) {
+        final data = vkrRes.data['data'];
+        if (data is Map) {
+          final downloads = data['downloads'] as List?;
+          if (downloads != null && downloads.isNotEmpty) {
+            final first = downloads.first as Map;
+            final vUrl = first['url']?.toString();
+            if (vUrl != null && vUrl.startsWith('http')) {
               return _buildSimpleMediaResult(
-                id: shortcode,
-                title: caption.split('\n').first,
-                thumbnail: thumb,
-                videoUrl: cleanedV,
-                hdVideoUrl: cleanedV,
-                sdVideoUrl: cleanedV,
+                id: shortcode.isNotEmpty ? shortcode : 'ig_${DateTime.now().millisecondsSinceEpoch}',
+                title: data['title']?.toString() ?? 'ريلز إنستغرام',
+                thumbnail: data['thumbnail']?.toString() ?? '',
+                videoUrl: _cleanUrl(vUrl),
+                hdVideoUrl: _cleanUrl(vUrl),
+                sdVideoUrl: _cleanUrl(vUrl),
                 platform: 'instagram',
-                author: media['owner']?['username']?.toString() ?? 'Instagram',
+                author: 'Instagram',
               );
             }
           }
         }
-      } catch (e) {
-        debugPrint('Instagram GraphQL error: $e');
       }
-    }
+    } catch (_) {}
 
     // محاولة 5: الفحص العام للصفحة ومؤشرات OpenGraph
     return await _extractGenericWebOrFallbacks(url, forcedPlatform: 'instagram');

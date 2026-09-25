@@ -413,7 +413,7 @@ class _LinksTabState extends State<LinksTab> {
                             ),
                             onPressed: _pasteFromClipboard,
                             icon: const Icon(Icons.content_paste, size: 18),
-                            label: const Text('لصق', style: TextStyle(fontWeight: FontWeight.bold)),
+                            label: Text(_backend.t('paste'), style: const TextStyle(fontWeight: FontWeight.bold)),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -474,7 +474,7 @@ class _LinksTabState extends State<LinksTab> {
       {'name': 'Facebook', 'icon': Icons.facebook_rounded, 'color': Colors.blueAccent},
       {'name': 'X / Twitter', 'icon': Icons.tag_rounded, 'color': Colors.lightBlueAccent},
       {'name': 'Pinterest', 'icon': Icons.pin_drop_rounded, 'color': Colors.red},
-      {'name': 'أي موقع ويب', 'icon': Icons.language_rounded, 'color': AppColors.cyan},
+      {'name': _backend.t('all_web'), 'icon': Icons.language_rounded, 'color': AppColors.cyan},
     ];
 
     return SingleChildScrollView(

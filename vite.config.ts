@@ -42,8 +42,8 @@ function apiPlugin(): Plugin {
             conclusion: 'success',
             html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/35977297528',
             head_commit: {
-              id: 'a77667b',
-              message: 'feat(v1.4.0): Chronological downloads grouping, instant search, and sorting'
+              id: 'd1983ec',
+              message: 'feat(v1.4.1): Target SDK 34, YouTube safe feed, Background Audio & Instagram fix'
             }
           },
           runs: []

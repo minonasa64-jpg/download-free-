@@ -144,6 +144,25 @@ class BackendService {
       'biometric_subtitle': 'استخدام بصمة الإصبع أو الوجه لفتح الخزنة بسرعة وأمان',
       'all_media': 'الكل',
       'search_placeholder': 'ابحث في التنزيلات...',
+      'paste': 'لصق',
+      'cancel': 'إلغاء',
+      'save': 'حفظ',
+      'apply': 'تطبيق',
+      'close': 'إغلاق',
+      'enter': 'دخول',
+      'notif_desc': 'إشعار عند اكتمال التنزيل',
+      'select_all': 'تحديد الكل',
+      'deselect_all': 'إلغاء التحديد',
+      'download_all_mp3': 'تحميل الكل MP3',
+      'download_all_mp4': 'تحميل الكل MP4',
+      'no_subtitles': 'لا توجد ملفات ترجمة متوفرة لهذا المقطع',
+      'all_web': 'أي موقع ويب',
+      'default_boykta_folder': 'مجلد Boykta الافتراضي للفيديوهات',
+      'public_download_folder': 'مجلد التنزيلات العام Download',
+      'music_folder': 'مجلد الموسيقى والصوتيات Music',
+      'custom_path_hint': 'أو أدخل مساراً مخصصاً:',
+      'playlist_title': 'قائمة تشغيل يوتيوب',
+      'clean_feed_title': 'خلاصة نقية ومريحة',
     };
     final en = {
       'youtube': 'YouTube', 'link': 'Links', 'downloads': 'Downloads', 'settings': 'Settings',
@@ -196,6 +215,25 @@ class BackendService {
       'biometric_subtitle': 'Use Fingerprint or Face ID for fast and secure vault access',
       'all_media': 'All',
       'search_placeholder': 'Search downloads...',
+      'paste': 'Paste',
+      'cancel': 'Cancel',
+      'save': 'Save',
+      'apply': 'Apply',
+      'close': 'Close',
+      'enter': 'Enter',
+      'notif_desc': 'Notify upon download completion',
+      'select_all': 'Select All',
+      'deselect_all': 'Deselect All',
+      'download_all_mp3': 'Download All MP3',
+      'download_all_mp4': 'Download All MP4',
+      'no_subtitles': 'No subtitles available for this video',
+      'all_web': 'Any Web Link',
+      'default_boykta_folder': 'Default Boykta Videos Folder',
+      'public_download_folder': 'Public Downloads Folder',
+      'music_folder': 'Music & Audio Folder',
+      'custom_path_hint': 'Or enter a custom path:',
+      'playlist_title': 'YouTube Playlist',
+      'clean_feed_title': 'Clean & Relaxing Feed',
     };
     final fr = {
       'youtube': 'YouTube', 'link': 'Liens', 'downloads': 'Téléchargements', 'settings': 'Paramètres',
@@ -248,6 +286,25 @@ class BackendService {
       'biometric_subtitle': 'Utiliser l\'empreinte ou le visage pour un accès rapide et sécurisé',
       'all_media': 'Tous',
       'search_placeholder': 'Rechercher des fichiers...',
+      'paste': 'Coller',
+      'cancel': 'Annuler',
+      'save': 'Enregistrer',
+      'apply': 'Appliquer',
+      'close': 'Fermer',
+      'enter': 'Entrer',
+      'notif_desc': 'Notification à la fin du téléchargement',
+      'select_all': 'Tout sélectionner',
+      'deselect_all': 'Tout désélectionner',
+      'download_all_mp3': 'Tout télécharger en MP3',
+      'download_all_mp4': 'Tout télécharger en MP4',
+      'no_subtitles': 'Aucun sous-titre disponible',
+      'all_web': 'Tout site Web',
+      'default_boykta_folder': 'Dossier Boykta par défaut',
+      'public_download_folder': 'Dossier Téléchargements public',
+      'music_folder': 'Dossier Musique & Audio',
+      'custom_path_hint': 'Ou entrez un chemin personnalisé :',
+      'playlist_title': 'Playlist YouTube',
+      'clean_feed_title': 'Contenu relaxant et soigné',
     };
     final es = {
       'youtube': 'YouTube', 'link': 'Enlaces', 'downloads': 'Descargas', 'settings': 'Ajustes',
@@ -300,6 +357,25 @@ class BackendService {
       'biometric_subtitle': 'Usar huella digital o rostro para acceso rápido y seguro',
       'all_media': 'Todo',
       'search_placeholder': 'Buscar descargas...',
+      'paste': 'Pegar',
+      'cancel': 'Cancelar',
+      'save': 'Guardar',
+      'apply': 'Aplicar',
+      'close': 'Cerrar',
+      'enter': 'Entrar',
+      'notif_desc': 'Notificación al completar la descarga',
+      'select_all': 'Seleccionar todo',
+      'deselect_all': 'Deseleccionar todo',
+      'download_all_mp3': 'Descargar todo en MP3',
+      'download_all_mp4': 'Descargar todo en MP4',
+      'no_subtitles': 'No hay subtítulos disponibles',
+      'all_web': 'Cualquier web',
+      'default_boykta_folder': 'Carpeta predeterminada Boykta',
+      'public_download_folder': 'Carpeta pública de descargas',
+      'music_folder': 'Carpeta de música y audio',
+      'custom_path_hint': 'O introduce una ruta personalizada:',
+      'playlist_title': 'Lista de reproducción YouTube',
+      'clean_feed_title': 'Contenido relajante y limpio',
     };
     final tr = {
       'youtube': 'YouTube', 'link': 'Bağlantılar', 'downloads': 'İndirilenler', 'settings': 'Ayarlar',
@@ -352,6 +428,25 @@ class BackendService {
       'biometric_subtitle': 'Parmak izi veya yüz tanıma ile hızlı erişim',
       'all_media': 'Tümü',
       'search_placeholder': 'Dosyalarda ara...',
+      'paste': 'Yapıştır',
+      'cancel': 'İptal',
+      'save': 'Kaydet',
+      'apply': 'Uygula',
+      'close': 'Kapat',
+      'enter': 'Giriş',
+      'notif_desc': 'İndirme tamamlandığında bildir',
+      'select_all': 'Tümünü Seç',
+      'deselect_all': 'Seçimi Kaldır',
+      'download_all_mp3': 'Tümünü MP3 Olarak İndir',
+      'download_all_mp4': 'Tümünü MP4 Olarak İndir',
+      'no_subtitles': 'Bu video için altyazı yok',
+      'all_web': 'Herhangi bir Web Sitesi',
+      'default_boykta_folder': 'Varsayılan Boykta Klasörü',
+      'public_download_folder': 'Genel İndirilenler Klasörü',
+      'music_folder': 'Müzik ve Ses Klasörü',
+      'custom_path_hint': 'Veya özel bir yol girin:',
+      'playlist_title': 'YouTube Oynatma Listesi',
+      'clean_feed_title': 'Huzurlu ve Temiz İçerik',
     };
     final de = {
       'youtube': 'YouTube', 'link': 'Links', 'downloads': 'Downloads', 'settings': 'Einstellungen',
@@ -404,6 +499,25 @@ class BackendService {
       'biometric_subtitle': 'Fingerabdruck oder Face ID für schnellen Tresorzugriff',
       'all_media': 'Alle',
       'search_placeholder': 'Downloads durchsuchen...',
+      'paste': 'Einfügen',
+      'cancel': 'Abbrechen',
+      'save': 'Speichern',
+      'apply': 'Anwenden',
+      'close': 'Schließen',
+      'enter': 'Eingabe',
+      'notif_desc': 'Benachrichtigung nach Download-Abschluss',
+      'select_all': 'Alle auswählen',
+      'deselect_all': 'Auswahl aufheben',
+      'download_all_mp3': 'Alle als MP3 herunterladen',
+      'download_all_mp4': 'Alle als MP4 herunterladen',
+      'no_subtitles': 'Keine Untertitel für dieses Video verfügbar',
+      'all_web': 'Beliebige Website',
+      'default_boykta_folder': 'Standard-Boykta-Ordner',
+      'public_download_folder': 'Öffentlicher Download-Ordner',
+      'music_folder': 'Musik- & Audio-Ordner',
+      'custom_path_hint': 'Oder benutzerdefinierten Pfad eingeben:',
+      'playlist_title': 'YouTube-Wiedergabeliste',
+      'clean_feed_title': 'Entspannter & sauberer Feed',
     };
     final ru = {
       'youtube': 'YouTube', 'link': 'Ссылки', 'downloads': 'Загрузки', 'settings': 'Настройки',
@@ -456,6 +570,25 @@ class BackendService {
       'biometric_subtitle': 'Вход в сейф по отпечатку пальца или лицу',
       'all_media': 'Все',
       'search_placeholder': 'Поиск среди файлов...',
+      'paste': 'Вставить',
+      'cancel': 'Отмена',
+      'save': 'Сохранить',
+      'apply': 'Применить',
+      'close': 'Закрыть',
+      'enter': 'Войти',
+      'notif_desc': 'Уведомление при завершении загрузки',
+      'select_all': 'Выбрать все',
+      'deselect_all': 'Снять выбор',
+      'download_all_mp3': 'Скачать все в MP3',
+      'download_all_mp4': 'Скачать все в MP4',
+      'no_subtitles': 'Для этого видео субтитры недоступны',
+      'all_web': 'Любой веб-сайт',
+      'default_boykta_folder': 'Папка Boykta по умолчанию',
+      'public_download_folder': 'Общая папка загрузок',
+      'music_folder': 'Папка Музыка и Аудио',
+      'custom_path_hint': 'Или укажите свой путь:',
+      'playlist_title': 'Плейлист YouTube',
+      'clean_feed_title': 'Спокойный и чистый контент',
     };
     
     final currentLang = langNotifier.value;
@@ -1276,22 +1409,30 @@ class BackendService {
       throw Exception('حدث خطأ: $e');
     }
   }
-Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
+  Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
     try {
       StreamManifest? manifest = _streamManifestCache[videoId];
       if (manifest == null) {
-        manifest = await _yt.videos.streamsClient.getManifest(videoId);
+        manifest = await _yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 8));
         _streamManifestCache[videoId] = manifest;
       }
 
       if (manifest.muxed.isNotEmpty) {
         final muxedList = manifest.muxed.toList();
         muxedList.sort((a, b) => a.size.totalBytes.compareTo(b.size.totalBytes));
-        // نختار أعلى دقة مدمجة صوت وصورة (عادة 720p أو 360p) لضمان تشغيل مباشر سلس وفوري بدون تقطيع
-        final bestStream = muxedList.last;
+        
+        // نختار تيار سريع البدء (360p أو 480p) ليبدأ التشغيل في أقل من نصف ثانية بدون تعليق
+        final fastStream = muxedList.firstWhere(
+          (s) => s.qualityLabel.contains('360') || s.qualityLabel.contains('480'),
+          orElse: () => muxedList.first,
+        );
+        final hdStream = muxedList.last;
+
         return {
-          'url': bestStream.url.toString(),
-          'quality': bestStream.qualityLabel,
+          'url': fastStream.url.toString(),
+          'hdUrl': hdStream.url.toString(),
+          'quality': fastStream.qualityLabel,
+          'hdQuality': hdStream.qualityLabel,
           'aspectRatio': 16 / 9,
           'allStreams': muxedList.map((s) => {
             'url': s.url.toString(),
@@ -1303,7 +1444,9 @@ Future<Map<String, dynamic>> getPlayableStream(String videoId) async {
         final stream = manifest.streams.first;
         return {
           'url': stream.url.toString(),
+          'hdUrl': stream.url.toString(),
           'quality': 'Standard',
+          'hdQuality': 'Standard',
           'aspectRatio': 16 / 9,
           'allStreams': [
             {'url': stream.url.toString(), 'quality': 'Standard', 'size': ''}

@@ -323,7 +323,7 @@ class _SettingsTabState extends State<SettingsTab> {
           const SizedBox(height: 10),
 
           // قسم الخزنة والخصوصية
-          _buildSectionHeader('الخصوصية والأمان'),
+          _buildSectionHeader(_backend.t('privacy_security')),
           _buildGlassTile(
             context,
             icon: Icons.shield_rounded,
@@ -339,8 +339,8 @@ class _SettingsTabState extends State<SettingsTab> {
             _buildGlassTile(
               context,
               icon: Icons.password_rounded,
-              title: 'تغيير رمز PIN للخزنة',
-              subtitle: 'تعيين رمز حماية سري جديد للخزنة',
+              title: _backend.t('change_vault_pin'),
+              subtitle: _backend.t('change_vault_pin_desc'),
               textColor: textColor,
               subtitleColor: subtitleColor,
               surfaceColor: surfaceColor,
@@ -362,8 +362,8 @@ class _SettingsTabState extends State<SettingsTab> {
           _buildGlassTile(
             context,
             icon: Icons.fingerprint_rounded,
-            title: 'فتح الخزنة بالبصمة (Biometrics)',
-            subtitle: 'استخدام بصمة الإصبع أو الوجه لفتح الخزنة بسرعة وأمان',
+            title: _backend.t('biometric_title'),
+            subtitle: _backend.t('biometric_subtitle'),
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -407,8 +407,8 @@ class _SettingsTabState extends State<SettingsTab> {
           _buildGlassTile(
             context,
             icon: Icons.bolt_rounded,
-            title: 'التحميل التوربو فائق السرعة (Turbo Multi-Threading)',
-            subtitle: 'يعمل دائماً بأقصى طاقة مسارات متزامنة (16 مسار) لتسريع التنزيل لأقصى حد ممكن',
+            title: _backend.t('turbo_download'),
+            subtitle: _backend.t('turbo_download_desc'),
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -417,7 +417,7 @@ class _SettingsTabState extends State<SettingsTab> {
           _buildGlassTile(
             context,
             icon: Icons.folder_open_rounded,
-            title: 'مسار حفظ التنزيلات',
+            title: _backend.t('download_path_title'),
             subtitle: _downloadPath,
             textColor: textColor,
             subtitleColor: subtitleColor,
@@ -443,7 +443,7 @@ class _SettingsTabState extends State<SettingsTab> {
             context,
             icon: Icons.replay_circle_filled_rounded,
             title: _backend.t('auto_retry_active'),
-            subtitle: 'استئناف التحميل تلقائياً عند انقطاع الاتصال',
+            subtitle: _backend.t('auto_retry_desc'),
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -516,7 +516,7 @@ class _SettingsTabState extends State<SettingsTab> {
             context,
             icon: Icons.notifications_active_rounded,
             title: _backend.t('notif'),
-            subtitle: 'إشعار عند اكتمال التنزيل',
+            subtitle: _backend.t('notif_desc'),
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -561,7 +561,7 @@ class _SettingsTabState extends State<SettingsTab> {
             context,
             icon: Icons.info_outline_rounded,
             title: _backend.t('about'),
-            subtitle: 'Boykta Pro v1.3.9 (إصدار متكامل فائق السرعة بدقة 1080p FHD)',
+            subtitle: 'Boykta Pro v1.4.1 (1080p FHD & Background Audio)',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -664,7 +664,7 @@ class _SettingsTabState extends State<SettingsTab> {
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? AppColors.surface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('مسار حفظ التنزيلات', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+        title: Text(_backend.t('download_path_title'), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -672,24 +672,24 @@ class _SettingsTabState extends State<SettingsTab> {
             children: [
               _buildPathOption(
                 ctx,
-                title: 'مجلد Boykta الافتراضي للفيديوهات',
+                title: _backend.t('default_boykta_folder'),
                 path: '/storage/emulated/0/Movies/Boykta',
                 isDark: isDark,
               ),
               _buildPathOption(
                 ctx,
-                title: 'مجلد التنزيلات العام Download',
+                title: _backend.t('public_download_folder'),
                 path: '/storage/emulated/0/Download/Boykta',
                 isDark: isDark,
               ),
               _buildPathOption(
                 ctx,
-                title: 'مجلد الموسيقى والصوتيات Music',
+                title: _backend.t('music_folder'),
                 path: '/storage/emulated/0/Music/Boykta',
                 isDark: isDark,
               ),
               const Divider(height: 20),
-              Text('أو أدخل مساراً مخصصاً:', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12)),
+              Text(_backend.t('custom_path_hint'), style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12)),
               const SizedBox(height: 6),
               TextField(
                 controller: pathController,
@@ -705,7 +705,7 @@ class _SettingsTabState extends State<SettingsTab> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(_backend.t('cancel'))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
             onPressed: () {
@@ -715,7 +715,7 @@ class _SettingsTabState extends State<SettingsTab> {
               }
               Navigator.pop(ctx);
             },
-            child: const Text('تطبيق', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            child: Text(_backend.t('apply'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

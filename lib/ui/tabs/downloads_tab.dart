@@ -57,8 +57,28 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
     _backend.activeDownloads.addListener(_onActiveDownloadsChanged);
   }
 
-  void _initAudioPlayer() {
+  void _initAudioPlayer() async {
     _audioPlayer = AudioPlayer();
+    
+    // إعداد AudioContext لضمان استمرار عمل المشغل حتى خارج التطبيق وقفل الشاشة
+    try {
+      await _audioPlayer.setAudioContext(AudioContext(
+        android: const AudioContextAndroid(
+          isSpeakerphoneOn: false,
+          stayAwake: true,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.media,
+          audioFocus: AndroidAudioFocus.gain,
+        ),
+        iOS: AudioContextIOS(
+          category: null,
+          options: const {},
+        ),
+      ));
+      await _audioPlayer.setReleaseMode(ReleaseMode.stop);
+    } catch (e) {
+      debugPrint('Error configuring audio player context: $e');
+    }
     
     _audioPlayer.onPlayerStateChanged.listen((state) {
       if (mounted) setState(() => _isPlaying = state == PlayerState.playing);
@@ -74,12 +94,29 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
 
     _audioPlayer.onPlayerComplete.listen((_) {
       if (mounted) {
-        setState(() {
-          _isPlaying = false;
-          _position = Duration.zero;
-        });
+        _playNextAudioTrack();
       }
     });
+  }
+
+  void _playNextAudioTrack() {
+    if (_audioFiles.isEmpty || _currentAudio == null) return;
+    final idx = _audioFiles.indexWhere((f) => f.path == _currentAudio!.path);
+    if (idx != -1 && idx + 1 < _audioFiles.length) {
+      _playAudio(_audioFiles[idx + 1]);
+    } else if (_audioFiles.isNotEmpty) {
+      _playAudio(_audioFiles.first);
+    }
+  }
+
+  void _playPreviousAudioTrack() {
+    if (_audioFiles.isEmpty || _currentAudio == null) return;
+    final idx = _audioFiles.indexWhere((f) => f.path == _currentAudio!.path);
+    if (idx > 0) {
+      _playAudio(_audioFiles[idx - 1]);
+    } else if (_audioFiles.isNotEmpty) {
+      _playAudio(_audioFiles.last);
+    }
   }
 
   void _onActiveDownloadsChanged() {
@@ -780,12 +817,20 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
                                 ),
                               ),
                               IconButton(
+                                icon: const Icon(Icons.skip_previous_rounded, color: Colors.white70, size: 24),
+                                onPressed: _playPreviousAudioTrack,
+                              ),
+                              IconButton(
                                 icon: Icon(
                                   _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, 
                                   color: AppColors.cyan, 
                                   size: 36,
                                 ),
                                 onPressed: () => _playAudio(_currentAudio!),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.skip_next_rounded, color: Colors.white70, size: 24),
+                                onPressed: _playNextAudioTrack,
                               ),
                               IconButton(
                                 icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 22),

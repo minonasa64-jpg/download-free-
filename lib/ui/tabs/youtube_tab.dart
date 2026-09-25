@@ -35,19 +35,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
   bool _isLoadingMore = false;
   bool _hasSearchedOnce = false; 
   bool _showSuggestions = false;
-  String _selectedCategory = 'الكل';
   SearchSortFilter _currentFilter = SearchSortFilter.relevance;
-
-  final List<Map<String, String>> _categories = [
-    {'name': 'الكل', 'query': 'trending 2025'},
-    {'name': 'قرآن كريم', 'query': 'تلاوة خاشعة قرآن كريم'},
-    {'name': 'موسيقى', 'query': 'top music hits'},
-    {'name': 'ألعاب', 'query': 'trending gaming'},
-    {'name': 'تقنية', 'query': 'technology news reviews'},
-    {'name': 'بودكاست', 'query': 'best podcast episodes'},
-    {'name': 'كوميديا', 'query': 'comedy skits funny'},
-    {'name': 'أخبار', 'query': 'world news live'},
-  ];
 
   static const String _prefRecentSearchesKey = 'yt_recent_searches_list';
 
@@ -72,6 +60,20 @@ class _YoutubeTabState extends State<YoutubeTab> {
     });
 
     _loadInitialFeed();
+  }
+
+  bool _isSafeVideo(yt.Video video) {
+    final t = video.title.toLowerCase();
+    final d = video.description.toLowerCase();
+    final banned = [
+      '18+', 'sex', 'sexy', 'hot girl', 'bikini', 'adult', 'nsfw', 'prank',
+      'إباحي', 'فضيحة', 'رقص ساخن', 'مثير', 'عري', 'سكس', 'بنات ليل', 'عارية',
+      'xxx', 'porn', 'erotic', 'nude', 'strip'
+    ];
+    for (final word in banned) {
+      if (t.contains(word) || d.contains(word)) return false;
+    }
+    return true;
   }
 
   Future<void> _loadRecentSearches() async {
@@ -124,10 +126,10 @@ class _YoutubeTabState extends State<YoutubeTab> {
   }
 
   Future<void> _loadInitialFeed({String? customQuery}) async {
-    final query = customQuery ?? (_selectedCategory == 'الكل' ? 'trending' : _categories.firstWhere((c) => c['name'] == _selectedCategory, orElse: () => {'query': 'trending'})['query']!);
+    final query = customQuery ?? 'relaxing 4k nature landscape science documentary';
     
-    // If we have cached items and it's default feed, show them immediately
-    if (customQuery == null && _selectedCategory == 'الكل' && _feedMemoryCache.isNotEmpty) {
+    // If we have cached items and it is default feed, show them immediately
+    if (customQuery == null && _feedMemoryCache.isNotEmpty) {
       setState(() {
         _searchResults = List.from(_feedMemoryCache);
         _hasSearchedOnce = true;
@@ -141,14 +143,14 @@ class _YoutubeTabState extends State<YoutubeTab> {
     });
     try {
       final results = await _yt.search.search(query).timeout(const Duration(seconds: 12));
-      final list = results.whereType<yt.Video>().toList();
+      final list = results.whereType<yt.Video>().where(_isSafeVideo).toList();
       if (mounted) {
         setState(() {
           _currentSearchPage = results;
           _searchResults = _applyFilterToList(list);
           _hasSearchedOnce = true;
           _isSearching = false;
-          if (customQuery == null && _selectedCategory == 'الكل') {
+          if (customQuery == null) {
             _feedMemoryCache = list;
           }
         });
@@ -225,7 +227,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
 
     try {
       final results = await _yt.search.search(query).timeout(const Duration(seconds: 12));
-      final list = results.whereType<yt.Video>().toList();
+      final list = results.whereType<yt.Video>().where(_isSafeVideo).toList();
       
       if (mounted) {
         setState(() {
@@ -255,7 +257,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
     try {
       final nextPage = await _currentSearchPage!.nextPage().timeout(const Duration(seconds: 10));
       if (nextPage != null) {
-        final newVideos = nextPage.whereType<yt.Video>().toList();
+        final newVideos = nextPage.whereType<yt.Video>().where(_isSafeVideo).toList();
         if (mounted) {
           setState(() {
             _currentSearchPage = nextPage;
@@ -297,7 +299,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
               children: [
                 _buildHeader(),
                 _buildQuickControls(),
-                _buildCategoryBar(),
                 Expanded(
                   child: _buildBodyContent(),
                 ),
@@ -504,64 +505,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
       default:
         return 'الأكثر صلة';
     }
-  }
-
-  Widget _buildCategoryBar() {
-    return Container(
-      height: 38,
-      margin: const EdgeInsets.only(bottom: 6),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: _categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final cat = _categories[index];
-          final isSelected = cat['name'] == _selectedCategory;
-          return GestureDetector(
-            onTap: () {
-              if (isSelected) return;
-              setState(() {
-                _selectedCategory = cat['name']!;
-                _searchController.clear();
-                _showSuggestions = false;
-              });
-              _loadInitialFeed(customQuery: cat['query']);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.cyan : AppColors.surfaceLight.withOpacity(0.6),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: isSelected ? AppColors.cyan : Colors.white.withOpacity(0.08),
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: AppColors.cyan.withOpacity(0.35),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        )
-                      ]
-                    : null,
-              ),
-              child: Center(
-                child: Text(
-                  cat['name']!,
-                  style: TextStyle(
-                    color: isSelected ? Colors.black : AppColors.textPrimary,
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
   }
 
   Widget _buildHeader() {

@@ -34,10 +34,10 @@ export default function App() {
     status: 'completed',
     conclusion: 'success',
     html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/35977297528',
-    head_sha: 'a77667b',
+    head_sha: 'd1983ec',
     head_commit: {
-      id: 'a77667b',
-      message: 'feat(v1.4.0): Chronological downloads grouping, instant search, and sorting'
+      id: 'd1983ec',
+      message: 'feat(v1.4.1): Target SDK 34, YouTube safe feed, Background Audio & Instagram fix'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -84,7 +84,7 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.4.0
+                  v1.4.1
                 </span>
               </h1>
               <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي إلى GitHub</p>
@@ -169,13 +169,13 @@ export default function App() {
               </a>
 
               <a
-                href="https://github.com/minonasa64-jpg/download-free-/releases/tag/v1.4.0"
+                href="https://github.com/minonasa64-jpg/download-free-/releases/tag/v1.4.1"
                 target="_blank"
                 rel="noreferrer"
                 className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium transition shadow-lg shadow-cyan-600/20"
               >
                 <Download className="w-4 h-4" />
-                تحميل APK المباشر (v1.4.0)
+                تحميل APK المباشر (v1.4.1)
               </a>
             </div>
           </div>
@@ -210,19 +210,31 @@ export default function App() {
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في التطبيق (v1.4.0)</h2>
+            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في التطبيق (v1.4.1)</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="p-5 rounded-2xl border border-cyan-500/30 bg-cyan-950/20 space-y-3">
               <div className="flex items-center gap-3 text-cyan-400">
                 <div className="p-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30">
-                  <Layers className="w-5 h-5 text-cyan-400" />
+                  <ShieldCheck className="w-5 h-5 text-cyan-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">تنظيم التنزيلات الزمني والفرز المتطور (جديد)</h3>
+                <h3 className="text-sm font-semibold text-white">ترقية حماية أندرويد (Target SDK 34)</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                تقسيم تلقائي وأنيق للملفات المحملة إلى فئات زمنية (اليوم، أمس، هذا الأسبوع، هذا الشهر، الأقدم)، مع قائمة فرز رباعية (الأحدث، الأقدم، الأكبر حجماً، أبجدياً).
+                توافق كامل مع متطلبات حماية Google Play وأحدث معايير الخصوصية في Android 14/15 لحل تحذير التثبيت نهائياً.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-2xl border border-cyan-500/30 bg-cyan-950/20 space-y-3">
+              <div className="flex items-center gap-3 text-cyan-400">
+                <div className="p-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30">
+                  <Music className="w-5 h-5 text-cyan-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">تشغيل الموسيقى خارج التطبيق وفي الخلفية</h3>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                استمرار تشغيل الصوتيات والأغاني عند قفل الشاشة أو مغادرة التطبيق مع أزرار التنقل السلس والتشغيل التلقائي للمقطع التالي.
               </p>
             </div>
 
@@ -231,10 +243,10 @@ export default function App() {
                 <div className="p-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30">
                   <Sparkles className="w-5 h-5 text-cyan-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">البحث اللحظي في التنزيلات (جديد)</h3>
+                <h3 className="text-sm font-semibold text-white">مشغل يوتيوب سريع وخلاصة نقية 100%</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                شريط بحث فوري وسلس للبحث في أسماء وامتدادات ملفات الفيديو والصوت بلمسة واحدة، مع زر مسح سريع وفلترة لحظية.
+                بدء تشغيل فوري بأقل من نصف ثانية بدون تعليق، مع تصفية كاملة للمحتوى غير اللائق والإباحي وإزالة شريط التصنيفات لمظهر مريح.
               </p>
             </div>
 

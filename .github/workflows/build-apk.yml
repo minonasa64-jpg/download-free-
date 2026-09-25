@@ -56,12 +56,21 @@ jobs:
               'android.permission.USE_FINGERPRINT',
               'android.permission.WAKE_LOCK',
               'android.permission.FOREGROUND_SERVICE',
-              'android.permission.FOREGROUND_SERVICE_DATA_SYNC'
+              'android.permission.FOREGROUND_SERVICE_DATA_SYNC',
+              'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK'
           ]
           for p in perms:
               e = ET.Element('uses-permission')
               e.set('{http://schemas.android.com/apk/res/android}name', p)
               root.insert(0, e)
+
+          # Inject modern targetSdkVersion 34 to avoid Google Play Protect warning
+          uses_sdk = root.find('uses-sdk')
+          if uses_sdk is None:
+              uses_sdk = ET.Element('uses-sdk')
+              root.insert(0, uses_sdk)
+          uses_sdk.set('{http://schemas.android.com/apk/res/android}minSdkVersion', '24')
+          uses_sdk.set('{http://schemas.android.com/apk/res/android}targetSdkVersion', '34')
               
           app = root.find('application')
           if app is not None:
@@ -509,6 +518,10 @@ jobs:
             sed -i -E 's/compileSdkVersion\s+flutter\.compileSdkVersion/compileSdkVersion 34/g' android/app/build.gradle || true
             sed -i -E 's/compileSdk\s*=\s*[0-9]+/compileSdk = 34/g' android/app/build.gradle || true
             sed -i -E 's/compileSdk\s*=\s*flutter\.compileSdkVersion/compileSdk = 34/g' android/app/build.gradle || true
+            sed -i -E 's/targetSdkVersion\s+[0-9]+/targetSdkVersion 34/g' android/app/build.gradle || true
+            sed -i -E 's/targetSdkVersion\s+flutter\.targetSdkVersion/targetSdkVersion 34/g' android/app/build.gradle || true
+            sed -i -E 's/targetSdk\s*=\s*[0-9]+/targetSdk = 34/g' android/app/build.gradle || true
+            sed -i -E 's/targetSdk\s*=\s*flutter\.targetSdkVersion/targetSdk = 34/g' android/app/build.gradle || true
             sed -i -E 's/minSdkVersion\s+[0-9]+/minSdkVersion 24/g' android/app/build.gradle || true
             sed -i -E 's/minSdkVersion\s+flutter\.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle || true
             sed -i -E 's/minSdk\s*=\s*[0-9]+/minSdk = 24/g' android/app/build.gradle || true
@@ -518,6 +531,10 @@ jobs:
             echo 'tasks.whenTaskAdded { task -> if (task.name.toLowerCase().contains("aarmetadata")) { task.enabled = false } }' >> android/app/build.gradle
           fi
           if [ -f "android/app/build.gradle.kts" ]; then
+            sed -i -E 's/compileSdk\s*=\s*[0-9]+/compileSdk = 34/g' android/app/build.gradle.kts || true
+            sed -i -E 's/compileSdk\s*=\s*flutter\.compileSdkVersion/compileSdk = 34/g' android/app/build.gradle.kts || true
+            sed -i -E 's/targetSdk\s*=\s*[0-9]+/targetSdk = 34/g' android/app/build.gradle.kts || true
+            sed -i -E 's/targetSdk\s*=\s*flutter\.targetSdkVersion/targetSdk = 34/g' android/app/build.gradle.kts || true
             sed -i -E 's/minSdk\s*=\s*[0-9]+/minSdk = 24/g' android/app/build.gradle.kts || true
             sed -i -E 's/minSdk\s*=\s*flutter\.minSdkVersion/minSdk = 24/g' android/app/build.gradle.kts || true
           fi
@@ -563,35 +580,31 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v1.4.0"
-          RELEASE_TITLE="Boykta Pro v1.4.0 - تنظيم التنزيلات زمنياً، بحث فوري، فرز متقدم، وإصلاحات شاملة"
+          TAG="v1.4.1"
+          RELEASE_TITLE="Boykta Pro v1.4.1 - تحديث Target SDK 34، تحسين مشغل يوتيوب والموسيقى بالخلفية، وإصلاح إنستغرام واللغات"
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           
-          NOTES="🚀 **Boykta Pro v1.4.0** - التحديث الأضخم لإدارة وتنظيم الوسائط المحفوظة مع الحفاظ التام على كافة الميزات السابقة!
+          NOTES="🚀 **Boykta Pro v1.4.1** - ترقية شاملة للحماية، توافق أندرويد الحديث، وتشغيل الموسيقى في الخلفية!
 
-          ### ✨ الجديد والمُطور في إصدار v1.4.0:
-          - 🗂️ **تنظيم التنزيلات الزمني الذكي (Chronological Timeline Grouping):**
-            * تجميع ملفات الفيديو والصوت تلقائياً في فئات زمنية واضحة وأنيقة: (اليوم، أمس، هذا الأسبوع، هذا الشهر، وتاريخ السنة/الشهر).
-            * سهولة فائقة في الوصول إلى الملفات المحملة حديثاً دون تشتت.
-          - 🔍 **البحث اللحظي في التنزيلات (Instant Search & Filter):**
-            * شريط بحث منبثق وسلس مع إمكانية مسح الاستعلام بلمسة واحدة.
-            * فلترة فورية وحية للأسماء والامتدادات في أقسام الفيديو والصوت أثناء الكتابة.
-          - 🔃 **نظام الفرز والتصنيف المتقدم (Multi-Mode Sorting):**
-            * قائمة تصنيف متكاملة تتيح الترتيب حسب: (الأحدث أولاً، الأقدم أولاً، الأكبر حجماً، أو أبجدياً أ-ي).
-            * احتفاظ القائمة بترتيبها المفضل بسلاسة أثناء التنقل.
-          - 🎨 **محرك الثيمات الحي (Dynamic 7-Theme Station):**
-            * تطبيق فوري لـ 7 ثيمات متقدمة (Cyber Neon, Deep Dark, Sunset Orange, Emerald Forest, Rose Gold, Royal Gold, AMOLED) دون الحاجة لإعادة تشغيل التطبيق.
-          - 🌐 **دعم شامل ومتعدد اللغات (7 Languages Instant Rebuild):**
-            * إعادة بناء الواجهة فورياً عند التبديل بين اللغات (العربية، الإنجليزية، الفرنسية، الإسبانية، التركية، الألمانية، الروسية).
-          - 📸 **محرك استخراج إنستغرام المتطور (Multi-Layer Instagram Reels & Posts):**
-            * دعم استخراج وتنزيل الريلز والمنشورات بأعلى دقة ممكنة عبر طبقات استخراج متعددة ومستقرة.
-          - ⚡ **محرك التنزيل التوربو فائق السرعة (Turbo 16-Thread Downloader):**
-            * تجزئة الملفات حتى 16 مساراً متوازياً لتحقيق أقصى سرعة اتصال.
-          - 🎵 **مشغل الموسيقى بملء الشاشة وصانع النغمات (Lossless Trimmer & Fullscreen Player):**
-            * واجهة تشغيل موسيقية احترافية مع أداة قص النغمات وحفظها بصيغة متوافقة نقية.
-          - 🛡️ **الخزنة المشفرة وبصمة الإصبع ورمز التمويه:**
-            * حماية الملفات الحساسة بكلمة مرور PIN ودعم البصمة البيومترية ووضع التمويه.
-          - 📡 **خادم المشاركة اللاسلكي السريع عبر Wi-Fi للكمبيوتر والأجهزة الأخرى.**
+          ### ✨ الجديد والمُحدث في إصدار v1.4.1:
+          - 🛡️ **ترقية نظام الحماية والتوافق مع Android 14/15 (Target SDK 34):**
+            * تم تحديد Target SDK و Compile SDK إلى 34 لحل رسالة تحذير حماية Google Play نهائياً.
+            * إضافة صلاحية تشغيل الوسائط في الخلفية الحديثة (FOREGROUND_SERVICE_MEDIA_PLAYBACK).
+          - 🎬 **تطوير وسرعة استجابة مشغل فيديو يوتيوب:**
+            * استجابة فورية بدون بطء مع تحسين اختيار تيار البث الأمثل وتجنب التقطيع.
+            * تنقية خلاصة البداية بمحتوى راقٍ، مريح وممتع (وثائقيات، طبيعة خلابة، تقنية راقية) خالٍ تماماً من المحتوى غير اللائق أو الإباحي.
+            * إزالة شريط التصنيفات السابق لتوفير مساحة رؤية كاملة ونقية ومريحة للمستخدم.
+          - 🎵 **تشغيل الموسيقى في الخلفية (Background Audio Playback):**
+            * استمرار عمل مشغل الموسيقى عند الخروج من التطبيق أو قفل الشاشة مع دعم كامل لصلاحيات WAKE_LOCK و AudioFocus.
+            * مشغل مصغر مريح وسلس وأزرار تحكم كاملة.
+          - 🌐 **إصلاح شامل لكافة النصوص غير المترجمة في اللغات:**
+            * تعريب وترجمة شاشات الإعدادات والروابط بالكامل لتتوافق 100% فورياً عند تبديل اللغة (زر اللصق، عناوين الخزنة، التنزيل التوربو، وغيرها).
+            * إعادة بناء الواجهة فورياً عند اختيار أي لغة من اللغات السبع المدعومة.
+          - 📸 **حل جذري ودعم فائق لتحميل ريلز وفيديوهات إنستغرام:**
+            * محرك استخراج متوازي ذكي يدمج بين Instagram OEmbed و APIs سريعة ومتعددة لحل مشكلة تعليق التحميل.
+          - 💎 **جاهزية واستقرار الإعلانات (Unity Ads):**
+            * نظام إعلانات ذكي مع تحكم بتردد الإعلانات لحماية تجربة المستخدم وجاهزية تامة لآلاف المستخدمين.
+          - ⚡ الحفاظ التام والكامل على كافة ميزات التنزيل التوربو (16 مسار)، الخزنة المشفرة، المشاركة عبر Wi-Fi، وصانع النغمات.
 
           📲 **التثبيت المباشر:** قم بتحميل ملف \`app-release.apk\` المرفق أدناه وتثبيته مباشرة على هاتفك الأندرويد."
 
