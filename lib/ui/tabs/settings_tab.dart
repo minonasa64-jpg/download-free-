@@ -560,28 +560,9 @@ class _SettingsTabState extends State<SettingsTab> {
           _buildSectionHeader(_backend.t('more_tools')),
           _buildGlassTile(
             context,
-            icon: Icons.send_rounded,
-            title: 'إحصائيات بوت تيليجرام (Telegram Analytics)',
-            subtitle: 'متصل بالبوت ومفعل بنجاح • إرسال فوري',
-            textColor: textColor,
-            subtitleColor: subtitleColor,
-            surfaceColor: surfaceColor,
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.withOpacity(0.3)),
-              ),
-              child: const Text('متصل ✅', style: TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold)),
-            ),
-            onTap: () => _showTelegramBotDialog(context),
-          ),
-          _buildGlassTile(
-            context,
             icon: Icons.info_outline_rounded,
             title: _backend.t('about'),
-            subtitle: 'Boykta Pro v1.4.2 (Telegram Bot & Background Audio)',
+            subtitle: 'Boykta Pro v1.4.2 (1080p FHD & Background Audio)',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -836,112 +817,6 @@ class _SettingsTabState extends State<SettingsTab> {
             },
           ),
         ),
-      ),
-    );
-  }
-
-  void _showTelegramBotDialog(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    bool isTesting = false;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            backgroundColor: isDark ? AppColors.surface : Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.send_rounded, color: Colors.blueAccent, size: 24),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'بوت إحصائيات تيليجرام',
-                    style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green.withOpacity(0.2)),
-                    ),
-                    child: Row(
-                      children: const [
-                        Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 20),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'البوت مربوط بنجاح ويعمل بتناغم فوري لإرسال تنبيهات المستخدمين والتنزيلات.',
-                            style: TextStyle(color: Colors.greenAccent, fontSize: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text('معرّف المسؤول (Admin ID):', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12)),
-                  const SizedBox(height: 2),
-                  Text('8262706717', style: TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 10),
-                  Text('الميزات المُفعلة:', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12)),
-                  const SizedBox(height: 4),
-                  Text('• إشعار فوري عند تثبيت التطبيق لأول مرة (New User)', style: TextStyle(color: isDark ? Colors.white60 : Colors.black87, fontSize: 12)),
-                  Text('• نبضة المستخدم النشط يومياً (Daily Active User)', style: TextStyle(color: isDark ? Colors.white60 : Colors.black87, fontSize: 12)),
-                  Text('• إشعار فوري عند اكتمال تنزيل أي فيديو أو صوت', style: TextStyle(color: isDark ? Colors.white60 : Colors.black87, fontSize: 12)),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(_backend.t('cancel')),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
-                icon: isTesting 
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                    : const Icon(Icons.send_rounded, size: 16, color: Colors.black),
-                label: Text(
-                  isTesting ? 'جاري الإرسال...' : 'إرسال إشعار تجريبي للبوت',
-                  style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
-                ),
-                onPressed: isTesting ? null : () async {
-                  setDialogState(() => isTesting = true);
-                  final success = await TelegramAnalyticsService().sendMessage(
-                    '🔔 <b>رسالة فحص الاتصال من تطبيق Boykta!</b>\n━━━━━━━━━━━━━━━━━━━━\n✅ تم تأكيد الاتصال المباشر بين التطبيق وبوتك بنجاح.\n🚀 الإصدار: v1.4.2\n🕒 الوقت: ${DateTime.now().toLocal().toString().substring(0, 19)}',
-                  );
-                  setDialogState(() => isTesting = false);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(success ? 'تم إرسال الإشعار بنجاح إلى تيليجرام! ✅' : 'تعذر الإرسال، تحقق من الإنترنت ⚠️'),
-                        backgroundColor: success ? Colors.green : Colors.red,
-                        duration: const Duration(seconds: 3),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ],
-          );
-        },
       ),
     );
   }

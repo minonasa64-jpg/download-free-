@@ -7,8 +7,6 @@ import '../../core/app_colors.dart';
 import '../watch_video_screen.dart';
 import '../../services/backend_service.dart';
 
-enum SearchSortFilter { relevance, uploadDate, viewCount, rating }
-
 class YoutubeTab extends StatefulWidget {
   const YoutubeTab({super.key});
 
@@ -35,7 +33,18 @@ class _YoutubeTabState extends State<YoutubeTab> {
   bool _isLoadingMore = false;
   bool _hasSearchedOnce = false; 
   bool _showSuggestions = false;
-  SearchSortFilter _currentFilter = SearchSortFilter.relevance;
+  String _selectedCategory = 'الكل';
+
+  final List<Map<String, String>> _categories = [
+    {'name': 'الكل', 'query': 'وثائقيات طبيعة خلابة علوم وتكنولوجيا 4k'},
+    {'name': 'قرآن كريم', 'query': 'تلاوة خاشعة تريح القلب قرآن كريم'},
+    {'name': 'طبيعة وحيوانات', 'query': 'wild animals nature planet documentary 4k'},
+    {'name': 'تكنولوجيا وتقنية', 'query': 'technology innovation future gadgets review'},
+    {'name': 'بودكاست مفيد', 'query': 'بودكاست حوارات وثقافة مفيدة'},
+    {'name': 'رياضة وأهداف', 'query': 'best sports skills moments goals'},
+    {'name': 'سيارات وهندسة', 'query': 'supercars review engineering 4k'},
+    {'name': 'فضاء وكون', 'query': 'space universe astronomy documentary 4k'},
+  ];
 
   static const String _prefRecentSearchesKey = 'yt_recent_searches_list';
 
@@ -65,13 +74,16 @@ class _YoutubeTabState extends State<YoutubeTab> {
   bool _isSafeVideo(yt.Video video) {
     final t = video.title.toLowerCase();
     final d = video.description.toLowerCase();
+    final a = video.author.toLowerCase();
     final banned = [
       '18+', 'sex', 'sexy', 'hot girl', 'bikini', 'adult', 'nsfw', 'prank',
       'إباحي', 'فضيحة', 'رقص ساخن', 'مثير', 'عري', 'سكس', 'بنات ليل', 'عارية',
-      'xxx', 'porn', 'erotic', 'nude', 'strip'
+      'xxx', 'porn', 'erotic', 'nude', 'strip', 'onlyfans', 'رقص', 'فاضح',
+      'cleavage', 'twerk', 'sensual', 'sexual', 'dating', 'kissing hot',
+      'ملابس داخلية', 'إغراء'
     ];
     for (final word in banned) {
-      if (t.contains(word) || d.contains(word)) return false;
+      if (t.contains(word) || d.contains(word) || a.contains(word)) return false;
     }
     return true;
   }
@@ -126,10 +138,13 @@ class _YoutubeTabState extends State<YoutubeTab> {
   }
 
   Future<void> _loadInitialFeed({String? customQuery}) async {
-    final query = customQuery ?? 'relaxing 4k nature landscape science documentary';
+    final query = customQuery ?? (_selectedCategory == 'الكل'
+        ? 'وثائقيات طبيعة خلابة علوم وتكنولوجيا 4k'
+        : _categories.firstWhere((c) => c['name'] == _selectedCategory,
+            orElse: () => {'query': 'وثائقيات طبيعة خلابة علوم وتكنولوجيا 4k'})['query']!);
     
     // If we have cached items and it is default feed, show them immediately
-    if (customQuery == null && _feedMemoryCache.isNotEmpty) {
+    if (customQuery == null && _selectedCategory == 'الكل' && _feedMemoryCache.isNotEmpty) {
       setState(() {
         _searchResults = List.from(_feedMemoryCache);
         _hasSearchedOnce = true;
@@ -140,23 +155,38 @@ class _YoutubeTabState extends State<YoutubeTab> {
 
     setState(() {
       _isSearching = true;
+      _searchResults.clear();
     });
+
     try {
-      final results = await _yt.search.search(query).timeout(const Duration(seconds: 12));
+      final results = await _yt.search.search(query).timeout(const Duration(seconds: 15));
       final list = results.whereType<yt.Video>().where(_isSafeVideo).toList();
+
+      List<yt.Video> finalList = list;
+      if (finalList.isEmpty) {
+        final fallback = await _yt.search.search('nature landscape 4k documentary').timeout(const Duration(seconds: 10));
+        finalList = fallback.whereType<yt.Video>().where(_isSafeVideo).toList();
+      }
+
       if (mounted) {
         setState(() {
           _currentSearchPage = results;
-          _searchResults = _applyFilterToList(list);
+          _searchResults = finalList;
           _hasSearchedOnce = true;
           _isSearching = false;
-          if (customQuery == null) {
-            _feedMemoryCache = list;
+          if (customQuery == null && _selectedCategory == 'الكل') {
+            _feedMemoryCache = finalList;
           }
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _isSearching = false);
+    } catch (e) {
+      debugPrint('Feed error: $e');
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+          _hasSearchedOnce = true;
+        });
+      }
     }
   }
 
@@ -185,27 +215,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
     });
   }
 
-  List<yt.Video> _applyFilterToList(List<yt.Video> list) {
-    final copy = List<yt.Video>.from(list);
-    switch (_currentFilter) {
-      case SearchSortFilter.viewCount:
-        copy.sort((a, b) => (b.engagement.viewCount).compareTo(a.engagement.viewCount));
-        break;
-      case SearchSortFilter.uploadDate:
-        copy.sort((a, b) {
-          final dateA = a.uploadDate ?? DateTime(2000);
-          final dateB = b.uploadDate ?? DateTime(2000);
-          return dateB.compareTo(dateA);
-        });
-        break;
-      case SearchSortFilter.rating:
-      case SearchSortFilter.relevance:
-      default:
-        break;
-    }
-    return copy;
-  }
-
   Future<void> _performSearch([String? suggestionQuery]) async {
     final query = suggestionQuery ?? _searchController.text.trim();
     if (query.isEmpty) return;
@@ -226,17 +235,18 @@ class _YoutubeTabState extends State<YoutubeTab> {
     });
 
     try {
-      final results = await _yt.search.search(query).timeout(const Duration(seconds: 12));
+      final results = await _yt.search.search(query).timeout(const Duration(seconds: 15));
       final list = results.whereType<yt.Video>().where(_isSafeVideo).toList();
       
       if (mounted) {
         setState(() {
           _currentSearchPage = results;
-          _searchResults = _applyFilterToList(list);
+          _searchResults = list;
           _isSearching = false;
         });
       }
     } catch (e) {
+      debugPrint('Search error: $e');
       if (mounted) {
         setState(() => _isSearching = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -255,13 +265,13 @@ class _YoutubeTabState extends State<YoutubeTab> {
     setState(() => _isLoadingMore = true);
     
     try {
-      final nextPage = await _currentSearchPage!.nextPage().timeout(const Duration(seconds: 10));
+      final nextPage = await _currentSearchPage!.nextPage().timeout(const Duration(seconds: 12));
       if (nextPage != null) {
         final newVideos = nextPage.whereType<yt.Video>().where(_isSafeVideo).toList();
         if (mounted) {
           setState(() {
             _currentSearchPage = nextPage;
-            _searchResults.addAll(_applyFilterToList(newVideos));
+            _searchResults.addAll(newVideos);
           });
         }
       }
@@ -298,7 +308,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
             Column(
               children: [
                 _buildHeader(),
-                _buildQuickControls(),
+                _buildCategoryBar(),
                 Expanded(
                   child: _buildBodyContent(),
                 ),
@@ -414,97 +424,63 @@ class _YoutubeTabState extends State<YoutubeTab> {
     );
   }
 
-  Widget _buildQuickControls() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: Row(
-        children: [
-          // شارة تصفية النتائج
-          PopupMenuButton<SearchSortFilter>(
-            color: AppColors.surface,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: AppColors.cyan.withOpacity(0.3))),
-            initialValue: _currentFilter,
-            onSelected: (filter) {
+  Widget _buildCategoryBar() {
+    return Container(
+      height: 38,
+      margin: const EdgeInsets.only(top: 4, bottom: 6),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: _categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final cat = _categories[index];
+          final isSelected = cat['name'] == _selectedCategory;
+          return GestureDetector(
+            onTap: () {
+              if (isSelected) return;
               setState(() {
-                _currentFilter = filter;
-                _searchResults = _applyFilterToList(_searchResults);
+                _selectedCategory = cat['name']!;
+                _searchController.clear();
+                _showSuggestions = false;
               });
+              _loadInitialFeed(customQuery: cat['query']);
             },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: SearchSortFilter.relevance,
-                child: Row(
-                  children: [
-                    Icon(Icons.auto_awesome, color: AppColors.cyan, size: 18),
-                    SizedBox(width: 8),
-                    Text('الأكثر صلة (افتراضي)', style: TextStyle(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: SearchSortFilter.uploadDate,
-                child: Row(
-                  children: [
-                    Icon(Icons.new_releases_outlined, color: AppColors.cyan, size: 18),
-                    SizedBox(width: 8),
-                    Text('الأحدث تاريخاً (Newest)', style: TextStyle(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: SearchSortFilter.viewCount,
-                child: Row(
-                  children: [
-                    Icon(Icons.trending_up, color: AppColors.cyan, size: 18),
-                    SizedBox(width: 8),
-                    Text('الأعلى مشاهدة (Most Viewed)', style: TextStyle(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
-              ),
-            ],
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.surfaceLight.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                color: isSelected ? AppColors.cyan : AppColors.surfaceLight.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: isSelected ? AppColors.cyan : Colors.white.withOpacity(0.08),
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.cyan.withOpacity(0.35),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        )
+                      ]
+                    : null,
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.sort_rounded, color: AppColors.cyan, size: 16),
-                  const SizedBox(width: 5),
-                  Text(
-                    _getFilterLabel(),
-                    style: TextStyle(color: AppColors.textPrimary, fontSize: 11, fontWeight: FontWeight.bold),
+              child: Center(
+                child: Text(
+                  cat['name']!,
+                  style: TextStyle(
+                    color: isSelected ? Colors.black : AppColors.textPrimary,
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
-                  Icon(Icons.arrow_drop_down, color: AppColors.textMuted, size: 16),
-                ],
+                ),
               ),
             ),
-          ),
-          const Spacer(),
-          if (_searchResults.isNotEmpty)
-            Text(
-              '${_searchResults.length} فيديو متوفر',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 11),
-            ),
-        ],
+          );
+        },
       ),
     );
-  }
-
-  String _getFilterLabel() {
-    switch (_currentFilter) {
-      case SearchSortFilter.viewCount:
-        return 'الأعلى مشاهدة';
-      case SearchSortFilter.uploadDate:
-        return 'الأحدث رفعاً';
-      case SearchSortFilter.rating:
-      case SearchSortFilter.relevance:
-      default:
-        return 'الأكثر صلة';
-    }
   }
 
   Widget _buildHeader() {
@@ -577,7 +553,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             ),
                           )
-                        : const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
+                        : const Icon(Icons.search_rounded, color: Colors.white, size: 20),
                   ),
                 ),
               ],
@@ -597,15 +573,37 @@ class _YoutubeTabState extends State<YoutubeTab> {
       );
     }
     
-    if (_hasSearchedOnce && _searchResults.isEmpty) {
+    if (_searchResults.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off_rounded, color: AppColors.textMuted, size: 60),
-            const SizedBox(height: 15),
-            Text(_backend.t('no_results'), style: TextStyle(color: AppColors.textMuted, fontSize: 16)),
-          ],
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.search_off_rounded, color: AppColors.cyan.withOpacity(0.8), size: 54),
+              const SizedBox(height: 14),
+              Text(
+                _hasSearchedOnce ? _backend.t('no_results') : 'جاري تحميل مقاطع مميزة...',
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'اسحب لأسفل أو اضغط بالأسفل لإعادة المحاولة',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.cyan,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+                onPressed: () => _loadInitialFeed(),
+                icon: const Icon(Icons.refresh_rounded, color: Colors.black, size: 18),
+                label: const Text('إعادة المحاولة', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
         ),
       );
     }

@@ -25,6 +25,23 @@ BOT_TOKEN = "8992827519:AAHGaDQSoSQU0h6GIsxQBdmS_iFmc5J7qKs"
 ADMIN_ID = "8262706717"
 BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 DB_FILE = "boykta_analytics.json"
+PID_FILE = ".bot.pid"
+
+def check_singleton():
+    """التأكد من تشغيل نسخة واحدة فقط من البوت لتجنب تعارض 409 Conflict"""
+    if os.path.exists(PID_FILE):
+        try:
+            with open(PID_FILE, "r") as f:
+                old_pid = int(f.read().strip())
+            if old_pid != os.getpid():
+                try:
+                    os.kill(old_pid, 9)
+                except OSError:
+                    pass
+        except Exception:
+            pass
+    with open(PID_FILE, "w") as f:
+        f.write(str(os.getpid()))
 
 # قاعدة بيانات محلية لحفظ الإحصائيات
 def load_db():
@@ -247,6 +264,7 @@ def process_incoming_app_message(text, db):
 
 # الحلقة الرئيسية لتشغيل البوت
 def main():
+    check_singleton()
     print("=" * 60)
     print("      🚀 بدء تشغيل واستضافة بوت Boykta Pro في الخلفية 🚀")
     print(f"      • معرف المسؤول المعتمد: {ADMIN_ID}")
