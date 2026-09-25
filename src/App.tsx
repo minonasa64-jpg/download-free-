@@ -30,14 +30,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 35436236640,
+    id: 35977297528,
     status: 'completed',
     conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/35436236640',
-    head_sha: '16d0034',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/35977297528',
+    head_sha: 'a77667b',
     head_commit: {
-      id: '16d0034',
-      message: 'fix: handle release upload asset gracefully and bump release tag to v1.2.4'
+      id: 'a77667b',
+      message: 'feat(v1.4.0): Chronological downloads grouping, instant search, and sorting'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -84,7 +84,7 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.3.6
+                  v1.4.0
                 </span>
               </h1>
               <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي إلى GitHub</p>
@@ -151,7 +151,7 @@ export default function App() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
-                  Commit: <code className="text-cyan-400 bg-slate-900 px-1 py-0.5 rounded border border-slate-800 text-[11px]">{run?.head_sha?.slice(0, 7) || run?.head_commit?.id?.slice(0, 7) || '19f89ab'}</code> — {run?.head_commit?.message?.slice(0, 70)}...
+                  Commit: <code className="text-cyan-400 bg-slate-900 px-1 py-0.5 rounded border border-slate-800 text-[11px]">{run?.head_sha?.slice(0, 7) || run?.head_commit?.id?.slice(0, 7) || 'a77667b'}</code> — {run?.head_commit?.message?.slice(0, 70)}...
                 </p>
               </div>
             </div>
@@ -169,13 +169,13 @@ export default function App() {
               </a>
 
               <a
-                href="https://github.com/minonasa64-jpg/download-free-/releases/tag/v1.3.8"
+                href="https://github.com/minonasa64-jpg/download-free-/releases/tag/v1.4.0"
                 target="_blank"
                 rel="noreferrer"
                 className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium transition shadow-lg shadow-cyan-600/20"
               >
                 <Download className="w-4 h-4" />
-                تحميل APK المباشر (v1.3.8)
+                تحميل APK المباشر (v1.4.0)
               </a>
             </div>
           </div>
@@ -206,23 +206,59 @@ export default function App() {
           </div>
         </section>
 
-        {/* Applied Fixes Overview */}
+        {/* Applied Features Overview */}
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-base font-bold text-white">الإصلاحات والتحسينات المطبقة والمرفوعة إلى المستودع</h2>
+            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في التطبيق (v1.4.0)</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="p-5 rounded-2xl border border-cyan-500/30 bg-cyan-950/20 space-y-3">
               <div className="flex items-center gap-3 text-cyan-400">
                 <div className="p-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30">
-                  <Sparkles className="w-5 h-5 text-cyan-400" />
+                  <Layers className="w-5 h-5 text-cyan-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">محرك التنزيل متعدد الخطوط (Turbo 8-16 Chunks)</h3>
+                <h3 className="text-sm font-semibold text-white">تنظيم التنزيلات الزمني والفرز المتطور (جديد)</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                تقسيم ملفات الفيديو والصوت إلى قنوات متزامنة متوازية (2، 4، 8، 16 خط) عبر Range Requests لتسريع التحميل بأقصى سرعة إنترنت، مع مؤشرات بصرية لتقدم كل خط وخيار تحكم في الإعدادات.
+                تقسيم تلقائي وأنيق للملفات المحملة إلى فئات زمنية (اليوم، أمس، هذا الأسبوع، هذا الشهر، الأقدم)، مع قائمة فرز رباعية (الأحدث، الأقدم، الأكبر حجماً، أبجدياً).
+              </p>
+            </div>
+
+            <div className="p-5 rounded-2xl border border-cyan-500/30 bg-cyan-950/20 space-y-3">
+              <div className="flex items-center gap-3 text-cyan-400">
+                <div className="p-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30">
+                  <Sparkles className="w-5 h-5 text-cyan-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">البحث اللحظي في التنزيلات (جديد)</h3>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                شريط بحث فوري وسلس للبحث في أسماء وامتدادات ملفات الفيديو والصوت بلمسة واحدة، مع زر مسح سريع وفلترة لحظية.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-2xl border border-slate-800 bg-slate-900/50 space-y-3">
+              <div className="flex items-center gap-3 text-emerald-400">
+                <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                  <Download className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">محرك التنزيل متعدد الخطوط (Turbo 16 Chunks)</h3>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                تقسيم ملفات الفيديو والصوت إلى قنوات متزامنة متوازية (حتى 16 خط) عبر Range Requests لتسريع التحميل بأقصى سرعة إنترنت، مع مؤشرات بصرية لتقدم كل خط.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-2xl border border-slate-800 bg-slate-900/50 space-y-3">
+              <div className="flex items-center gap-3 text-purple-400">
+                <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">محطة الثيمات الحية (7 Themes)</h3>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                تطبيق فوري لـ 7 ثيمات متقدمة (Cyber Neon, Deep Dark, Sunset Orange, Emerald Forest, Rose Gold, Royal Gold, AMOLED) على كافة أجزاء التطبيق دون إعادة تشغيل.
               </p>
             </div>
 
@@ -231,10 +267,10 @@ export default function App() {
                 <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
                   <Music className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">إصلاح صانع النغمات وقص الصوت (Audio Trimmer)</h3>
+                <h3 className="text-sm font-semibold text-white">صانع النغمات وقص الصوت (Audio Trimmer)</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                تم استبدال الترميز القديم بترميز متوافق وديناميكي؛ حيث يتم نسخ تيار الصوت الأصلي مباشرة دون إعادة ترميز مشوهة إذا كان الملف MP3، مع دعم آمن لحاوية M4A/AAC كبديل فوري، مما يضمن عمل النغمات المقصوصة على جميع مشغلات أندرويد ونغمات الاتصال دون تلف.
+                قص المقاطع الصوتية بدون فقدان جودة وبدقة عالية مع دعم مباشر لنسخ تيار MP3 أو حاوية AAC/M4A المتوافقة مع كافة مشغلات أندرويد.
               </p>
             </div>
 
@@ -243,10 +279,10 @@ export default function App() {
                 <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
                   <Wifi className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">منافذ بديلة لخادم المشاركة المحلي (Web Share)</h3>
+                <h3 className="text-sm font-semibold text-white">خادم المشاركة اللاسلكي المحلي (Web Share)</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                بدلاً من التعطل عند حجز المنفذ الافتراضي 8080، أصبح الخادم يفحص المنافذ تلقائياً (8080, 8088, 8888, 5000, 3000) ليعمل بسلاسة حتى لو كان هناك تطبيق آخر يستخدم المنفذ.
+                فحص المنافذ تلقائياً (8080, 8088, 8888, 5000, 3000) ومشاركة الملفات مباشرة مع أجهزة الكمبيوتر والهواتف على نفس شبكة Wi-Fi عبر متصفح الويب.
               </p>
             </div>
 
@@ -255,10 +291,10 @@ export default function App() {
                 <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">توحيد حزمة Android & PiP MethodChannel</h3>
+                <h3 className="text-sm font-semibold text-white">الخزنة المشفرة وبصمة الإصبع ورمز التمويه</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                تمت مطابقة حزمة <code>MainActivity.kt</code> لتصبح <code>com.boykta.pro_downloader</code> متطابقة مع <code>AndroidManifest.xml</code> لتفادي أي خطأ انهيار فوري عند تشغيل التطبيق أو تفعيل ميزة صورة-داخل-صورة (Picture-in-Picture).
+                حماية الملفات الحساسة بكلمة مرور PIN ودعم البصمة البيومترية ووضع التمويه لخداع المتطفلين وحماية الخصوصية.
               </p>
             </div>
 
@@ -267,34 +303,22 @@ export default function App() {
                 <div className="p-2 rounded-lg bg-rose-500/20 border border-rose-500/30">
                   <Smartphone className="w-5 h-5 text-rose-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">إصلاح مشغل فيديو يوتيوب (YouTube Player)</h3>
+                <h3 className="text-sm font-semibold text-white">مشغل فيديو يوتيوب وبحث تفاعلي (YouTube UX)</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                حل مشكلة عدم عمل المشغل داخل قسم اليوتيوب من خلال دمج مشغل تفاعلي يدعم التشغيل الفوري بجودات متعددة والوضع الأفقي وملء الشاشة دون توقف.
-              </p>
-            </div>
-
-            <div className="p-5 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 space-y-3">
-              <div className="flex items-center gap-3 text-emerald-400">
-                <div className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
-                  <Download className="w-5 h-5" />
-                </div>
-                <h3 className="text-sm font-semibold text-white">إصلاح محرك التنزيل واستخراج الوسائط (Download Engine)</h3>
-              </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                حل مشكلة فشل وتوقف التحميل بتحديث عميل استخراج مسارات الفيديو والصوت وتخزينها بأمان في ذاكرة الجهاز مع دعم التنزيل التوربو المقسم لتفادي الانقطاع.
+                مشغل تفاعلي يدعم التشغيل الفوري بجودات متعددة والوضع الأفقي وملء الشاشة، مع سجل بحث واقتراحات حية وسحب للتحديث.
               </p>
             </div>
 
             <div className="p-5 rounded-2xl border border-slate-800 bg-slate-900/50 space-y-3">
-              <div className="flex items-center gap-3 text-purple-400">
-                <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                  <Layers className="w-5 h-5" />
+              <div className="flex items-center gap-3 text-amber-400">
+                <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <Code2 className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">متصفح الوسائط ولاقط الروابط الذكي (Sniffer)</h3>
+                <h3 className="text-sm font-semibold text-white">نظام اللغات الشامل (7 اللغات الفورية)</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                متصفح مدمج مع مانع إعلانات ولاقط وسائط تلقائي، يتعرف على تدفقات الفيديو والصوت وروابط HLS فور تشغيلها في أي موقع مع زر تنزيل فوري بلمسة واحدة.
+                دعم فوري كامل للعربية والإنجليزية والفرنسية والإسبانية والتركية والألمانية والروسية مع تبديل الاتجاه وتحديث الواجهة مباشرة.
               </p>
             </div>
           </div>

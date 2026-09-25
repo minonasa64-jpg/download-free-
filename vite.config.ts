@@ -37,13 +37,13 @@ function apiPlugin(): Plugin {
         res.end(JSON.stringify({
           success: true,
           latestRun: {
-            id: 35388626020,
-            status: 'in_progress',
-            conclusion: null,
-            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/35388626020',
+            id: 35977297528,
+            status: 'completed',
+            conclusion: 'success',
+            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/35977297528',
             head_commit: {
-              id: '3ad3b2d',
-              message: 'fix: scope isMultiThread and threadCount to _downloadFile and update release tag to v1.2.3'
+              id: 'a77667b',
+              message: 'feat(v1.4.0): Chronological downloads grouping, instant search, and sorting'
             }
           },
           runs: []
