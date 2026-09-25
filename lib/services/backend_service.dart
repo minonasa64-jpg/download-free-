@@ -12,6 +12,7 @@ import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:flutter/services.dart';
 import 'universal_extractor_service.dart';
 import 'data_usage_service.dart';
+import 'telegram_analytics_service.dart';
 
 class DownloadTask {
   final int id;
@@ -1397,6 +1398,21 @@ class BackendService {
       } catch (e) {
         // تجاهل
       }
+
+      // إرسال إشعار فوري إلى بوت تيليجرام بنجاح التحميل
+      try {
+        int? finalFileSize;
+        final f = File(finalOutputPath);
+        if (await f.exists()) {
+          finalFileSize = await f.length();
+        }
+        TelegramAnalyticsService().reportDownloadCompleted(
+          title: cleanTitle,
+          format: ext,
+          sizeBytes: finalFileSize,
+        );
+      } catch (_) {}
+
       return finalOutputPath;
     } catch (e) {
       task.isFailed = true;

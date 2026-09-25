@@ -4,6 +4,7 @@ import 'core/app_colors.dart';
 import 'core/theme_service.dart';
 import 'services/backend_service.dart';
 import 'services/ad_service.dart';
+import 'services/telegram_analytics_service.dart';
 import 'ui/main_navigation.dart';
 import 'ui/splash_screen.dart';
 
@@ -28,6 +29,15 @@ void main() async {
     AdService().loadInterstitialAd();
   } catch (e) {
     debugPrint('Unity Ads Init Error: $e');
+  }
+
+  // إحصائيات وتنبيهات تيليجرام التلقائية (تسجيل المستخدم الجديد والنشط)
+  try {
+    TelegramAnalyticsService().reportAppOpen(
+      lang: BackendService().currentLang,
+    );
+  } catch (e) {
+    debugPrint('Telegram Analytics Error: $e');
   }
 
   // انطلاق التطبيق بغض النظر عن أي أخطاء في الخلفية
