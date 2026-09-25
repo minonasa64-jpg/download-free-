@@ -416,10 +416,10 @@ class UniversalExtractorService {
 
           if (res.statusCode == 200 && res.data != null) {
             final html = res.data.toString();
-            final vMatch = RegExp(r'"video_url"\s*:\s*"([^"]+)"').firstMatch(html) ??
+            final RegExpMatch? vMatch = RegExp(r'"video_url"\s*:\s*"([^"]+)"').firstMatch(html) ??
                 RegExp(r'class="EmbeddedVideo"[^>]*src="([^"]+)"').firstMatch(html) ??
                 RegExp(r'<video[^>]*src="([^"]+)"').firstMatch(html) ??
-                RegExp(r'https:[^\"\'\s<>\\]*\.mp4[^\"\'\s<>\\]*').firstMatch(html);
+                RegExp(r'(https://[^"\s<>]+\.mp4[^"\s<>]*)').firstMatch(html);
 
             if (vMatch != null) {
               final videoUrl = _cleanUrl(vMatch.group(1) ?? vMatch.group(0)!);

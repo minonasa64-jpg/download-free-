@@ -62,17 +62,13 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
     
     // إعداد AudioContext لضمان استمرار عمل المشغل حتى خارج التطبيق وقفل الشاشة
     try {
-      await _audioPlayer.setAudioContext(AudioContext(
-        android: const AudioContextAndroid(
+      await _audioPlayer.setAudioContext(const AudioContext(
+        android: AudioContextAndroid(
           isSpeakerphoneOn: false,
           stayAwake: true,
           contentType: AndroidContentType.music,
           usageType: AndroidUsageType.media,
           audioFocus: AndroidAudioFocus.gain,
-        ),
-        iOS: AudioContextIOS(
-          category: null,
-          options: const {},
         ),
       ));
       await _audioPlayer.setReleaseMode(ReleaseMode.stop);
@@ -103,9 +99,9 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
     if (_audioFiles.isEmpty || _currentAudio == null) return;
     final idx = _audioFiles.indexWhere((f) => f.path == _currentAudio!.path);
     if (idx != -1 && idx + 1 < _audioFiles.length) {
-      _playAudio(_audioFiles[idx + 1]);
+      _playAudio(File(_audioFiles[idx + 1].path));
     } else if (_audioFiles.isNotEmpty) {
-      _playAudio(_audioFiles.first);
+      _playAudio(File(_audioFiles.first.path));
     }
   }
 
@@ -113,9 +109,9 @@ class _DownloadsTabState extends State<DownloadsTab> with SingleTickerProviderSt
     if (_audioFiles.isEmpty || _currentAudio == null) return;
     final idx = _audioFiles.indexWhere((f) => f.path == _currentAudio!.path);
     if (idx > 0) {
-      _playAudio(_audioFiles[idx - 1]);
+      _playAudio(File(_audioFiles[idx - 1].path));
     } else if (_audioFiles.isNotEmpty) {
-      _playAudio(_audioFiles.last);
+      _playAudio(File(_audioFiles.last.path));
     }
   }
 
