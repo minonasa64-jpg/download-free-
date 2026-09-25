@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 36151217157,
-    status: 'completed',
-    conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36151217157',
-    head_sha: '8121442',
+    id: 36162358962,
+    status: 'in_progress',
+    conclusion: null,
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36162358962',
+    head_sha: 'bcb41f4',
     head_commit: {
-      id: '8121442',
-      message: 'fix(dart): resolve currentLang getter in BackendService and update bot with zero dependencies'
+      id: 'bcb41f4',
+      message: 'feat(youtube): restore categories, remove sort filter dropdown, enhance safe feed, remove telegram button from settings'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
