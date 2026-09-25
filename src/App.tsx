@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 36143470475,
+    id: 36151217157,
     status: 'in_progress',
     conclusion: null,
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36143470475',
-    head_sha: 'd4e37f8',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36151217157',
+    head_sha: '8121442',
     head_commit: {
-      id: 'd4e37f8',
-      message: 'feat(telegram): integrate live analytics bot v1.4.2 for new users, DAU, and downloads'
+      id: '8121442',
+      message: 'fix(dart): resolve currentLang getter in BackendService and update bot with zero dependencies'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
