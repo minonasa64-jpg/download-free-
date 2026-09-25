@@ -44,6 +44,7 @@ class BackendService {
   BackendService._internal();
 
   final ValueNotifier<String> langNotifier = ValueNotifier<String>('ar');
+  String get currentLang => langNotifier.value;
   final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
   
   final ValueNotifier<List<DownloadTask>> activeDownloads = ValueNotifier([]);

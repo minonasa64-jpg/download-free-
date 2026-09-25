@@ -6,38 +6,19 @@
 ===================================================================
 • التوكن: 8992827519:AAHGaDQSoSQU0h6GIsxQBdmS_iFmc5J7qKs
 • معرف الأدمن: 8262706717
-• وظيفة البوت: استقبال إشعارات المستخدمين الجدد، النشطين يومياً،
-  وعمليات التحميل الناجحة، مع لوحة تحكم وإحصائيات تفاعلية.
+• الميزات: يعمل مباشرة وبدون الحاجة لتثبيت أي مكتبات خارجية (Zero Dependencies)
+  مبني على مكتبات بايثون القياسية القياسية 100%.
 ===================================================================
 """
 
 import sys
-import subprocess
 import os
 import json
 import time
+import urllib.request
+import urllib.error
+import urllib.parse
 from datetime import datetime
-
-# التثبيت التلقائي للمكتبات الضرورية إذا لم تكن موجودة
-REQUIRED_LIBRARIES = ['requests']
-
-def ensure_dependencies():
-    for lib in REQUIRED_LIBRARIES:
-        try:
-            __import__(lib)
-        except ImportError:
-            print(f"[*] جاري تثبيت المكتبة المطلوبة تلقائياً: {lib}...")
-            try:
-                subprocess.check_call([sys.executable, "-m", "pip", "install", lib])
-                print(f"[+] تم تثبيت {lib} بنجاح!")
-            except Exception as e:
-                print(f"[-] فشل تثبيت {lib}: {e}")
-                print("[!] يرجى تثبيتها يدوياً عبر: pip install requests")
-                sys.exit(1)
-
-ensure_dependencies()
-
-import requests
 
 # إعدادات البوت والمسؤول
 BOT_TOKEN = "8992827519:AAHGaDQSoSQU0h6GIsxQBdmS_iFmc5J7qKs"
@@ -69,9 +50,21 @@ def save_db(db):
     except Exception as e:
         print(f"[-] خطأ أثناء حفظ البيانات: {e}")
 
-# دوال التواصل مع Telegram API
+# دوال التواصل مع Telegram API عبر مكتبة urllib القياسية
+def api_request(method, payload=None, timeout=35):
+    url = f"{BASE_URL}/{method}"
+    headers = {"Content-Type": "application/json"}
+    data = json.dumps(payload).encode("utf-8") if payload else None
+    req = urllib.request.Request(url, data=data, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            content = resp.read().decode("utf-8")
+            return json.loads(content)
+    except Exception as e:
+        # print(f"[-] خطأ في الاتصال ({method}): {e}")
+        return None
+
 def send_telegram_message(chat_id, text, reply_markup=None):
-    url = f"{BASE_URL}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": text,
@@ -80,19 +73,10 @@ def send_telegram_message(chat_id, text, reply_markup=None):
     }
     if reply_markup:
         payload["reply_markup"] = reply_markup
-    try:
-        resp = requests.post(url, json=payload, timeout=10)
-        return resp.json()
-    except Exception as e:
-        print(f"[-] خطأ في الإرسال: {e}")
-        return None
+    return api_request("sendMessage", payload, timeout=10)
 
 def answer_callback(callback_query_id, text=""):
-    url = f"{BASE_URL}/answerCallbackQuery"
-    try:
-        requests.post(url, json={"callback_query_id": callback_query_id, "text": text}, timeout=5)
-    except Exception:
-        pass
+    api_request("answerCallbackQuery", {"callback_query_id": callback_query_id, "text": text}, timeout=5)
 
 # لوحة المفاتيح التفاعلية الرئيسية
 def get_main_keyboard():
@@ -104,7 +88,7 @@ def get_main_keyboard():
             ],
             [
                 {"text": "📥 أحدث التنزيلات", "callback_data": "cmd_downloads"},
-                {"text": "⚡ حالة البوت", "callback_data": "cmd_ping"}
+                {"text": "⚡ حالة الاستضافة", "callback_data": "cmd_ping"}
             ],
             [
                 {"text": "🔄 تحديث", "callback_data": "cmd_refresh"},
@@ -134,17 +118,17 @@ def format_stats_message(db):
 
 # معالجة الأوامر والرسائل
 def handle_command(chat_id, user_id, text, db):
-    str_user_id = str(user_id)
     cmd = text.strip().split()[0].lower()
 
     if cmd == "/start":
         welcome = (
             "👋 <b>مرحباً بك في بوت إدارة وإحصائيات Boykta Pro!</b>\n\n"
-            "هذا البوت مربوط بتطبيقك مباشرة، ويستقبل:\n"
-            "• 🎉 تنبيهات فورية عند قيام أي مستخدم جديد بتثبيت التطبيق.\n"
-            "• 👤 إحصائيات النشاط اليومي للمستخدمين.\n"
-            "• 📥 تفاصيل التنزيلات المكتملة بنجاح.\n\n"
-            "اختر من القائمة أدناه لعرض الإحصائيات:"
+            "🟢 <b>البوت مستضاف ويعمل الآن في السحابة بنجاح!</b>\n\n"
+            "الوظائف التي يقوم بها البوت تلقائياً:\n"
+            "• 🎉 استقبال إشعار فوري عند قيام أي مستخدم جديد بتثبيت التطبيق.\n"
+            "• 👤 تسجيل وحساب المستخدمين النشطين يومياً (DAU).\n"
+            "• 📥 إشعار فوري وتوثيق لكل عملية تنزيل مكتملة.\n\n"
+            "اختر من القائمة أدناه لعرض الإحصائيات الحالية:"
         )
         send_telegram_message(chat_id, welcome, get_main_keyboard())
 
@@ -154,7 +138,7 @@ def handle_command(chat_id, user_id, text, db):
     elif cmd == "/users":
         users = db.get("users", {})
         if not users:
-            send_telegram_message(chat_id, "ℹ️ لا يوجد مستخدمين مسجلين حتى الآن. ستصلك البيانات فور فتح المستخدمين للتطبيق.")
+            send_telegram_message(chat_id, "ℹ️ لا يوجد مستخدمين مسجلين بعد. ستصلك البيانات فور فتح أي شخص للتطبيق.", get_main_keyboard())
             return
         
         lines = ["👥 <b>قائمة آخر المستخدمين:</b>\n━━━━━━━━━━━━━━━━━━━━"]
@@ -168,7 +152,7 @@ def handle_command(chat_id, user_id, text, db):
     elif cmd == "/downloads":
         recent_dl = db.get("recent_downloads", [])
         if not recent_dl:
-            send_telegram_message(chat_id, "ℹ️ لم تسجل عمليات تنزيل بعد. ستظهر هنا فور إتمام المستخدمين لعمليات التحميل.")
+            send_telegram_message(chat_id, "ℹ️ لم تسجل عمليات تنزيل بعد. ستظهر هنا فور إتمام المستخدمين لعمليات التحميل.", get_main_keyboard())
             return
         lines = ["📥 <b>أحدث 5 عمليات تنزيل:</b>\n━━━━━━━━━━━━━━━━━━━━"]
         for item in recent_dl[-5:]:
@@ -180,7 +164,7 @@ def handle_command(chat_id, user_id, text, db):
         send_telegram_message(chat_id, "\n".join(lines), get_main_keyboard())
 
     elif cmd == "/ping":
-        send_telegram_message(chat_id, "⚡ <b>البوت يعمل بكفاءة وسرعة فائقة!</b>\n🟢 حالة الاتصال: ممتاز 100%")
+        send_telegram_message(chat_id, "⚡ <b>البوت مستضاف ويعمل بكفاءة وسرعة فائقة!</b>\n🟢 حالة الاتصال: متصل وسريع 100%")
 
     elif cmd == "/help":
         help_text = (
@@ -218,12 +202,10 @@ def handle_callback_query(cq, db):
 # تسجيل الرسائل الواردة من التطبيق تلقائياً في الإحصائيات
 def process_incoming_app_message(text, db):
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    today_str = datetime.now().strftime("%Y-%m-%d")
 
-    # مستخدم جديد
+    # 1. مستخدم جديد
     if "مستخدم جديد قام بتثبيت تطبيق Boykta" in text:
         db["new_users_count"] = db.get("new_users_count", 0) + 1
-        # استخراج المعرف
         import re
         m = re.search(r"معرّف المستخدم:</b>\s*<code>(.*?)</code>", text)
         uid = m.group(1) if m else f"user_{len(db.get('users', {})) + 1}"
@@ -235,7 +217,7 @@ def process_incoming_app_message(text, db):
         }
         save_db(db)
 
-    # مستخدم نشط يومي
+    # 2. مستخدم نشط يومي
     elif "مستخدم نشط اليوم" in text:
         import re
         m = re.search(r"معرّف المستخدم:</b>\s*<code>(.*?)</code>", text)
@@ -244,7 +226,7 @@ def process_incoming_app_message(text, db):
         active_today[uid] = now_str
         save_db(db)
 
-    # اكتمال تحميل
+    # 3. اكتمال تنزيل
     elif "عملية تنزيل ناجحة" in text:
         db["total_downloads"] = db.get("total_downloads", 0) + 1
         import re
@@ -266,7 +248,7 @@ def process_incoming_app_message(text, db):
 # الحلقة الرئيسية لتشغيل البوت
 def main():
     print("=" * 60)
-    print("      🚀 بدء تشغيل بوت إحصائيات Boykta Pro 🚀")
+    print("      🚀 بدء تشغيل واستضافة بوت Boykta Pro في الخلفية 🚀")
     print(f"      • معرف المسؤول المعتمد: {ADMIN_ID}")
     print(f"      • إصدار التطبيق المتوافق: v1.4.2")
     print("=" * 60)
@@ -275,65 +257,52 @@ def main():
     db["last_started"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_db(db)
 
-    # إرسال إشعار بدء التشغيل لحساب التيليجرام الخاص بك
+    # إرسال إشعار بدء الاستضافة لحساب التيليجرام الخاص بك فورياً
     startup_msg = (
-        "🚀 <b>تم تشغيل بوت Boykta Pro بنجاح على جهازك/سيرفرك!</b>\n"
+        "🚀 <b>تم تفعيل واستضافة بوت Boykta Pro بنجاح في السحابة!</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "🟢 <b>الحالة:</b> متصل وجاهز للاستقبال والتحكم.\n"
+        "🟢 <b>الحالة:</b> مستضاف، متصل ويعمل في الخلفية.\n"
         "📱 <b>إصدار التطبيق المتصل:</b> v1.4.2\n"
-        f"🕒 <b>توقيت التشغيل:</b> {db['last_started']}\n"
+        f"🕒 <b>توقيت البدء:</b> {db['last_started']}\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "اضغط /start لفتح لوحة التحكم والإحصائيات."
+        "أرسل /start أو اضغط الأزرار أدناه للتحكم."
     )
-    print("[*] جاري إرسال إشعار بدء التشغيل إلى حسابك على تيليجرام...")
+    print("[*] جاري إرسال إشعار بدء الاستضافة إلى حسابك على تيليجرام...")
     send_telegram_message(ADMIN_ID, startup_msg, get_main_keyboard())
     print("[+] تم إرسال إشعار البدء بنجاح! البوت الآن يستقبل التحديثات...")
 
     offset = 0
     while True:
         try:
-            url = f"{BASE_URL}/getUpdates?offset={offset}&timeout=30"
-            resp = requests.get(url, timeout=35)
-            if resp.status_code != 200:
-                time.sleep(3)
-                continue
-            
-            data = resp.json()
-            if not data.get("ok"):
+            updates = api_request("getUpdates", {"offset": offset, "timeout": 25}, timeout=30)
+            if not updates or not updates.get("ok"):
                 time.sleep(3)
                 continue
 
-            for update in data.get("result", []):
+            for update in updates.get("result", []):
                 offset = update["update_id"] + 1
 
-                # معالجة أزرار الكول باك
                 if "callback_query" in update:
                     handle_callback_query(update["callback_query"], db)
                     continue
 
-                # معالجة الرسائل النصية
                 if "message" in update:
                     msg = update["message"]
                     chat_id = msg.get("chat", {}).get("id")
                     user_id = msg.get("from", {}).get("id")
                     text = msg.get("text", "")
 
-                    # فحص إذا كانت الرسالة إشعاراً آلياً قادماً من التطبيق
                     process_incoming_app_message(text, db)
 
-                    # إذا كانت أمراً موجهاً للبوت
                     if text.startswith("/"):
                         handle_command(chat_id, user_id, text, db)
 
-        except requests.exceptions.RequestException as e:
-            # معالجة انقطاع الإنترنت بهدوء وإعادة المحاولة
-            time.sleep(5)
         except Exception as e:
-            print(f"[-] خطأ غير متوقع: {e}")
+            # print(f"[-] خطأ: {e}")
             time.sleep(3)
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n[!] تم إيقاف البوت يدوياً. إلى اللقاء!")
+        print("\n[!] تم إيقاف البوت يدوياً.")

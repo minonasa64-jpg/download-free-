@@ -34,7 +34,7 @@ void main() async {
   // إحصائيات وتنبيهات تيليجرام التلقائية (تسجيل المستخدم الجديد والنشط)
   try {
     TelegramAnalyticsService().reportAppOpen(
-      lang: BackendService().currentLang,
+      lang: BackendService().langNotifier.value,
     );
   } catch (e) {
     debugPrint('Telegram Analytics Error: $e');
