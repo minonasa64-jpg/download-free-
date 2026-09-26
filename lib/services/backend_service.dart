@@ -1430,7 +1430,7 @@ class BackendService {
     try {
       StreamManifest? manifest = _streamManifestCache[videoId];
       if (manifest == null) {
-        manifest = await _yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 8));
+        manifest = await _yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 15));
         _streamManifestCache[videoId] = manifest;
       }
 
@@ -1451,6 +1451,7 @@ class BackendService {
           'quality': fastStream.qualityLabel,
           'hdQuality': hdStream.qualityLabel,
           'aspectRatio': 16 / 9,
+          'isLive': false,
           'allStreams': muxedList.map((s) => {
             'url': s.url.toString(),
             'quality': s.qualityLabel,
@@ -1465,15 +1466,37 @@ class BackendService {
           'quality': 'Standard',
           'hdQuality': 'Standard',
           'aspectRatio': 16 / 9,
+          'isLive': false,
           'allStreams': [
             {'url': stream.url.toString(), 'quality': 'Standard', 'size': ''}
           ],
         };
       }
-      throw Exception('لا توجد دفقات تشغيل متاحة لهذا المقطع');
     } catch (e) {
-      throw Exception('فشل استخراج رابط التشغيل المباشر: $e');
+      debugPrint('Manifest stream lookup encountered: $e. Checking live streams...');
     }
+
+    // Try extracting Live HLS stream url (for Live Free Fire / streams)
+    try {
+      final liveUrl = await _yt.videos.streamsClient.getHttpLiveStreamUrl(VideoId(videoId)).timeout(const Duration(seconds: 10));
+      if (liveUrl.isNotEmpty) {
+        return {
+          'url': liveUrl,
+          'hdUrl': liveUrl,
+          'quality': 'بث مباشر (Live)',
+          'hdQuality': 'بث مباشر (Live)',
+          'aspectRatio': 16 / 9,
+          'isLive': true,
+          'allStreams': [
+            {'url': liveUrl, 'quality': 'بث مباشر HLS', 'size': 'Live'}
+          ],
+        };
+      }
+    } catch (liveErr) {
+      debugPrint('Live stream extraction: $liveErr');
+    }
+
+    throw Exception('لا توجد دفقات تشغيل مباشرة متاحة لهذا المقطع');
   }
 
   Future<void> _downloadFile({

@@ -29,6 +29,22 @@ class _YoutubeTabState extends State<YoutubeTab> {
   List<String> _recentSearches = [];
   yt.VideoSearchList? _currentSearchPage;
   
+  final Set<String> _seenFeedVideoIds = <String>{};
+  int _infiniteFeedTopicIndex = 0;
+  int _seedRelatedIndex = 0;
+  String _activeSearchQuery = '';
+
+  static const List<String> _infiniteTopics = [
+    'وثائقيات طبيعة خلابة علوم وتكنولوجيا 4k nature landscape documentary',
+    'wildlife planet earth 4k hdr national park documentary',
+    'space universe cosmos exploration galaxy 4k documentary',
+    'deep ocean marine biology coral reef 4k underwater',
+    'ancient world history civilization archaeology 4k',
+    'future technology engineering artificial intelligence robotics 4k',
+    'scenic drone flights natural wonders ultra hd 60fps',
+    'calm relaxing nature scenic landscapes 4k documentary',
+  ];
+  
   bool _isSearching = false;
   bool _isLoadingMore = false;
   bool _hasSearchedOnce = false; 
@@ -42,7 +58,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
     _loadRecentSearches();
 
     _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300) {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 500) {
         _loadMore();
       }
     });
@@ -128,11 +144,17 @@ class _YoutubeTabState extends State<YoutubeTab> {
   Future<void> _loadInitialFeed({String? customQuery}) async {
     const defaultQuery = 'وثائقيات طبيعة خلابة علوم وتكنولوجيا 4k nature landscape documentary';
     final query = customQuery ?? defaultQuery;
+    _activeSearchQuery = customQuery ?? '';
+    _seedRelatedIndex = 0;
     
     // If we have cached items and it is default feed, show them immediately
     if (customQuery == null && _feedMemoryCache.isNotEmpty) {
       setState(() {
         _searchResults = List.from(_feedMemoryCache);
+        _seenFeedVideoIds.clear();
+        for (final v in _searchResults) {
+          _seenFeedVideoIds.add(v.id.value);
+        }
         _hasSearchedOnce = true;
         _isSearching = false;
       });
@@ -142,6 +164,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
     setState(() {
       _isSearching = true;
       _searchResults.clear();
+      _seenFeedVideoIds.clear();
     });
 
     try {
@@ -152,6 +175,10 @@ class _YoutubeTabState extends State<YoutubeTab> {
       if (finalList.isEmpty) {
         final fallback = await _yt.search.search('nature landscape 4k documentary').timeout(const Duration(seconds: 10));
         finalList = fallback.whereType<yt.Video>().where(_isSafeVideo).toList();
+      }
+
+      for (final v in finalList) {
+        _seenFeedVideoIds.add(v.id.value);
       }
 
       if (mounted) {
@@ -211,12 +238,15 @@ class _YoutubeTabState extends State<YoutubeTab> {
 
     _searchFocusNode.unfocus();
     _saveRecentSearch(query);
+    _activeSearchQuery = query;
+    _seedRelatedIndex = 0;
     
     setState(() {
       _isSearching = true;
       _hasSearchedOnce = true;
       _showSuggestions = false;
       _searchResults.clear();
+      _seenFeedVideoIds.clear();
       _currentSearchPage = null;
     });
 
@@ -224,6 +254,10 @@ class _YoutubeTabState extends State<YoutubeTab> {
       final results = await _yt.search.search(query).timeout(const Duration(seconds: 15));
       final list = results.whereType<yt.Video>().where(_isSafeVideo).toList();
       
+      for (final v in list) {
+        _seenFeedVideoIds.add(v.id.value);
+      }
+
       if (mounted) {
         setState(() {
           _currentSearchPage = results;
@@ -245,22 +279,93 @@ class _YoutubeTabState extends State<YoutubeTab> {
     }
   }
 
+  /// التمرير اللانهائي المتقدم (Infinite Scroll): لا يتوقف أبداً عن تحميل مقاطع جديدة
   Future<void> _loadMore() async {
-    if (_isLoadingMore || _isSearching || _currentSearchPage == null) return;
+    if (_isLoadingMore || _isSearching) return;
     
     setState(() => _isLoadingMore = true);
     
     try {
-      final nextPage = await _currentSearchPage!.nextPage().timeout(const Duration(seconds: 12));
-      if (nextPage != null) {
-        final newVideos = nextPage.whereType<yt.Video>().where(_isSafeVideo).toList();
-        if (mounted) {
-          setState(() {
+      bool addedNew = false;
+
+      // 1. محاولة جلب الصفحة التالية من صفحة البحث الحالية
+      if (_currentSearchPage != null) {
+        try {
+          final nextPage = await _currentSearchPage!.nextPage().timeout(const Duration(seconds: 10));
+          if (nextPage != null && nextPage.isNotEmpty) {
             _currentSearchPage = nextPage;
-            _searchResults.addAll(newVideos);
-          });
+            final newVideos = nextPage.whereType<yt.Video>().where(_isSafeVideo).toList();
+            for (final v in newVideos) {
+              if (_seenFeedVideoIds.add(v.id.value)) {
+                _searchResults.add(v);
+                addedNew = true;
+              }
+            }
+          } else {
+            _currentSearchPage = null; // انتهاء صفحات الاستعلام الحالي
+          }
+        } catch (_) {
+          _currentSearchPage = null;
         }
       }
+
+      // 2. إذا لم تكن هناك صفحة تالية، نستمر في التمرير اللانهائي الذكي
+      if (!addedNew) {
+        if (_activeSearchQuery.isEmpty) {
+          // في التغذية الرئيسية الافتراضية: التبديل الدوري بين مواضيع وثائقية وعلمية عالية الدقة لا تنتهي
+          _infiniteFeedTopicIndex = (_infiniteFeedTopicIndex + 1) % _infiniteTopics.length;
+          final nextTopic = _infiniteTopics[_infiniteFeedTopicIndex];
+          try {
+            final nextResults = await _yt.search.search(nextTopic).timeout(const Duration(seconds: 10));
+            _currentSearchPage = nextResults;
+            for (final v in nextResults.whereType<yt.Video>()) {
+              if (_isSafeVideo(v) && _seenFeedVideoIds.add(v.id.value)) {
+                _searchResults.add(v);
+                addedNew = true;
+              }
+            }
+          } catch (e) {
+            debugPrint('خطأ في جلب تصنيف لا نهائي: $e');
+          }
+        } else {
+          // في وضع البحث النشط: التمرير اللانهائي عبر استدعاء مقاطع ذات صلة للمقاطع المحملة
+          while (_seedRelatedIndex < _searchResults.length && !addedNew) {
+            final seed = _searchResults[_seedRelatedIndex];
+            _seedRelatedIndex++;
+            try {
+              final relatedList = await _yt.videos.getRelatedVideos(seed).timeout(const Duration(seconds: 8));
+              if (relatedList != null && relatedList.isNotEmpty) {
+                for (final v in relatedList) {
+                  if (_isSafeVideo(v) && _seenFeedVideoIds.add(v.id.value)) {
+                    _searchResults.add(v);
+                    addedNew = true;
+                  }
+                }
+              }
+            } catch (_) {}
+          }
+
+          // في حال استنفاد المقاطع ذات الصلة، جلب اقتراحات بحث إضافية لكلمة البحث
+          if (!addedNew) {
+            try {
+              final suggestions = await _yt.search.getQuerySuggestions(_activeSearchQuery);
+              if (suggestions.isNotEmpty) {
+                final nextQuery = suggestions[_seedRelatedIndex % suggestions.length];
+                final extraRes = await _yt.search.search(nextQuery).timeout(const Duration(seconds: 8));
+                _currentSearchPage = extraRes;
+                for (final v in extraRes.whereType<yt.Video>()) {
+                  if (_isSafeVideo(v) && _seenFeedVideoIds.add(v.id.value)) {
+                    _searchResults.add(v);
+                    addedNew = true;
+                  }
+                }
+              }
+            } catch (_) {}
+          }
+        }
+      }
+
+      if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Error loading more: $e');
     } finally {
