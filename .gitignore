@@ -9,4 +9,3 @@ coverage/
 __pycache__/
 *.pyc
 boykta_analytics.json
-.bot.pid

@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 36242103365,
-    status: 'in_progress',
-    conclusion: null,
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36242103365',
-    head_sha: '954c5c5',
+    id: 36151217157,
+    status: 'completed',
+    conclusion: 'success',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36151217157',
+    head_sha: '8121442',
     head_commit: {
-      id: '954c5c5',
-      message: 'fix(player): restore original working video player and restore previous app icon'
+      id: '8121442',
+      message: 'fix(dart): resolve currentLang getter in BackendService and update bot with zero dependencies'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -86,7 +86,7 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.4.5
+                  v1.4.2
                 </span>
               </h1>
               <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي إلى GitHub</p>
@@ -171,13 +171,13 @@ export default function App() {
               </a>
 
               <a
-                href="https://github.com/minonasa64-jpg/download-free-/releases/download/v1.4.5/app-release.apk"
+                href="https://github.com/minonasa64-jpg/download-free-/releases/download/v1.4.2/app-release.apk"
                 target="_blank"
                 rel="noreferrer"
                 className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium transition shadow-lg shadow-cyan-600/20"
               >
                 <Download className="w-4 h-4" />
-                تحميل APK المباشر (v1.4.5)
+                تحميل APK المباشر (v1.4.2)
               </a>
             </div>
           </div>
@@ -199,10 +199,10 @@ export default function App() {
               </span>
             </div>
             <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80">
-              <span className="text-slate-500 block mb-1">توقيع الإطلاق الرسمي</span>
+              <span className="text-slate-500 block mb-1">حزمة أندرويد المستهدفة</span>
               <span className="font-semibold text-slate-200 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                RSA 2048-bit (Google Protect Safe)
+                com.boykta.pro_downloader (MinSdk 24)
               </span>
             </div>
           </div>
@@ -212,7 +212,7 @@ export default function App() {
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في الإصدار الجديد (v1.4.5)</h2>
+            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في التطبيق (v1.4.2)</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

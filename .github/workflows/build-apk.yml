@@ -49,6 +49,7 @@ jobs:
               'android.permission.READ_EXTERNAL_STORAGE',
               'android.permission.READ_MEDIA_VIDEO',
               'android.permission.READ_MEDIA_AUDIO',
+              'android.permission.MANAGE_EXTERNAL_STORAGE',
               'com.google.android.gms.permission.AD_ID',
               'android.permission.POST_NOTIFICATIONS',
               'android.permission.USE_BIOMETRIC',
@@ -77,8 +78,6 @@ jobs:
               app.set('{http://schemas.android.com/apk/res/android}requestLegacyExternalStorage', 'true')
               app.set('{http://schemas.android.com/apk/res/android}usesCleartextTraffic', 'true')
               app.set('{http://schemas.android.com/apk/res/android}hardwareAccelerated', 'true')
-              app.set('{http://schemas.android.com/apk/res/android}extractNativeLibs', 'true')
-              app.set('{http://schemas.android.com/apk/res/android}allowBackup', 'false')
 
               for act in app.findall('activity'):
                   if '{http://schemas.android.com/apk/res/android}taskAffinity' in act.attrib:
@@ -562,48 +561,6 @@ jobs:
           -dontwarn com.rebeloid.unity_ads_plugin.**
           EOF
 
-      - name: Generate Official Release Keystore and Sign APK
-        run: |
-          mkdir -p android/app
-          keytool -genkeypair -v \
-            -keystore android/app/boykta_release.keystore \
-            -alias boyktapro \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass boykta2026pro \
-            -keypass boykta2026pro \
-            -dname "CN=Boykta Pro, OU=Software Development, O=Boykta Technologies, L=Dubai, ST=Dubai, C=AE"
-          
-          python3 -c "
-          p = 'android/app/build.gradle'
-          with open(p, 'r') as f:
-              s = f.read()
-          
-          signing_code = '''
-              signingConfigs {
-                  release {
-                      storeFile file('boykta_release.keystore')
-                      storePassword 'boykta2026pro'
-                      keyAlias 'boyktapro'
-                      keyPassword 'boykta2026pro'
-                      v1SigningEnabled true
-                      v2SigningEnabled true
-                  }
-              }
-          '''
-          if 'signingConfigs {' not in s:
-              s = s.replace('android {', 'android {\n' + signing_code, 1)
-          
-          if 'signingConfig signingConfigs.debug' in s:
-              s = s.replace('signingConfig signingConfigs.debug', 'signingConfig signingConfigs.release')
-          elif 'buildTypes {' in s:
-              s = s.replace('buildTypes {', 'buildTypes {\n        release {\n            signingConfig signingConfigs.release\n        }')
-          
-          with open(p, 'w') as f:
-              f.write(s)
-          "
-
       - name: Install Dependencies
         run: flutter pub get
 
@@ -623,27 +580,30 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v1.4.5"
-          RELEASE_TITLE="Boykta Pro v1.4.5 - استعادة مشغل فيديوهات اليوتيوب الأصلي المستقر واستعادة الأيقونة السابقة"
+          TAG="v1.4.2"
+          RELEASE_TITLE="Boykta Pro v1.4.2 - ربط بوت تيليجرام للإحصائيات الحية، وتحسينات الأداء والتشغيل"
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           
-          NOTES="🚀 **Boykta Pro v1.4.5** - استعادة مشغل فيديوهات اليوتيوب المستقر والأيقونة السابقة مع الحفاظ على كافة الميزات والتمرير اللانهائي!
+          NOTES="🚀 **Boykta Pro v1.4.2** - ترقية شاملة مع نظام إحصائيات وتنبيهات تيليجرام المباشر، وتحديثات الاستقرار!
 
-          ### ✨ التحديثات في إصدار v1.4.5:
-          - 🎬 **استعادة مشغل فيديوهات اليوتيوب كما كان في الإصدار المستقر:**
-            * استعادة المشغل الأصلي المباشر (Native Chewie Player) بكامل كفاءته وسرعته.
-            * دعم تشغيل الصوت في الخلفية خارج التطبيق وزر Picture-in-Picture (PiP).
-            * نافذة اختيار صيغ التنزيل المتقدمة مع دمج الصوت والصورة بأعلى جودة.
-          - 🖼️ **استعادة أيقونة التطبيق السابقة:**
-            * العودة للأيقونة السابقة الأصلية للتطبيق بدقة وجودة فائقة.
-          - ♾️ **الحفاظ على التمرير اللانهائي في قسم يوتيوب:**
-            * تدفق لا يتوقف لمقاطع الفيديو والنتائج بدون انقطاع التصفح.
-          - 🛡️ **استمرار التوقيع الموثوق (Google Play Protect Compliant):**
-            * توقيع الـ APK بمفتاح رسمي مشفر (RSA 2048-bit Keystore) وحماية سلسة وتثبيت فوري دون تحذيرات أمان.
-          - 🔒 **الحفاظ على كافة الميزات:**
-            * استمرار كامل لمحرك التحميل فائق السرعة، الخزنة المشفرة، نقل الملفات عبر Wi-Fi، والثيمات المتقدمة.
+          ### ✨ الجديد والمُحدث في إصدار v1.4.2:
+          - 🤖 **ربط متقدم مع بوت تيليجرام (Telegram Analytics & Alerts):**
+            * إرسال تنبيهات فورية للمسؤول عند تثبيت التطبيق لأول مرة من أي مستخدم جديد (New Installs).
+            * تسجيل نبضة النشاط اليومية للمستخدمين النشطين (Daily Active Users - DAU).
+            * إرسال إشعارات فورية عند اكتمال عمليات التنزيل الناجحة بصيغ MP4 و MP3.
+            * مدمج مباشرة مع كود بايثون مستقل لتشغيل البوت والتحكم الكامل في الإحصائيات عبر أزرار تفاعلية.
+          - 🛡️ **نظام الحماية والتوافق الحديث (Target SDK 34):**
+            * توافق كامل مع Android 14 و Android 15 مع حل كافة تحذيرات حماية Google Play.
+            * صلاحية تشغيل الوسائط في الخلفية (FOREGROUND_SERVICE_MEDIA_PLAYBACK).
+          - 🎵 **مشغل الموسيقى في الخلفية (Background Audio Playback):**
+            * استمرار عمل تشغيل الصوت عند الخروج أو قفل الشاشة مع دعم كامل لصلاحيات WAKE_LOCK و AudioFocus.
+          - 🎬 **مشغل يوتيوب عالي السرعة وتغذية نقية راقية:**
+            * استجابة فورية بدون تقطيع ومحتوى مريح وراقي خالٍ من أي مواد غير لائقة.
+          - 🌐 **دعم كامل لكافة اللغات والواجهات (RTL & Multi-language):**
+            * دعم 7 لغات عالمية مع تعريب وترجمة فورية شاملة لكل الأزرار والشاشات.
+          - ⚡ الحفاظ التام والكامل على كافة ميزات التنزيل التوربو (16 مسار)، الخزنة المشفرة، المشاركة عبر Wi-Fi، وصانع النغمات.
 
-          📲 **التثبيت المباشر:** قم بتحميل ملف \`app-release.apk\` وتثبيته مباشرة."
+          📲 **التثبيت المباشر:** قم بتحميل ملف \`app-release.apk\` المرفق أدناه وتثبيته مباشرة على هاتفك الأندرويد."
 
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" "$APK_PATH" --clobber || true
