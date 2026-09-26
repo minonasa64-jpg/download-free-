@@ -33,18 +33,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
   bool _isLoadingMore = false;
   bool _hasSearchedOnce = false; 
   bool _showSuggestions = false;
-  String _selectedCategory = 'الكل';
-
-  final List<Map<String, String>> _categories = [
-    {'name': 'الكل', 'query': 'وثائقيات طبيعة خلابة علوم وتكنولوجيا 4k'},
-    {'name': 'قرآن كريم', 'query': 'تلاوة خاشعة تريح القلب قرآن كريم'},
-    {'name': 'طبيعة وحيوانات', 'query': 'wild animals nature planet documentary 4k'},
-    {'name': 'تكنولوجيا وتقنية', 'query': 'technology innovation future gadgets review'},
-    {'name': 'بودكاست مفيد', 'query': 'بودكاست حوارات وثقافة مفيدة'},
-    {'name': 'رياضة وأهداف', 'query': 'best sports skills moments goals'},
-    {'name': 'سيارات وهندسة', 'query': 'supercars review engineering 4k'},
-    {'name': 'فضاء وكون', 'query': 'space universe astronomy documentary 4k'},
-  ];
 
   static const String _prefRecentSearchesKey = 'yt_recent_searches_list';
 
@@ -138,13 +126,11 @@ class _YoutubeTabState extends State<YoutubeTab> {
   }
 
   Future<void> _loadInitialFeed({String? customQuery}) async {
-    final query = customQuery ?? (_selectedCategory == 'الكل'
-        ? 'وثائقيات طبيعة خلابة علوم وتكنولوجيا 4k'
-        : _categories.firstWhere((c) => c['name'] == _selectedCategory,
-            orElse: () => {'query': 'وثائقيات طبيعة خلابة علوم وتكنولوجيا 4k'})['query']!);
+    const defaultQuery = 'وثائقيات طبيعة خلابة علوم وتكنولوجيا 4k nature landscape documentary';
+    final query = customQuery ?? defaultQuery;
     
     // If we have cached items and it is default feed, show them immediately
-    if (customQuery == null && _selectedCategory == 'الكل' && _feedMemoryCache.isNotEmpty) {
+    if (customQuery == null && _feedMemoryCache.isNotEmpty) {
       setState(() {
         _searchResults = List.from(_feedMemoryCache);
         _hasSearchedOnce = true;
@@ -174,7 +160,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
           _searchResults = finalList;
           _hasSearchedOnce = true;
           _isSearching = false;
-          if (customQuery == null && _selectedCategory == 'الكل') {
+          if (customQuery == null) {
             _feedMemoryCache = finalList;
           }
         });
@@ -308,7 +294,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
             Column(
               children: [
                 _buildHeader(),
-                _buildCategoryBar(),
                 Expanded(
                   child: _buildBodyContent(),
                 ),
@@ -424,65 +409,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
     );
   }
 
-  Widget _buildCategoryBar() {
-    return Container(
-      height: 38,
-      margin: const EdgeInsets.only(top: 4, bottom: 6),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: _categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final cat = _categories[index];
-          final isSelected = cat['name'] == _selectedCategory;
-          return GestureDetector(
-            onTap: () {
-              if (isSelected) return;
-              setState(() {
-                _selectedCategory = cat['name']!;
-                _searchController.clear();
-                _showSuggestions = false;
-              });
-              _loadInitialFeed(customQuery: cat['query']);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.cyan : AppColors.surfaceLight.withOpacity(0.6),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: isSelected ? AppColors.cyan : Colors.white.withOpacity(0.08),
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: AppColors.cyan.withOpacity(0.35),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        )
-                      ]
-                    : null,
-              ),
-              child: Center(
-                child: Text(
-                  cat['name']!,
-                  style: TextStyle(
-                    color: isSelected ? Colors.black : AppColors.textPrimary,
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
@@ -584,10 +510,10 @@ class _YoutubeTabState extends State<YoutubeTab> {
               const SizedBox(height: 14),
               Text(
                 _hasSearchedOnce ? _backend.t('no_results') : 'جاري تحميل مقاطع مميزة...',
-                style: const TextStyle(color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.bold),
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'اسحب لأسفل أو اضغط بالأسفل لإعادة المحاولة',
                 style: TextStyle(color: AppColors.textMuted, fontSize: 12),
               ),

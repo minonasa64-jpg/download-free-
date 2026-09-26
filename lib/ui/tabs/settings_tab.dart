@@ -10,7 +10,6 @@ import '../vault_screen.dart';
 import '../web_share_screen.dart';
 import '../sheets/theme_station_sheet.dart';
 import '../sheets/data_usage_sheet.dart';
-import '../../services/telegram_analytics_service.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
