@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 36235024919,
-    status: 'completed',
-    conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36235024919',
-    head_sha: 'bb8dfba',
+    id: 36239999555,
+    status: 'in_progress',
+    conclusion: null,
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36239999555',
+    head_sha: '3e58d41',
     head_commit: {
-      id: 'bb8dfba',
-      message: 'fix(build): resolve constant evaluation error, remove categories bar and fix youtube search'
+      id: '3e58d41',
+      message: 'feat(v1.4.4): add infinite youtube scroll, smart dual-engine player, fix google play protect warning, and modernize icons'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
