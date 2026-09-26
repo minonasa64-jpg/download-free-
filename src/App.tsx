@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 36239999555,
+    id: 36240287964,
     status: 'in_progress',
     conclusion: null,
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36239999555',
-    head_sha: '3e58d41',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36240287964',
+    head_sha: 'e29e4a4',
     head_commit: {
-      id: '3e58d41',
-      message: 'feat(v1.4.4): add infinite youtube scroll, smart dual-engine player, fix google play protect warning, and modernize icons'
+      id: 'e29e4a4',
+      message: 'fix(player): remove const from ytp.ProgressBarColors with dynamic theme cyan color'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
