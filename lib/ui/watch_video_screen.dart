@@ -702,7 +702,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                               controller: _youtubePlayerController!,
                               showVideoProgressIndicator: true,
                               progressIndicatorColor: AppColors.cyan,
-                              progressColors: const ytp.ProgressBarColors(
+                              progressColors: ytp.ProgressBarColors(
                                 playedColor: AppColors.cyan,
                                 handleColor: AppColors.cyan,
                               ),
