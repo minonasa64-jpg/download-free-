@@ -4,12 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart' as ytp;
 import '../core/app_colors.dart';
 import '../services/backend_service.dart';
 import '../services/ad_service.dart';
-
-enum ActivePlayerEngine { directNative, youtubeIframe }
 
 class WatchVideoScreen extends StatefulWidget {
   final yt.Video video;
@@ -27,9 +24,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   late yt.Video _currentVideo;
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
-  ytp.YoutubePlayerController? _youtubePlayerController;
 
-  ActivePlayerEngine _activeEngine = ActivePlayerEngine.directNative;
   bool _isLoadingPlayer = true;
   String? _playerError;
   bool _isBackgroundAudioEnabled = false;
@@ -38,9 +33,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
 
   final ScrollController _relatedScrollController = ScrollController();
   bool _isLoadingExtraction = false;
-  final List<yt.Video> _relatedVideos = [];
-  final Set<String> _seenRelatedIds = <String>{};
-  int _relatedSeedIndex = 0;
+  List<yt.Video> _relatedVideos = [];
   yt.VideoSearchList? _relatedSearchPage;
   bool _isLoadingRelated = true;
   bool _isLoadingMoreRelated = false;
@@ -51,51 +44,33 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   void initState() {
     super.initState();
     _currentVideo = widget.video;
-    _initPlayer(_currentVideo);
+    _initDirectStreamPlayer(_currentVideo);
     _fetchRelatedVideos();
 
     _relatedScrollController.addListener(() {
-      if (_relatedScrollController.position.pixels >= _relatedScrollController.position.maxScrollExtent - 400) {
+      if (_relatedScrollController.position.pixels >= _relatedScrollController.position.maxScrollExtent - 200) {
         _loadMoreRelatedVideos();
       }
     });
   }
 
-  void _disposePlayers() {
-    try {
-      _chewieController?.pause();
-      _chewieController?.dispose();
-      _chewieController = null;
-    } catch (_) {}
-
-    try {
-      _videoPlayerController?.dispose();
-      _videoPlayerController = null;
-    } catch (_) {}
-
-    try {
-      _youtubePlayerController?.pause();
-      _youtubePlayerController?.dispose();
-      _youtubePlayerController = null;
-    } catch (_) {}
-  }
-
-  /// إعداد مشغل الفيديو: يجرب أولاً المشغل المباشر السريع (Direct Stream)، وفي حال تعذره لأي سبب (مثل البث المباشر) ينتقل تلقائياً وبسلاسة إلى مشغل يوتيوب الرسمي
-  Future<void> _initPlayer(yt.Video video, {bool forceYoutubePlayer = false}) async {
+  /// التقاط رابط البث المباشر وتشغيله عبر مشغل الفيديو الأصلي Native Video Player (Chewie)
+  Future<void> _initDirectStreamPlayer(yt.Video video) async {
     if (!mounted) return;
     setState(() {
       _isLoadingPlayer = true;
       _playerError = null;
     });
 
-    _disposePlayers();
+    // تحرير المشغلات السابقة بأمان
+    try {
+      _chewieController?.pause();
+      _chewieController?.dispose();
+      _chewieController = null;
+      await _videoPlayerController?.dispose();
+      _videoPlayerController = null;
+    } catch (_) {}
 
-    if (forceYoutubePlayer) {
-      _startYoutubePlayer(video.id.value);
-      return;
-    }
-
-    // 1. محاولة المشغل المباشر عالي السرعة (Direct Native Stream)
     try {
       final streamData = await _backend.getPlayableStream(video.id.value);
       final String streamUrl = streamData['url'] as String;
@@ -131,179 +106,59 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       );
 
       setState(() {
-        _activeEngine = ActivePlayerEngine.directNative;
         _isLoadingPlayer = false;
-        _playerError = null;
       });
     } catch (e) {
-      debugPrint('تعذر المشغل المباشر، جاري التبديل التلقائي لمشغل يوتيوب: $e');
-      // تحويل تلقائي سلس لمشغل يوتيوب المدمج لحل مشكلة البث المباشر والمقاطع المقيدة
-      _startYoutubePlayer(video.id.value);
-    }
-  }
-
-  void _startYoutubePlayer(String videoId) {
-    try {
-      _youtubePlayerController = ytp.YoutubePlayerController(
-        initialVideoId: videoId,
-        flags: const ytp.YoutubePlayerFlags(
-          autoPlay: true,
-          mute: false,
-          enableCaption: true,
-          isLive: false,
-          forceHD: false,
-          useHybridComposition: true,
-        ),
-      );
-
-      if (mounted) {
-        setState(() {
-          _activeEngine = ActivePlayerEngine.youtubeIframe;
-          _isLoadingPlayer = false;
-          _playerError = null;
-        });
-      }
-    } catch (ytErr) {
-      debugPrint('YouTube Player Error: $ytErr');
+      debugPrint('خطأ في تشغيل الفيديو المباشر: $e');
       if (mounted) {
         setState(() {
           _isLoadingPlayer = false;
-          _playerError = 'تعذر تشغيل المقطع. اضغط لإعادة المحاولة.';
+          _playerError = 'تعذر تشغيل هذا المقطع مباشرة عبر خادم البث، يرجى إعادة المحاولة أو التحميل.';
         });
       }
     }
   }
 
-  void _togglePlayerEngine() {
-    if (_activeEngine == ActivePlayerEngine.directNative) {
-      _initPlayer(_currentVideo, forceYoutubePlayer: true);
-    } else {
-      _initPlayer(_currentVideo, forceYoutubePlayer: false);
-    }
-  }
-
-  /// جلب الفيديوهات ذات الصلة الحقيقية والتمرير اللانهائي الذكي
   Future<void> _fetchRelatedVideos() async {
-    _seenRelatedIds.clear();
-    _seenRelatedIds.add(_currentVideo.id.value);
-    _relatedSeedIndex = 0;
-
-    if (mounted) {
-      setState(() {
-        _relatedVideos.clear();
-        _isLoadingRelated = true;
-      });
-    }
-
-    // 1. استدعاء الفيديوهات ذات الصلة الرسمية من يوتيوب
     try {
-      final related = await _yt.videos.getRelatedVideos(_currentVideo).timeout(const Duration(seconds: 10));
-      if (related != null) {
-        for (final v in related) {
-          if (v.id.value != _currentVideo.id.value && _seenRelatedIds.add(v.id.value)) {
-            _relatedVideos.add(v);
-          }
-        }
+      var results = await _yt.search.search(_currentVideo.author);
+      var filteredList = results.whereType<yt.Video>().where((v) => v.id.value != _currentVideo.id.value).toList();
+
+      if (filteredList.isEmpty) {
+        String shortTitle = _currentVideo.title.split(' ').take(3).join(' ');
+        results = await _yt.search.search(shortTitle);
+        filteredList = results.whereType<yt.Video>().where((v) => v.id.value != _currentVideo.id.value).toList();
+      }
+
+      if (mounted) {
+        setState(() {
+          _relatedSearchPage = results;
+          _relatedVideos = filteredList;
+          _isLoadingRelated = false;
+        });
       }
     } catch (e) {
-      debugPrint('Related videos api: $e');
-    }
-
-    // 2. تدعيم القائمة ببحث ذكي بالكلمات الدلالية في حال قلة النتائج
-    if (_relatedVideos.length < 12) {
-      try {
-        final cleanWords = _currentVideo.title
-            .replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]'), ' ')
-            .split(' ')
-            .where((w) => w.trim().length > 2)
-            .take(3)
-            .join(' ');
-        final q = cleanWords.isNotEmpty ? cleanWords : _currentVideo.author;
-        final res = await _yt.search.search(q).timeout(const Duration(seconds: 10));
-        _relatedSearchPage = res;
-        for (final item in res.whereType<yt.Video>()) {
-          if (item.id.value != _currentVideo.id.value && _seenRelatedIds.add(item.id.value)) {
-            _relatedVideos.add(item);
-          }
-        }
-      } catch (e) {
-        debugPrint('Related fallback search: $e');
-      }
-    }
-
-    if (mounted) {
-      setState(() => _isLoadingRelated = false);
+      if (mounted) setState(() => _isLoadingRelated = false);
     }
   }
 
-  /// التمرير اللانهائي للفيديوهات ذات الصلة (Infinite Related Videos)
   Future<void> _loadMoreRelatedVideos() async {
     if (_isLoadingMoreRelated) return;
-    setState(() => _isLoadingMoreRelated = true);
-
-    try {
-      bool addedAny = false;
-
-      // أ) الانتقال للصفحة التالية إذا كانت متوفرة
-      if (_relatedSearchPage != null) {
-        try {
-          final next = await _relatedSearchPage!.nextPage().timeout(const Duration(seconds: 10));
-          if (next != null && next.isNotEmpty) {
+    if (_relatedSearchPage?.nextPage != null) {
+      setState(() => _isLoadingMoreRelated = true);
+      try {
+        final next = await _relatedSearchPage!.nextPage();
+        if (next != null) {
+          setState(() {
             _relatedSearchPage = next;
-            for (final item in next.whereType<yt.Video>()) {
-              if (_seenRelatedIds.add(item.id.value)) {
-                _relatedVideos.add(item);
-                addedAny = true;
-              }
-            }
-          } else {
-            _relatedSearchPage = null;
-          }
-        } catch (_) {
-          _relatedSearchPage = null;
+            _relatedVideos.addAll(next.whereType<yt.Video>());
+          });
         }
+      } catch (e) {
+        debugPrint('Error loading more related: $e');
+      } finally {
+        if (mounted) setState(() => _isLoadingMoreRelated = false);
       }
-
-      // ب) سلسلة التمرير اللانهائي التلقائية: استخراج فيديوهات ذات صلة للمقاطع المحملة في القائمة
-      if (!addedAny && _relatedVideos.isNotEmpty) {
-        while (_relatedSeedIndex < _relatedVideos.length && !addedAny) {
-          final seedVideo = _relatedVideos[_relatedSeedIndex];
-          _relatedSeedIndex++;
-          try {
-            final moreRelated = await _yt.videos.getRelatedVideos(seedVideo).timeout(const Duration(seconds: 8));
-            if (moreRelated != null && moreRelated.isNotEmpty) {
-              for (final v in moreRelated) {
-                if (_seenRelatedIds.add(v.id.value)) {
-                  _relatedVideos.add(v);
-                  addedAny = true;
-                }
-              }
-            }
-          } catch (_) {}
-        }
-      }
-
-      // جـ) في حال نفاذ السلسلة، توليد مقترحات بحث إضافية لا تنتهي
-      if (!addedAny) {
-        try {
-          final suggestions = await _yt.search.getQuerySuggestions(_currentVideo.author);
-          if (suggestions.isNotEmpty) {
-            final query = suggestions[_relatedSeedIndex % suggestions.length];
-            final searchRes = await _yt.search.search(query).timeout(const Duration(seconds: 8));
-            _relatedSearchPage = searchRes;
-            for (final item in searchRes.whereType<yt.Video>()) {
-              if (_seenRelatedIds.add(item.id.value)) {
-                _relatedVideos.add(item);
-                addedAny = true;
-              }
-            }
-          }
-        } catch (_) {}
-      }
-
-      if (mounted) setState(() {});
-    } finally {
-      if (mounted) setState(() => _isLoadingMoreRelated = false);
     }
   }
 
@@ -316,7 +171,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       _relatedVideos.clear();
     });
 
-    _initPlayer(newVideo);
+    _initDirectStreamPlayer(newVideo);
     _fetchRelatedVideos();
   }
 
@@ -446,7 +301,6 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       _chewieController?.dispose();
       _videoPlayerController?.dispose();
     }
-    _youtubePlayerController?.dispose();
     _relatedScrollController.dispose();
     _yt.close();
     super.dispose();
@@ -582,36 +436,6 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
-          // زر تبديل محرك المشغل بين المباشر ومشغل يوتيوب
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.cyan.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.cyan.withOpacity(0.4)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _activeEngine == ActivePlayerEngine.directNative
-                        ? Icons.bolt_rounded
-                        : Icons.ondemand_video_rounded,
-                    color: AppColors.cyan,
-                    size: 14,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _activeEngine == ActivePlayerEngine.directNative ? 'مباشر' : 'يوتيوب',
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-            tooltip: 'تبديل المشغل (مباشر / يوتيوب)',
-            onPressed: _togglePlayerEngine,
-          ),
           IconButton(
             icon: Icon(
               _isBackgroundAudioEnabled ? Icons.headset_rounded : Icons.headset_off_rounded,
@@ -630,7 +454,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // مشغل الفيديو الذكي المزدوج (Direct Native + YouTube Player)
+          // مشغل الفيديو المباشر عالي الأداء والموثوقية
           Container(
             color: Colors.black,
             width: double.infinity,
@@ -642,9 +466,9 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           CircularProgressIndicator(color: AppColors.cyan, strokeWidth: 2.5),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'جاري تجهيز مشغل الفيديو...',
+                          SizedBox(height: 12),
+                          Text(
+                            'جاري التقاط رابط البث المباشر وتشغيله...',
                             style: TextStyle(color: Colors.white70, fontSize: 12),
                           ),
                         ],
@@ -665,54 +489,27 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                                 ),
                                 const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppColors.cyan,
-                                        foregroundColor: Colors.black,
-                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      ),
-                                      onPressed: () => _initPlayer(_currentVideo, forceYoutubePlayer: false),
-                                      icon: const Icon(Icons.refresh_rounded, size: 16),
-                                      label: const Text('المشغل المباشر', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.white12,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      ),
-                                      onPressed: () => _initPlayer(_currentVideo, forceYoutubePlayer: true),
-                                      icon: const Icon(Icons.ondemand_video_rounded, size: 16),
-                                      label: const Text('مشغل يوتيوب', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                    ),
-                                  ],
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.cyan,
+                                    foregroundColor: Colors.black,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  onPressed: () => _initDirectStreamPlayer(_currentVideo),
+                                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                                  label: const Text('إعادة المحاولة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                                 ),
                               ],
                             ),
                           ),
                         )
-                      : _activeEngine == ActivePlayerEngine.youtubeIframe && _youtubePlayerController != null
-                          ? ytp.YoutubePlayer(
-                              controller: _youtubePlayerController!,
-                              showVideoProgressIndicator: true,
-                              progressIndicatorColor: AppColors.cyan,
-                              progressColors: ytp.ProgressBarColors(
-                                playedColor: AppColors.cyan,
-                                handleColor: AppColors.cyan,
-                              ),
-                            )
-                          : _chewieController != null &&
-                                  _chewieController!.videoPlayerController.value.isInitialized
-                              ? Chewie(controller: _chewieController!)
-                              : Center(
-                                  child: CircularProgressIndicator(color: AppColors.cyan),
-                                ),
+                      : _chewieController != null &&
+                              _chewieController!.videoPlayerController.value.isInitialized
+                          ? Chewie(controller: _chewieController!)
+                          : Center(
+                              child: CircularProgressIndicator(color: AppColors.cyan),
+                            ),
             ),
           ),
 
