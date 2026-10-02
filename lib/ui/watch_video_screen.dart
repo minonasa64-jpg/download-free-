@@ -120,25 +120,88 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   }
 
   Future<void> _fetchRelatedVideos() async {
+    setState(() => _isLoadingRelated = true);
+    final Set<String> existingIds = {_currentVideo.id.value};
+    final List<yt.Video> gatheredVideos = [];
+
+    // استراتيجية 1: جلب الفيديوهات ذات الصلة عبر واجهة يوتيوب الرسمية getRelatedVideos
     try {
-      var results = await _yt.search.search(_currentVideo.author);
-      var filteredList = results.whereType<yt.Video>().where((v) => v.id.value != _currentVideo.id.value).toList();
-
-      if (filteredList.isEmpty) {
-        String shortTitle = _currentVideo.title.split(' ').take(3).join(' ');
-        results = await _yt.search.search(shortTitle);
-        filteredList = results.whereType<yt.Video>().where((v) => v.id.value != _currentVideo.id.value).toList();
-      }
-
-      if (mounted) {
-        setState(() {
-          _relatedSearchPage = results;
-          _relatedVideos = filteredList;
-          _isLoadingRelated = false;
-        });
+      final related = await _yt.videos.getRelatedVideos(_currentVideo).timeout(const Duration(seconds: 7));
+      if (related != null && related.isNotEmpty) {
+        for (final v in related) {
+          if (!existingIds.contains(v.id.value)) {
+            existingIds.add(v.id.value);
+            gatheredVideos.add(v);
+          }
+        }
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoadingRelated = false);
+      debugPrint('تنبيه أثناء getRelatedVideos: $e');
+    }
+
+    // استراتيجية 2: استخراج كلمات مفتاحية نقية من عنوان الفيديو والبحث بها في يوتيوب
+    if (gatheredVideos.length < 5) {
+      try {
+        final cleanTitle = _currentVideo.title
+            .replaceAll(RegExp(r'[\|\-_\[\]\(\)\{\}\#\!\?\/\\]'), ' ')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+        final words = cleanTitle
+            .split(' ')
+            .where((w) => w.length > 2 && !w.startsWith('http'))
+            .take(4)
+            .join(' ');
+        if (words.isNotEmpty) {
+          final results = await _yt.search.search(words).timeout(const Duration(seconds: 7));
+          _relatedSearchPage = results;
+          for (final v in results.whereType<yt.Video>()) {
+            if (!existingIds.contains(v.id.value)) {
+              existingIds.add(v.id.value);
+              gatheredVideos.add(v);
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('تنبيه أثناء البحث بالكلمات المفتاحية: $e');
+      }
+    }
+
+    // استراتيجية 3: البحث باسم القناة / المؤلف
+    if (gatheredVideos.length < 5 && _currentVideo.author.isNotEmpty) {
+      try {
+        final cleanAuthor = _currentVideo.author.trim();
+        final results = await _yt.search.search(cleanAuthor).timeout(const Duration(seconds: 7));
+        _relatedSearchPage ??= results;
+        for (final v in results.whereType<yt.Video>()) {
+          if (!existingIds.contains(v.id.value)) {
+            existingIds.add(v.id.value);
+            gatheredVideos.add(v);
+          }
+        }
+      } catch (e) {
+        debugPrint('تنبيه أثناء البحث باسم القناة: $e');
+      }
+    }
+
+    // استراتيجية 4: البحث بمصطلحات عامة ربيعية وشائعة لضمان عدم بقاء القائمة فارغة إطلاقاً
+    if (gatheredVideos.isEmpty) {
+      try {
+        final results = await _yt.search.search('فيديوهات مقترحة شائعة').timeout(const Duration(seconds: 7));
+        _relatedSearchPage ??= results;
+        for (final v in results.whereType<yt.Video>()) {
+          if (!existingIds.contains(v.id.value)) {
+            existingIds.add(v.id.value);
+            gatheredVideos.add(v);
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      setState(() {
+        _relatedVideos = gatheredVideos;
+        _isLoadingRelated = false;
+      });
     }
   }
 
@@ -146,11 +209,12 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     if (_isLoadingMoreRelated) return;
     setState(() => _isLoadingMoreRelated = true);
     try {
+      final existingIds = _relatedVideos.map((v) => v.id.value).toSet();
+      existingIds.add(_currentVideo.id.value);
+
       if (_relatedSearchPage != null) {
-        final next = await _relatedSearchPage!.nextPage().timeout(const Duration(seconds: 10));
+        final next = await _relatedSearchPage!.nextPage().timeout(const Duration(seconds: 8));
         if (next != null) {
-          final existingIds = _relatedVideos.map((v) => v.id.value).toSet();
-          existingIds.add(_currentVideo.id.value);
           final newVideos = next.whereType<yt.Video>().where((v) => !existingIds.contains(v.id.value)).toList();
           if (mounted && newVideos.isNotEmpty) {
             setState(() {
@@ -163,18 +227,21 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       }
 
       // إذا انتهت صفحات البحث السابقة، نبحث عن مواضيع قريبة من عنوان الفيديو
-      final words = _currentVideo.title.split(RegExp(r'\s+')).where((w) => w.length > 3).take(3).join(' ');
-      if (words.isNotEmpty) {
-        final moreResults = await _yt.search.search(words).timeout(const Duration(seconds: 10));
-        final existingIds = _relatedVideos.map((v) => v.id.value).toSet();
-        existingIds.add(_currentVideo.id.value);
-        final newVideos = moreResults.whereType<yt.Video>().where((v) => !existingIds.contains(v.id.value)).toList();
-        if (mounted && newVideos.isNotEmpty) {
-          setState(() {
-            _relatedSearchPage = moreResults;
-            _relatedVideos.addAll(newVideos);
-          });
-        }
+      final words = _currentVideo.title
+          .replaceAll(RegExp(r'[\|\-_\[\]\(\)\{\}\#\!\?\/\\]'), ' ')
+          .split(RegExp(r'\s+'))
+          .where((w) => w.length > 3)
+          .skip(2)
+          .take(3)
+          .join(' ');
+      final query = words.isNotEmpty ? words : '${_currentVideo.author} مقاطع مقترحة';
+      final moreResults = await _yt.search.search(query).timeout(const Duration(seconds: 8));
+      final newVideos = moreResults.whereType<yt.Video>().where((v) => !existingIds.contains(v.id.value)).toList();
+      if (mounted && newVideos.isNotEmpty) {
+        setState(() {
+          _relatedSearchPage = moreResults;
+          _relatedVideos.addAll(newVideos);
+        });
       }
     } catch (e) {
       debugPrint('Error loading more related: $e');
@@ -539,7 +606,9 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
             child: ListView.builder(
               controller: _relatedScrollController,
               physics: const BouncingScrollPhysics(),
-              itemCount: _relatedVideos.length + 2,
+              itemCount: _isLoadingRelated
+                  ? 2
+                  : (_relatedVideos.isEmpty ? 2 : _relatedVideos.length + 2),
               itemBuilder: (context, index) {
                 if (index == 0) {
                   return Padding(
@@ -597,11 +666,68 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                           ),
                         ),
                         const SizedBox(height: 25),
-                        Text(
-                          'فيديوهات ذات صلة',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        Row(
+                          children: [
+                            Icon(Icons.auto_awesome_rounded, size: 18, color: AppColors.cyan),
+                            const SizedBox(width: 8),
+                            Text(
+                              'فيديوهات ذات صلة',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                            if (!_isLoadingRelated && _relatedVideos.isNotEmpty) ...[
+                              const Spacer(),
+                              Text(
+                                '${_relatedVideos.length} مقطع',
+                                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                              ),
+                            ],
+                          ],
                         ),
                       ],
+                    ),
+                  );
+                }
+
+                if (_isLoadingRelated) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 36),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(color: AppColors.cyan, strokeWidth: 2.5),
+                          const SizedBox(height: 14),
+                          Text(
+                            'جاري جلب الفيديوهات ذات الصلة...',
+                            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                if (_relatedVideos.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.video_library_outlined, size: 40, color: AppColors.textMuted.withOpacity(0.5)),
+                          const SizedBox(height: 8),
+                          Text(
+                            'لم تتوفر مقاطع مشابهة حالياً',
+                            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: _fetchRelatedVideos,
+                            icon: Icon(Icons.refresh_rounded, size: 16, color: AppColors.cyan),
+                            label: Text('إعادة المحاولة', style: TextStyle(color: AppColors.cyan, fontSize: 13)),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 }

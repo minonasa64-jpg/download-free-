@@ -1538,6 +1538,151 @@ class BackendService {
       }
     }
 
+    final bool isYouTube = (targetVideoId != null && RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(targetVideoId)) ||
+        url.contains('googlevideo.com') ||
+        url.contains('youtube.com') ||
+        url.contains('youtu.be');
+
+    // =========================================================================
+    // القسم أ: محرك التنزيل الشامل فائق السرعة لكافة المنصات والمواقع الأخرى
+    // (TikTok, Instagram, Facebook, Twitter/X, Pinterest, Reddit, Vimeo, Dailymotion, Direct Media, Generic Web)
+    // =========================================================================
+    if (!isYouTube) {
+      debugPrint("بدء تنزيل وسائط من منصة خارجية عبر محرك التنزيل الشامل: $url");
+      final Map<String, String> headers = {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Encoding': 'identity',
+      };
+      if (url.contains('tiktok.com') || url.contains('tikwm.com')) {
+        headers['Referer'] = 'https://www.tiktok.com/';
+      } else if (url.contains('instagram.com') || url.contains('cdninstagram.com')) {
+        headers['Referer'] = 'https://www.instagram.com/';
+      } else if (url.contains('fbcdn.net') || url.contains('facebook.com')) {
+        headers['Referer'] = 'https://www.facebook.com/';
+      } else if (url.contains('twimg.com') || url.contains('twitter.com') || url.contains('x.com')) {
+        headers['Referer'] = 'https://twitter.com/';
+      } else if (url.contains('pinterest.com') || url.contains('pinimg.com')) {
+        headers['Referer'] = 'https://www.pinterest.com/';
+      } else {
+        final origin = Uri.tryParse(url)?.origin;
+        if (origin != null && origin.isNotEmpty) {
+          headers['Referer'] = origin;
+        }
+      }
+
+      final partFile = File("$savePath.part");
+      if (!await partFile.exists()) {
+        await partFile.create(recursive: true);
+      }
+
+      bool downloadedSuccessfully = false;
+
+      // محاولة 1: التنزيل المباشر المستقر عبر Dio مع تتبع التقدم وإعادة التوجيه التلقائي
+      try {
+        await _dio.download(
+          url,
+          partFile.path,
+          options: Options(
+            headers: headers,
+            followRedirects: true,
+            maxRedirects: 8,
+            receiveTimeout: const Duration(minutes: 30),
+            sendTimeout: const Duration(minutes: 5),
+            validateStatus: (s) => s != null && s < 400,
+          ),
+          onReceiveProgress: (received, total) {
+            onReceiveProgress(received, total > 0 ? total : -1);
+          },
+        );
+
+        if (await partFile.exists() && await partFile.length() > 0) {
+          downloadedSuccessfully = true;
+        }
+      } catch (dioErr) {
+        debugPrint("فشلت محاولة Dio لتنزيل الرابط الخارجي: $dioErr. الانتقال إلى تدفق HttpClient الآمن...");
+      }
+
+      // محاولة 2: تدفق البيانات عبر HttpClient بدقة وتوافقية عالية مع رؤوس المتصفح
+      if (!downloadedSuccessfully) {
+        HttpClient? client;
+        IOSink? sink;
+        try {
+          client = HttpClient();
+          client.connectionTimeout = const Duration(seconds: 30);
+          client.idleTimeout = const Duration(seconds: 40);
+          client.badCertificateCallback = (cert, host, port) => true;
+
+          final req = await client.getUrl(Uri.parse(url));
+          headers.forEach((k, v) => req.headers.set(k, v));
+          final res = await req.close();
+
+          if (res.statusCode < 200 || res.statusCode >= 400) {
+            throw Exception("HTTP status ${res.statusCode}");
+          }
+
+          final total = res.contentLength > 0 ? res.contentLength : -1;
+          sink = partFile.openWrite(mode: FileMode.write);
+          int received = 0;
+          int lastUpdate = 0;
+
+          await for (final chunk in res) {
+            sink.add(chunk);
+            received += chunk.length;
+            final now = DateTime.now().millisecondsSinceEpoch;
+            if (now - lastUpdate > 150) {
+              lastUpdate = now;
+              onReceiveProgress(received, total);
+            }
+          }
+
+          await sink.flush();
+          await sink.close();
+          sink = null;
+          client.close(force: true);
+          client = null;
+
+          if (await partFile.exists() && await partFile.length() > 0) {
+            downloadedSuccessfully = true;
+            onReceiveProgress(received, received);
+          }
+        } catch (httpErr) {
+          try { await sink?.flush(); } catch (_) {}
+          try { await sink?.close(); } catch (_) {}
+          sink = null;
+          client?.close(force: true);
+          debugPrint("خطأ في تدفق HttpClient للرابط الخارجي: $httpErr");
+          throw Exception("تعذر تنزيل ملف الوسائط من الرابط: $httpErr");
+        }
+      }
+
+      if (downloadedSuccessfully) {
+        final finalFile = File(savePath);
+        if (await finalFile.exists()) {
+          try { await finalFile.delete(); } catch (_) {}
+        }
+        try {
+          await partFile.rename(savePath);
+        } catch (_) {
+          await partFile.copy(savePath);
+          try { await partFile.delete(); } catch (_) {}
+        }
+        final finalLen = await File(savePath).length();
+        onReceiveProgress(finalLen, finalLen);
+        debugPrint("تم تنزيل الوسائط الخارجية بنجاح 100%: $savePath ($finalLen بايت)");
+        try {
+          final isAudio = savePath.toLowerCase().endsWith('.mp3') ||
+              savePath.toLowerCase().endsWith('.m4a') ||
+              savePath.toLowerCase().endsWith('.opus') ||
+              savePath.toLowerCase().endsWith('.wav');
+          DataUsageService().recordDownload(bytes: finalLen, isAudio: isAudio);
+        } catch (_) {}
+        return;
+      } else {
+        throw Exception("فشل تنزيل ملف الوسائط: الملف المستلم فارغ.");
+      }
+    }
+
     if (targetTag == null) {
       try {
         final uri = Uri.tryParse(url);
@@ -1738,10 +1883,11 @@ class BackendService {
 
           try {
             Uri requestUri = Uri.parse(currentStreamUrl);
+            final isGoogleVideo = currentStreamUrl.contains('googlevideo.com');
             final isAndroid = requestUri.queryParameters['c'] == 'ANDROID';
 
             // إذا لم يكن الدفق من عميل أندرويد (مثل iOS أو TV أو Web)، تتطلب خوادم googlevideo تمرير النطاق كمعلمة استعلام
-            if (!isAndroid) {
+            if (isGoogleVideo && !isAndroid) {
               final qp = Map<String, String>.from(requestUri.queryParameters);
               qp['range'] = '$downloadedBytes-$endByte';
               requestUri = requestUri.replace(queryParameters: qp);
@@ -1752,7 +1898,7 @@ class BackendService {
             client.idleTimeout = const Duration(seconds: 30);
 
             final req = await client.getUrl(requestUri);
-            if (isAndroid) {
+            if (isAndroid || !isGoogleVideo) {
               req.headers.set("Range", "bytes=$downloadedBytes-$endByte");
             }
             req.headers.set("Accept", "*/*");

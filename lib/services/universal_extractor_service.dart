@@ -72,6 +72,12 @@ class UniversalExtractorService {
         return await _extractTwitter(url);
       case 'pinterest':
         return await _extractPinterest(url);
+      case 'reddit':
+        return await _extractReddit(url);
+      case 'vimeo':
+        return await _extractVimeo(url);
+      case 'dailymotion':
+        return await _extractDailymotion(url);
       case 'direct':
         return await _extractDirectMedia(url);
       case 'web':
@@ -821,6 +827,129 @@ class UniversalExtractorService {
       'audio': audioFormats,
       'subtitles': [],
     };
+  }
+
+  // =========================================================================
+  // 6.5. استخراج مقاطع Reddit
+  // =========================================================================
+  Future<Map<String, dynamic>> _extractReddit(String url) async {
+    try {
+      String jsonUrl = url.split('?').first;
+      if (!jsonUrl.endsWith('.json')) {
+        jsonUrl = '${jsonUrl.replaceAll(RegExp(r'/+$'), '')}.json';
+      }
+      final res = await _dio.get(
+        jsonUrl,
+        options: Options(
+          headers: {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'},
+        ),
+      );
+
+      if (res.data is List && (res.data as List).isNotEmpty) {
+        final post = res.data[0]['data']['children'][0]['data'];
+        final title = (post['title'] ?? 'فيديو من Reddit').toString();
+        final author = (post['author'] ?? 'Reddit').toString();
+        final thumbnail = (post['thumbnail'] ?? '').toString();
+
+        String? videoUrl;
+        if (post['secure_media'] != null && post['secure_media']['reddit_video'] != null) {
+          videoUrl = post['secure_media']['reddit_video']['fallback_url']?.toString();
+        } else if (post['media'] != null && post['media']['reddit_video'] != null) {
+          videoUrl = post['media']['reddit_video']['fallback_url']?.toString();
+        }
+
+        if (videoUrl != null && videoUrl.isNotEmpty) {
+          return _buildSimpleMediaResult(
+            id: 'reddit_${DateTime.now().millisecondsSinceEpoch}',
+            title: title,
+            thumbnail: thumbnail.startsWith('http') ? thumbnail : '',
+            videoUrl: videoUrl,
+            platform: 'reddit',
+            author: author,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('خطأ في استخراج Reddit: $e');
+    }
+    return await _extractGenericWebOrFallbacks(url, forcedPlatform: 'reddit');
+  }
+
+  // =========================================================================
+  // 6.6. استخراج مقاطع Vimeo
+  // =========================================================================
+  Future<Map<String, dynamic>> _extractVimeo(String url) async {
+    try {
+      final idMatch = RegExp(r'vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/[^\/]*\/videos\/|album\/(?:\d+\/)?video\/|video\/|)(\d+)').firstMatch(url);
+      if (idMatch != null) {
+        final videoId = idMatch.group(1)!;
+        final oembed = await _dio.get('https://vimeo.com/api/oembed.json?url=$url');
+        final title = (oembed.data['title'] ?? 'فيديو Vimeo').toString();
+        final author = (oembed.data['author_name'] ?? 'Vimeo').toString();
+        final thumbnail = (oembed.data['thumbnail_url'] ?? '').toString();
+
+        final configRes = await _dio.get('https://player.vimeo.com/video/$videoId/config');
+        if (configRes.data is Map) {
+          final files = configRes.data['request']?['files']?['progressive'] as List? ?? [];
+          if (files.isNotEmpty) {
+            files.sort((a, b) => ((b['width'] ?? 0) as num).compareTo((a['width'] ?? 0) as num));
+            final best = files.first['url']?.toString() ?? '';
+            final sd = files.last['url']?.toString() ?? best;
+            if (best.isNotEmpty) {
+              return _buildSimpleMediaResult(
+                id: videoId,
+                title: title,
+                thumbnail: thumbnail,
+                videoUrl: best,
+                sdVideoUrl: sd,
+                platform: 'vimeo',
+                author: author,
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('خطأ في استخراج Vimeo: $e');
+    }
+    return await _extractGenericWebOrFallbacks(url, forcedPlatform: 'vimeo');
+  }
+
+  // =========================================================================
+  // 6.7. استخراج مقاطع Dailymotion
+  // =========================================================================
+  Future<Map<String, dynamic>> _extractDailymotion(String url) async {
+    try {
+      final idMatch = RegExp(r'(?:dailymotion\.com\/(?:video|hub)\/|dai\.ly\/)([a-zA-Z0-9]+)').firstMatch(url);
+      if (idMatch != null) {
+        final videoId = idMatch.group(1)!;
+        final res = await _dio.get('https://api.dailymotion.com/video/$videoId?fields=title,thumbnail_720_url,owner.screenname,stream_h264_url,stream_h264_hd_url,stream_h264_hd1080_url');
+        if (res.data is Map) {
+          final title = (res.data['title'] ?? 'فيديو Dailymotion').toString();
+          final author = (res.data['owner.screenname'] ?? 'Dailymotion').toString();
+          final thumbnail = (res.data['thumbnail_720_url'] ?? '').toString();
+          final hd1080 = res.data['stream_h264_hd1080_url']?.toString();
+          final hd = res.data['stream_h264_hd_url']?.toString();
+          final stream = res.data['stream_h264_url']?.toString();
+          final best = (hd1080 != null && hd1080.isNotEmpty)
+              ? hd1080
+              : ((hd != null && hd.isNotEmpty) ? hd : (stream ?? ''));
+          if (best.isNotEmpty) {
+            return _buildSimpleMediaResult(
+              id: videoId,
+              title: title,
+              thumbnail: thumbnail,
+              videoUrl: best,
+              platform: 'dailymotion',
+              author: author,
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('خطأ في استخراج Dailymotion: $e');
+    }
+    return await _extractGenericWebOrFallbacks(url, forcedPlatform: 'dailymotion');
   }
 
   // =========================================================================

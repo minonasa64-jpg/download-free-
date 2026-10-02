@@ -62,12 +62,18 @@ class _LinksTabState extends State<LinksTab> {
   }
 
   Future<void> _analyzeLink() async {
-    final url = _urlController.text.trim();
+    String url = _urlController.text.trim();
     if (url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('يرجى إدخال الرابط أولاً')),
       );
       return;
+    }
+
+    // استخراج الرابط النقي حتى لو كان النص المنسوخ يحتوي على كلمات أو وسوم أخرى
+    final urlMatch = RegExp(r'https?:\/\/[^\s]+').firstMatch(url);
+    if (urlMatch != null) {
+      url = urlMatch.group(0)!;
     }
 
     FocusScope.of(context).unfocus();
@@ -242,7 +248,7 @@ class _LinksTabState extends State<LinksTab> {
                 ext: _selectedFormat!['ext'],
                 needsMerge: _selectedFormat!['needs_merge'],
                 highestAudioUrl: audioUrl,
-                videoId: _selectedFormat!['video_id'] ?? _mediaData?['id'],
+                videoId: _selectedFormat!['video_id'],
                 videoTag: _selectedFormat!['tag'],
                 highestAudioTag: _mediaData?['highestAudioTag'],
               ),
@@ -834,7 +840,7 @@ class _LinksTabState extends State<LinksTab> {
                             ext: _selectedFormat!['ext'],
                             needsMerge: _selectedFormat!['needs_merge'] ?? false,
                             highestAudioUrl: highestAudioUrl,
-                            videoId: _selectedFormat!['video_id'] ?? _mediaData?['id'],
+                            videoId: _selectedFormat!['video_id'],
                             videoTag: _selectedFormat!['tag'],
                             highestAudioTag: _mediaData?['highestAudioTag'],
                           );
