@@ -34,7 +34,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   final ScrollController _relatedScrollController = ScrollController();
   bool _isLoadingExtraction = false;
   List<yt.Video> _relatedVideos = [];
-  yt.VideoSearchList? _relatedSearchPage;
+  dynamic _relatedPage;
   bool _isLoadingRelated = true;
   bool _isLoadingMoreRelated = false;
 
@@ -128,6 +128,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     try {
       final related = await _yt.videos.getRelatedVideos(_currentVideo).timeout(const Duration(seconds: 7));
       if (related != null && related.isNotEmpty) {
+        _relatedPage = related;
         for (final v in related) {
           if (!existingIds.contains(v.id.value)) {
             existingIds.add(v.id.value);
@@ -153,7 +154,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
             .join(' ');
         if (words.isNotEmpty) {
           final results = await _yt.search.search(words).timeout(const Duration(seconds: 7));
-          _relatedSearchPage = results;
+          _relatedPage ??= results;
           for (final v in results.whereType<yt.Video>()) {
             if (!existingIds.contains(v.id.value)) {
               existingIds.add(v.id.value);
@@ -171,7 +172,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       try {
         final cleanAuthor = _currentVideo.author.trim();
         final results = await _yt.search.search(cleanAuthor).timeout(const Duration(seconds: 7));
-        _relatedSearchPage ??= results;
+        _relatedPage ??= results;
         for (final v in results.whereType<yt.Video>()) {
           if (!existingIds.contains(v.id.value)) {
             existingIds.add(v.id.value);
@@ -187,7 +188,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     if (gatheredVideos.isEmpty) {
       try {
         final results = await _yt.search.search('فيديوهات مقترحة شائعة').timeout(const Duration(seconds: 7));
-        _relatedSearchPage ??= results;
+        _relatedPage ??= results;
         for (final v in results.whereType<yt.Video>()) {
           if (!existingIds.contains(v.id.value)) {
             existingIds.add(v.id.value);
@@ -212,18 +213,27 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       final existingIds = _relatedVideos.map((v) => v.id.value).toSet();
       existingIds.add(_currentVideo.id.value);
 
-      if (_relatedSearchPage != null) {
-        final next = await _relatedSearchPage!.nextPage().timeout(const Duration(seconds: 8));
-        if (next != null) {
-          final newVideos = next.whereType<yt.Video>().where((v) => !existingIds.contains(v.id.value)).toList();
-          if (mounted && newVideos.isNotEmpty) {
-            setState(() {
-              _relatedSearchPage = next;
-              _relatedVideos.addAll(newVideos);
-            });
-            return;
+      if (_relatedPage != null) {
+        try {
+          final next = await _relatedPage.nextPage().timeout(const Duration(seconds: 8));
+          if (next != null) {
+            _relatedPage = next;
+            final List<yt.Video> newVideos = [];
+            if (next is Iterable) {
+              for (final item in next) {
+                if (item is yt.Video && !existingIds.contains(item.id.value)) {
+                  newVideos.add(item);
+                }
+              }
+            }
+            if (mounted && newVideos.isNotEmpty) {
+              setState(() {
+                _relatedVideos.addAll(newVideos);
+              });
+              return;
+            }
           }
-        }
+        } catch (_) {}
       }
 
       // إذا انتهت صفحات البحث السابقة، نبحث عن مواضيع قريبة من عنوان الفيديو

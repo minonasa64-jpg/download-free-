@@ -37,13 +37,13 @@ function apiPlugin(): Plugin {
         res.end(JSON.stringify({
           success: true,
           latestRun: {
-            id: 36141335243,
-            status: 'in_progress',
-            conclusion: null,
-            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36141335243',
+            id: 36990291924,
+            status: 'completed',
+            conclusion: 'success',
+            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36990291924',
             head_commit: {
-              id: '5097d2c',
-              message: 'fix(build): resolve Dart compiler errors in AudioContext, File casting, and regex raw string'
+              id: '264658f',
+              message: 'fix(core): complete app audit, fix related videos and universal link downloader'
             }
           },
           runs: []
