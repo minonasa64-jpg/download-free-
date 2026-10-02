@@ -37,6 +37,17 @@ class _YoutubeTabState extends State<YoutubeTab> {
   bool _showSuggestions = false;
   SearchSortFilter _currentFilter = SearchSortFilter.relevance;
 
+  int _fallbackQueryIndex = 0;
+  static const List<String> _fallbackQueries = [
+    'documentary 4k wildlife nature technology',
+    'طبيعة خلابة استرخاء علوم وتكنولوجيا 4k',
+    'space astronomy universe science discovery',
+    'فيديوهات علمية وثائقية مذهلة 4k',
+    'ocean marine life deep sea documentary',
+    'ابتكارات واختراعات تكنولوجية حديثة',
+    'drone scenic travel landscape cinematic 4k',
+  ];
+
   static const String _prefRecentSearchesKey = 'yt_recent_searches_list';
 
   @override
@@ -250,20 +261,37 @@ class _YoutubeTabState extends State<YoutubeTab> {
   }
 
   Future<void> _loadMore() async {
-    if (_isLoadingMore || _isSearching || _currentSearchPage == null) return;
+    if (_isLoadingMore || _isSearching) return;
     
     setState(() => _isLoadingMore = true);
     
     try {
-      final nextPage = await _currentSearchPage!.nextPage().timeout(const Duration(seconds: 10));
-      if (nextPage != null) {
-        final newVideos = nextPage.whereType<yt.Video>().where(_isSafeVideo).toList();
-        if (mounted) {
-          setState(() {
-            _currentSearchPage = nextPage;
-            _searchResults.addAll(_applyFilterToList(newVideos));
-          });
+      if (_currentSearchPage != null) {
+        final nextPage = await _currentSearchPage!.nextPage().timeout(const Duration(seconds: 10));
+        if (nextPage != null) {
+          final existingIds = _searchResults.map((v) => v.id.value).toSet();
+          final newVideos = nextPage.whereType<yt.Video>().where((v) => _isSafeVideo(v) && !existingIds.contains(v.id.value)).toList();
+          if (mounted && newVideos.isNotEmpty) {
+            setState(() {
+              _currentSearchPage = nextPage;
+              _searchResults.addAll(_applyFilterToList(newVideos));
+            });
+            return;
+          }
         }
+      }
+
+      // إذا انتهت صفحات البحث أو لم تتوفر صفحة تالية، نواصل التدفق اللانهائي باستعلام متجدد
+      final nextQuery = _fallbackQueries[_fallbackQueryIndex % _fallbackQueries.length];
+      _fallbackQueryIndex++;
+      final moreResults = await _yt.search.search(nextQuery).timeout(const Duration(seconds: 10));
+      final existingIds = _searchResults.map((v) => v.id.value).toSet();
+      final extraVideos = moreResults.whereType<yt.Video>().where((v) => _isSafeVideo(v) && !existingIds.contains(v.id.value)).toList();
+      if (mounted && extraVideos.isNotEmpty) {
+        setState(() {
+          _currentSearchPage = moreResults;
+          _searchResults.addAll(_applyFilterToList(extraVideos));
+        });
       }
     } catch (e) {
       debugPrint('Error loading more: $e');

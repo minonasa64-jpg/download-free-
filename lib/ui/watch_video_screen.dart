@@ -144,21 +144,42 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
 
   Future<void> _loadMoreRelatedVideos() async {
     if (_isLoadingMoreRelated) return;
-    if (_relatedSearchPage?.nextPage != null) {
-      setState(() => _isLoadingMoreRelated = true);
-      try {
-        final next = await _relatedSearchPage!.nextPage();
+    setState(() => _isLoadingMoreRelated = true);
+    try {
+      if (_relatedSearchPage != null) {
+        final next = await _relatedSearchPage!.nextPage().timeout(const Duration(seconds: 10));
         if (next != null) {
+          final existingIds = _relatedVideos.map((v) => v.id.value).toSet();
+          existingIds.add(_currentVideo.id.value);
+          final newVideos = next.whereType<yt.Video>().where((v) => !existingIds.contains(v.id.value)).toList();
+          if (mounted && newVideos.isNotEmpty) {
+            setState(() {
+              _relatedSearchPage = next;
+              _relatedVideos.addAll(newVideos);
+            });
+            return;
+          }
+        }
+      }
+
+      // إذا انتهت صفحات البحث السابقة، نبحث عن مواضيع قريبة من عنوان الفيديو
+      final words = _currentVideo.title.split(RegExp(r'\s+')).where((w) => w.length > 3).take(3).join(' ');
+      if (words.isNotEmpty) {
+        final moreResults = await _yt.search.search(words).timeout(const Duration(seconds: 10));
+        final existingIds = _relatedVideos.map((v) => v.id.value).toSet();
+        existingIds.add(_currentVideo.id.value);
+        final newVideos = moreResults.whereType<yt.Video>().where((v) => !existingIds.contains(v.id.value)).toList();
+        if (mounted && newVideos.isNotEmpty) {
           setState(() {
-            _relatedSearchPage = next;
-            _relatedVideos.addAll(next.whereType<yt.Video>());
+            _relatedSearchPage = moreResults;
+            _relatedVideos.addAll(newVideos);
           });
         }
-      } catch (e) {
-        debugPrint('Error loading more related: $e');
-      } finally {
-        if (mounted) setState(() => _isLoadingMoreRelated = false);
       }
+    } catch (e) {
+      debugPrint('Error loading more related: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingMoreRelated = false);
     }
   }
 

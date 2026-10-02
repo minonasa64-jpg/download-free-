@@ -10,17 +10,17 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.background,
       primaryColor: AppColors.cyan,
       fontFamily: 'Cairo',
-      colorScheme: const ColorScheme.dark(
+      colorScheme: ColorScheme.dark(
         primary: AppColors.cyan,
         secondary: AppColors.magenta,
         background: AppColors.background,
         surface: AppColors.surface,
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        systemOverlayStyle: SystemUiOverlayStyle(
+        systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
         ),
@@ -36,9 +36,9 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       ),
     );
   }
@@ -50,10 +50,10 @@ class AppTheme {
       scaffoldBackgroundColor: const Color(0xFFF5F6FA),
       primaryColor: AppColors.cyan,
       fontFamily: 'Cairo',
-      colorScheme: const ColorScheme.light(
+      colorScheme: ColorScheme.light(
         primary: AppColors.cyan,
         secondary: AppColors.magenta,
-        background: Color(0xFFF5F6FA),
+        background: const Color(0xFFF5F6FA),
         surface: Colors.white,
       ),
       appBarTheme: const AppBarTheme(

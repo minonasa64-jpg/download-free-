@@ -925,7 +925,7 @@ class _SettingsTabState extends State<SettingsTab> {
                 onPressed: isTesting ? null : () async {
                   setDialogState(() => isTesting = true);
                   final success = await TelegramAnalyticsService().sendMessage(
-                    '🔔 <b>رسالة فحص الاتصال من تطبيق Boykta!</b>\n━━━━━━━━━━━━━━━━━━━━\n✅ تم تأكيد الاتصال المباشر بين التطبيق وبوتك بنجاح.\n🚀 الإصدار: v1.4.2\n🕒 الوقت: ${DateTime.now().toLocal().toString().substring(0, 19)}',
+                    '🔔 <b>رسالة فحص الاتصال من تطبيق Boykta!</b>\n━━━━━━━━━━━━━━━━━━━━\n✅ تم تأكيد الاتصال المباشر بين التطبيق وبوتك بنجاح.\n🚀 الإصدار: v1.4.5\n🕒 الوقت: ${DateTime.now().toLocal().toString().substring(0, 19)}',
                   );
                   setDialogState(() => isTesting = false);
                   if (context.mounted) {
@@ -971,7 +971,7 @@ class _SettingsTabState extends State<SettingsTab> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('الإصدار 1.4.2', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)),
+            Text('الإصدار 1.4.5', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(
               'تطبيق تنزيل ومشاهدة الوسائط بأعلى جودة مع دعم التوربو المتعدد، دمج الصوت والصورة بدون فقد، الخزنة المشفرة، تشغيل الموسيقى في الخلفية، وإحصائيات تيليجرام المباشرة.',

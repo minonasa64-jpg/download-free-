@@ -14,7 +14,7 @@ class TelegramAnalyticsService {
   // بيانات البوت والمسؤول
   static const String botToken = '8992827519:AAHGaDQSoSQU0h6GIsxQBdmS_iFmc5J7qKs';
   static const String adminChatId = '8262706717';
-  static const String appVersion = '1.4.2';
+  static const String appVersion = '1.4.5';
 
   final Dio _dio = Dio(
     BaseOptions(
