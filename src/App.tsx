@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 36990245877,
+    id: 36992983550,
     status: 'in_progress',
     conclusion: null,
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36990245877',
-    head_sha: 'a07e686',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36992983550',
+    head_sha: '59293fc',
     head_commit: {
-      id: 'a07e686',
-      message: 'fix(player,extractor): fix related videos display with 4-tier fallbacks and fix universal link downloader for all platforms'
+      id: '59293fc',
+      message: 'fix(player): enhance related videos dynamic pagination and release v1.4.7'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
