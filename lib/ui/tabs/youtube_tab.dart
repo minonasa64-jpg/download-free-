@@ -443,96 +443,19 @@ class _YoutubeTabState extends State<YoutubeTab> {
   }
 
   Widget _buildQuickControls() {
+    if (_searchResults.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          // شارة تصفية النتائج
-          PopupMenuButton<SearchSortFilter>(
-            color: AppColors.surface,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: AppColors.cyan.withOpacity(0.3))),
-            initialValue: _currentFilter,
-            onSelected: (filter) {
-              setState(() {
-                _currentFilter = filter;
-                _searchResults = _applyFilterToList(_searchResults);
-              });
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: SearchSortFilter.relevance,
-                child: Row(
-                  children: [
-                    Icon(Icons.auto_awesome, color: AppColors.cyan, size: 18),
-                    SizedBox(width: 8),
-                    Text('الأكثر صلة (افتراضي)', style: TextStyle(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: SearchSortFilter.uploadDate,
-                child: Row(
-                  children: [
-                    Icon(Icons.new_releases_outlined, color: AppColors.cyan, size: 18),
-                    SizedBox(width: 8),
-                    Text('الأحدث تاريخاً (Newest)', style: TextStyle(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: SearchSortFilter.viewCount,
-                child: Row(
-                  children: [
-                    Icon(Icons.trending_up, color: AppColors.cyan, size: 18),
-                    SizedBox(width: 8),
-                    Text('الأعلى مشاهدة (Most Viewed)', style: TextStyle(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
-              ),
-            ],
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceLight.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.sort_rounded, color: AppColors.cyan, size: 16),
-                  const SizedBox(width: 5),
-                  Text(
-                    _getFilterLabel(),
-                    style: TextStyle(color: AppColors.textPrimary, fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                  Icon(Icons.arrow_drop_down, color: AppColors.textMuted, size: 16),
-                ],
-              ),
-            ),
+          Text(
+            '${_searchResults.length} فيديو متوفر',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 11),
           ),
-          const Spacer(),
-          if (_searchResults.isNotEmpty)
-            Text(
-              '${_searchResults.length} فيديو متوفر',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 11),
-            ),
         ],
       ),
     );
-  }
-
-  String _getFilterLabel() {
-    switch (_currentFilter) {
-      case SearchSortFilter.viewCount:
-        return 'الأعلى مشاهدة';
-      case SearchSortFilter.uploadDate:
-        return 'الأحدث رفعاً';
-      case SearchSortFilter.rating:
-      case SearchSortFilter.relevance:
-      default:
-        return 'الأكثر صلة';
-    }
   }
 
   Widget _buildHeader() {

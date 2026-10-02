@@ -239,20 +239,23 @@ class _LinksTabState extends State<LinksTab> {
 
         Future.delayed(Duration(minutes: minutes), () {
           if (mounted) {
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => DownloadProgressDialog(
-                selectedUrl: _selectedFormat!['url'],
-                title: titleVal,
-                ext: _selectedFormat!['ext'],
-                needsMerge: _selectedFormat!['needs_merge'],
-                highestAudioUrl: audioUrl,
-                videoId: _selectedFormat!['video_id'],
-                videoTag: _selectedFormat!['tag'],
-                highestAudioTag: _mediaData?['highestAudioTag'],
-              ),
-            );
+                final bool isYt = (_selectedFormat!['video_id'] != null && RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(_selectedFormat!['video_id'].toString()));
+                final bool needsMerge = isYt && (_selectedFormat!['needs_merge'] == true);
+
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => DownloadProgressDialog(
+                    selectedUrl: _selectedFormat!['url'],
+                    title: titleVal,
+                    ext: _selectedFormat!['ext'] ?? 'mp4',
+                    needsMerge: needsMerge,
+                    highestAudioUrl: needsMerge ? audioUrl : '',
+                    videoId: _selectedFormat!['video_id'],
+                    videoTag: _selectedFormat!['tag'],
+                    highestAudioTag: _mediaData?['highestAudioTag'],
+                  ),
+                );
           }
         });
       },
@@ -834,12 +837,16 @@ class _LinksTabState extends State<LinksTab> {
                             AdService().showInterstitialAd();
                           } catch (_) {}
 
+                          final bool isYt = _mediaData?['platform'] == 'youtube' ||
+                              (_selectedFormat!['video_id'] != null && RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(_selectedFormat!['video_id'].toString()));
+                          final bool needsMerge = isYt && (_selectedFormat!['needs_merge'] == true);
+
                           _backend.startDownloadInBackground(
                             selectedUrl: _selectedFormat!['url'],
                             title: title,
-                            ext: _selectedFormat!['ext'],
-                            needsMerge: _selectedFormat!['needs_merge'] ?? false,
-                            highestAudioUrl: highestAudioUrl,
+                            ext: _selectedFormat!['ext'] ?? 'mp4',
+                            needsMerge: needsMerge,
+                            highestAudioUrl: needsMerge ? highestAudioUrl : '',
                             videoId: _selectedFormat!['video_id'],
                             videoTag: _selectedFormat!['tag'],
                             highestAudioTag: _mediaData?['highestAudioTag'],
