@@ -249,7 +249,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
       final newVideos = moreResults.whereType<yt.Video>().where((v) => !existingIds.contains(v.id.value)).toList();
       if (mounted && newVideos.isNotEmpty) {
         setState(() {
-          _relatedSearchPage = moreResults;
+          _relatedPage = moreResults;
           _relatedVideos.addAll(newVideos);
         });
       }
