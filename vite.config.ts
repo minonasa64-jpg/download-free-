@@ -13,12 +13,15 @@ function apiPlugin(): Plugin {
 
         const token = process.env.GITHUB_TOKEN || '';
         try {
+          const headers: Record<string, string> = {
+            'User-Agent': 'Boykta-Build-Dashboard',
+            'Accept': 'application/vnd.github.v3+json'
+          };
+          if (token) {
+            headers['Authorization'] = `token ${token}`;
+          }
           const response = await fetch('https://api.github.com/repos/minonasa64-jpg/download-free-/actions/runs?per_page=5', {
-            headers: {
-              'Authorization': `token ${token}`,
-              'User-Agent': 'Boykta-Build-Dashboard',
-              'Accept': 'application/vnd.github.v3+json'
-            }
+            headers
           });
           if (response.ok) {
             const data = (await response.json()) as { workflow_runs?: any[] };
@@ -37,13 +40,13 @@ function apiPlugin(): Plugin {
         res.end(JSON.stringify({
           success: true,
           latestRun: {
-            id: 36990291924,
+            id: 36996573082,
             status: 'completed',
             conclusion: 'success',
-            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36990291924',
+            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36996573082',
             head_commit: {
-              id: '264658f',
-              message: 'fix(core): complete app audit, fix related videos and universal link downloader'
+              id: 'b3980d7',
+              message: 'fix(player): resolve undefined setter _relatedSearchPage in watch_video_screen'
             }
           },
           runs: []
