@@ -40,13 +40,13 @@ function apiPlugin(): Plugin {
         res.end(JSON.stringify({
           success: true,
           latestRun: {
-            id: 36996573082,
+            id: 36999415543,
             status: 'completed',
             conclusion: 'success',
-            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36996573082',
+            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36999415543',
             head_commit: {
-              id: 'b3980d7',
-              message: 'fix(player): resolve undefined setter _relatedSearchPage in watch_video_screen'
+              id: '1b73df6',
+              message: 'fix(links,youtube): fix link downloading for all platforms, remove most-related button and bump to v1.4.8'
             }
           },
           runs: []
