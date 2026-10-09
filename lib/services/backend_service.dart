@@ -819,6 +819,7 @@ class BackendService {
 
       final mediaResult = {
         'id': video.id.value,
+        'platform': 'youtube',
         'title': video.title,
         'thumbnail': video.thumbnails.highResUrl,
         'highestAudioUrl': highestAudioUrl,
@@ -1249,7 +1250,18 @@ class BackendService {
                 tempMergedPath,
               ],
             },
-            // محاولة 3: ربط متساهل مع وسم VP9 داخل حاوية MP4 وخيار strict -2
+            // محاولة 3: حاوية Matroska الفائقة (MKV) التي تقبل أي كودك فيديو مع أي كودك صوت بدون مشاكل فائق السرعة
+            {
+              'path': tempMergedMkv,
+              'args': [
+                '-y',
+                '-i', tempVideoPath,
+                '-i', tempAudioPath,
+                '-c', 'copy',
+                tempMergedMkv,
+              ],
+            },
+            // محاولة 4: ربط متساهل مع وسم VP9 داخل حاوية MP4 وخيار strict -2
             {
               'path': tempMergedPath,
               'args': [
@@ -1267,7 +1279,7 @@ class BackendService {
                 tempMergedPath,
               ],
             },
-            // محاولة 4: تحويل سريع للغاية ultrafast إلى H.264 لضمان توافق الصوت والصورة 100% لكافة مشغلات أندرويد
+            // محاولة 5: ترميز فيديو سريع عبر كودك mpeg4 المدمج الأصلي
             {
               'path': tempMergedPath,
               'args': [
@@ -1276,24 +1288,12 @@ class BackendService {
                 '-i', tempAudioPath,
                 '-map', '0:v:0',
                 '-map', '1:a:0',
-                '-c:v', 'libx264',
-                '-preset', 'ultrafast',
-                '-crf', '22',
+                '-c:v', 'mpeg4',
+                '-q:v', '4',
                 '-c:a', 'aac',
                 '-b:a', '192k',
                 '-movflags', '+faststart',
                 tempMergedPath,
-              ],
-            },
-            // محاولة 5: حاوية Matroska الفائقة (MKV) التي تقبل أي كودك فيديو مع أي كودك صوت بدون مشاكل
-            {
-              'path': tempMergedMkv,
-              'args': [
-                '-y',
-                '-i', tempVideoPath,
-                '-i', tempAudioPath,
-                '-c', 'copy',
-                tempMergedMkv,
               ],
             },
           ];
@@ -1914,10 +1914,11 @@ class BackendService {
             client.idleTimeout = const Duration(seconds: 30);
             client.badCertificateCallback = (cert, host, port) => true;
 
-            // هام: نمرر الرابط الموقّع كما هو بدون إضافة range لمعلمات الاستعلام لتفادي خطأ 403
+            // هام: نمرر الرابط الموقّع كما هو بدون إضافة range لمعلمات الاستعلام لتفادي خطأ 403 مع رؤوس مطابقة لمحرك YoutubeExplode
             final req = await client.getUrl(Uri.parse(currentStreamUrl));
             req.headers.set("Range", "bytes=$downloadedBytes-$endByte");
-            req.headers.set("User-Agent", "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36");
+            req.headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.18 Safari/537.36");
+            req.headers.set("Cookie", "CONSENT=YES+cb");
             req.headers.set("Referer", "https://www.youtube.com/");
             req.headers.set("Accept", "*/*");
             req.headers.set("Accept-Encoding", "identity");
@@ -1968,7 +1969,13 @@ class BackendService {
               throw Exception("HTTP status ${res.statusCode}");
             }
 
-            chunkSink = partFile.openWrite(mode: FileMode.append);
+            final bool isFullContent = (res.statusCode == 200);
+            if (isFullContent && downloadedBytes > 0) {
+              chunkSink = partFile.openWrite(mode: FileMode.write);
+              downloadedBytes = 0;
+            } else {
+              chunkSink = partFile.openWrite(mode: FileMode.append);
+            }
             int bytesInChunk = 0;
 
             await for (final data in res) {
@@ -2002,11 +2009,16 @@ class BackendService {
             downloadedBytes = await partFile.length();
 
             if (chunkAttempt >= 6) {
-              debugPrint("تخطي إعادة المحاولة والانتقال للمرحلة التالية...");
+              debugPrint("تخطي إعادة المحاولة للمقطع الحالي...");
               break;
             }
             await Future.delayed(Duration(milliseconds: 300 * chunkAttempt));
           }
+        }
+
+        if (!chunkSuccess) {
+          debugPrint("تعذر استكمال المقطع المجزأ الحالي، الخروج لتفادي الحلقة التكرارية اللانهائية");
+          break;
         }
       }
     } else if (downloadedBytes == 0) {

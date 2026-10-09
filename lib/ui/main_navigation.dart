@@ -101,6 +101,9 @@ class _MainNavigationState extends State<MainNavigation> {
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
+        if (_currentIndex != index) {
+          AdService().refreshBanner();
+        }
         setState(() => _currentIndex = index);
       },
       behavior: HitTestBehavior.opaque,

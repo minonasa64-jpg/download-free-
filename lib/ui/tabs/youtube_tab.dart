@@ -137,8 +137,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
   }
 
   Future<void> _loadInitialFeed({String? customQuery}) async {
-    final query = customQuery ?? 'relaxing 4k nature landscape science documentary';
-    
     // If we have cached items and it is default feed, show them immediately
     if (customQuery == null && _feedMemoryCache.isNotEmpty) {
       setState(() {
@@ -152,22 +150,43 @@ class _YoutubeTabState extends State<YoutubeTab> {
     setState(() {
       _isSearching = true;
     });
-    try {
-      final results = await _yt.search.search(query).timeout(const Duration(seconds: 12));
-      final list = results.whereType<yt.Video>().where(_isSafeVideo).toList();
-      if (mounted) {
-        setState(() {
+
+    final queriesToTry = [
+      customQuery ?? 'طبيعة خلابة علوم وتكنولوجيا 4k',
+      'relaxing 4k nature documentary',
+      'space universe science discovery 4k',
+      'drone scenic travel 4k',
+      'فيديوهات علمية وثائقية مذهلة',
+      'documentary wildlife nature technology',
+    ];
+
+    List<yt.Video> list = [];
+    yt.VideoSearchList? results;
+
+    for (final q in queriesToTry) {
+      try {
+        results = await _yt.search.search(q).timeout(const Duration(seconds: 8));
+        list = results.whereType<yt.Video>().where(_isSafeVideo).toList();
+        if (list.isNotEmpty) break;
+      } catch (e) {
+        debugPrint('خطأ أثناء جلب تغذية يوتيوب للاستعلام $q: $e');
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        if (list.isNotEmpty) {
           _currentSearchPage = results;
           _searchResults = _applyFilterToList(list);
           _hasSearchedOnce = true;
-          _isSearching = false;
           if (customQuery == null) {
             _feedMemoryCache = list;
           }
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isSearching = false);
+        } else {
+          _hasSearchedOnce = true;
+        }
+        _isSearching = false;
+      });
     }
   }
 
@@ -267,31 +286,38 @@ class _YoutubeTabState extends State<YoutubeTab> {
     
     try {
       if (_currentSearchPage != null) {
-        final nextPage = await _currentSearchPage!.nextPage().timeout(const Duration(seconds: 10));
-        if (nextPage != null) {
-          final existingIds = _searchResults.map((v) => v.id.value).toSet();
-          final newVideos = nextPage.whereType<yt.Video>().where((v) => _isSafeVideo(v) && !existingIds.contains(v.id.value)).toList();
-          if (mounted && newVideos.isNotEmpty) {
-            setState(() {
-              _currentSearchPage = nextPage;
-              _searchResults.addAll(_applyFilterToList(newVideos));
-            });
-            return;
+        try {
+          final nextPage = await _currentSearchPage!.nextPage().timeout(const Duration(seconds: 8));
+          if (nextPage != null) {
+            final existingIds = _searchResults.map((v) => v.id.value).toSet();
+            final newVideos = nextPage.whereType<yt.Video>().where((v) => _isSafeVideo(v) && !existingIds.contains(v.id.value)).toList();
+            if (mounted && newVideos.isNotEmpty) {
+              setState(() {
+                _currentSearchPage = nextPage;
+                _searchResults.addAll(_applyFilterToList(newVideos));
+              });
+              return;
+            }
           }
-        }
+        } catch (_) {}
       }
 
-      // إذا انتهت صفحات البحث أو لم تتوفر صفحة تالية، نواصل التدفق اللانهائي باستعلام متجدد
-      final nextQuery = _fallbackQueries[_fallbackQueryIndex % _fallbackQueries.length];
-      _fallbackQueryIndex++;
-      final moreResults = await _yt.search.search(nextQuery).timeout(const Duration(seconds: 10));
-      final existingIds = _searchResults.map((v) => v.id.value).toSet();
-      final extraVideos = moreResults.whereType<yt.Video>().where((v) => _isSafeVideo(v) && !existingIds.contains(v.id.value)).toList();
-      if (mounted && extraVideos.isNotEmpty) {
-        setState(() {
-          _currentSearchPage = moreResults;
-          _searchResults.addAll(_applyFilterToList(extraVideos));
-        });
+      // إذا انتهت صفحات البحث، نواصل التدفق اللانهائي باستعلامات متجددة دوماً
+      for (int i = 0; i < 3; i++) {
+        final nextQuery = _fallbackQueries[_fallbackQueryIndex % _fallbackQueries.length];
+        _fallbackQueryIndex++;
+        try {
+          final moreResults = await _yt.search.search(nextQuery).timeout(const Duration(seconds: 8));
+          final existingIds = _searchResults.map((v) => v.id.value).toSet();
+          final extraVideos = moreResults.whereType<yt.Video>().where((v) => _isSafeVideo(v) && !existingIds.contains(v.id.value)).toList();
+          if (mounted && extraVideos.isNotEmpty) {
+            setState(() {
+              _currentSearchPage = moreResults;
+              _searchResults.addAll(_applyFilterToList(extraVideos));
+            });
+            break;
+          }
+        } catch (_) {}
       }
     } catch (e) {
       debugPrint('Error loading more: $e');
@@ -326,7 +352,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
             Column(
               children: [
                 _buildHeader(),
-                _buildQuickControls(),
                 Expanded(
                   child: _buildBodyContent(),
                 ),
@@ -442,22 +467,6 @@ class _YoutubeTabState extends State<YoutubeTab> {
     );
   }
 
-  Widget _buildQuickControls() {
-    if (_searchResults.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Text(
-            '${_searchResults.length} فيديو متوفر',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 11),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
@@ -549,14 +558,42 @@ class _YoutubeTabState extends State<YoutubeTab> {
     }
     
     if (_hasSearchedOnce && _searchResults.isEmpty) {
+      final isSearchingQuery = _searchController.text.trim().isNotEmpty;
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off_rounded, color: AppColors.textMuted, size: 60),
-            const SizedBox(height: 15),
-            Text(_backend.t('no_results'), style: TextStyle(color: AppColors.textMuted, fontSize: 16)),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isSearchingQuery ? Icons.search_off_rounded : Icons.wifi_off_rounded,
+                color: AppColors.cyan,
+                size: 54,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                isSearchingQuery ? _backend.t('no_results') : 'تعذر تحميل الفيديوهات حالياً',
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isSearchingQuery ? 'جرب البحث بكلمات دلالية أخرى' : 'يرجى التحقق من اتصالك بالإنترنت والضغط على إعادة المحاولة',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () => isSearchingQuery ? _performSearch() : _loadInitialFeed(),
+                icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                label: const Text('إعادة المحاولة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.cyan,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }

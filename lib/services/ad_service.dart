@@ -24,6 +24,11 @@ class AdService {
   int _interstitialRetryCount = 0;
   int _interstitialPlacementIndex = 0;
   Timer? _interstitialRetryTimer;
+  final ValueNotifier<int> bannerRefreshNotifier = ValueNotifier<int>(0);
+
+  void refreshBanner() {
+    bannerRefreshNotifier.value++;
+  }
 
   static const List<String> _candidateInterstitialPlacements = [
     interstitialPlacementId, // "BP_Interstitial_Android"
@@ -43,7 +48,7 @@ class AdService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedTestMode = prefs.getBool('unity_ads_test_mode');
-      final effectiveTestMode = testMode ?? savedTestMode ?? true; // الافتراضي هو تفعيل وضع الاختبار لضمان الظهور الفوري
+      final effectiveTestMode = testMode ?? savedTestMode ?? false; // الوضع الافتراضي إعلانات حقيقية متغيرة لضمان تنوع الإعلانات وعدم تكرار إعلان واحد
       _instance._isTestMode = effectiveTestMode;
 
       debugPrint("Unity Ads: Initializing with Game ID: $gameId (testMode: $effectiveTestMode)");
@@ -186,16 +191,19 @@ class AdService {
         onSkipped: (placementId) {
           debugPrint("Unity Ads: Interstitial ad skipped by user: $placementId");
           if (onAdClosed != null) onAdClosed();
+          _interstitialPlacementIndex = (_interstitialPlacementIndex + 1) % _candidateInterstitialPlacements.length;
           loadInterstitialAd();
         },
         onComplete: (placementId) {
           debugPrint("Unity Ads: Interstitial ad completed playback: $placementId");
           if (onAdClosed != null) onAdClosed();
+          _interstitialPlacementIndex = (_interstitialPlacementIndex + 1) % _candidateInterstitialPlacements.length;
           loadInterstitialAd();
         },
         onFailed: (placementId, error, message) {
           debugPrint("Unity Ads: Interstitial ad show failed ($error): $message");
           if (onAdClosed != null) onAdClosed();
+          _interstitialPlacementIndex = (_interstitialPlacementIndex + 1) % _candidateInterstitialPlacements.length;
           loadInterstitialAd();
         },
       );
@@ -250,8 +258,35 @@ class _SmartUnityBannerState extends State<_SmartUnityBanner> {
   Key _bannerKey = UniqueKey();
   int _retryCount = 0;
   Timer? _retryTimer;
+  Timer? _rotationTimer;
 
   String get _currentPlacement => _candidatePlacements[_placementIndex % _candidatePlacements.length];
+
+  @override
+  void initState() {
+    super.initState();
+    // تدوير شريط الإعلانات تلقائياً كل 35 ثانية لتقديم إعلانات متنوعة ومتجددة دائماً
+    _rotationTimer = Timer.periodic(const Duration(seconds: 35), (timer) {
+      if (mounted) {
+        setState(() {
+          _placementIndex = (_placementIndex + 1) % _candidatePlacements.length;
+          _bannerKey = UniqueKey();
+        });
+      }
+    });
+
+    // الاستماع لطلبات التحديث الفورية (مثل التبديل بين الأقسام)
+    AdService().bannerRefreshNotifier.addListener(_onExternalRefresh);
+  }
+
+  void _onExternalRefresh() {
+    if (mounted) {
+      setState(() {
+        _placementIndex = (_placementIndex + 1) % _candidatePlacements.length;
+        _bannerKey = UniqueKey();
+      });
+    }
+  }
 
   void _handleFailure(String failedId, dynamic error, String errorMessage) {
     if (!mounted) return;
@@ -295,7 +330,9 @@ class _SmartUnityBannerState extends State<_SmartUnityBanner> {
 
   @override
   void dispose() {
+    _rotationTimer?.cancel();
     _retryTimer?.cancel();
+    AdService().bannerRefreshNotifier.removeListener(_onExternalRefresh);
     super.dispose();
   }
 

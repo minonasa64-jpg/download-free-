@@ -31,17 +31,7 @@ interface WorkflowRun {
 }
 
 export default function App() {
-  const [run, setRun] = useState<WorkflowRun | null>({
-    id: 36999415543,
-    status: 'completed',
-    conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36999415543',
-    head_sha: '1b73df6',
-    head_commit: {
-      id: '1b73df6',
-      message: 'fix(links,youtube): fix link downloading for all platforms, remove most-related button and bump to v1.4.8'
-    }
-  });
+  const [run, setRun] = useState<WorkflowRun | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastChecked, setLastChecked] = useState<string>('');
 
@@ -86,7 +76,7 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.4.8
+                  v1.4.9
                 </span>
               </h1>
               <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي إلى GitHub</p>
@@ -212,7 +202,7 @@ export default function App() {
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في التطبيق (v1.4.7)</h2>
+            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في التطبيق (v1.4.9)</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
