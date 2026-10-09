@@ -44,18 +44,12 @@ class _MainNavigationState extends State<MainNavigation> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // شريط إعلانات Unity Ads (Banner Strip)
-          ValueListenableBuilder<bool>(
-            valueListenable: AdService().isInitializedNotifier,
-            builder: (context, isInit, _) {
-              if (!isInit) return const SizedBox.shrink();
-              return AdService().buildBannerWidget(
-                onLoaded: () {
-                  if (mounted && !_isBannerLoaded) {
-                    setState(() => _isBannerLoaded = true);
-                  }
-                },
-              );
+          // شريط إعلانات Unity Ads الذكي (يظهر فوراً وبدون أي تأخير)
+          AdService().buildBannerWidget(
+            onLoaded: () {
+              if (mounted && !_isBannerLoaded) {
+                setState(() => _isBannerLoaded = true);
+              }
             },
           ),
 

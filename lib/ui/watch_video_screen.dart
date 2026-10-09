@@ -31,6 +31,11 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   bool _isFloatingPiP = false;
   Offset _pipPosition = const Offset(20, 100);
 
+  List<Map<String, dynamic>> _candidateStreams = [];
+  int _currentCandidateIndex = 0;
+  bool _isAutoRecovering = false;
+  Duration _lastPlaybackPosition = Duration.zero;
+
   final ScrollController _relatedScrollController = ScrollController();
   bool _isLoadingExtraction = false;
   List<yt.Video> _relatedVideos = [];
@@ -54,69 +59,187 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     });
   }
 
-  /// التقاط رابط البث المباشر وتشغيله عبر مشغل الفيديو الأصلي Native Video Player (Chewie)
-  Future<void> _initDirectStreamPlayer(yt.Video video) async {
+  /// تنظيف وتفكيك المشغل الحالي بأمان تام
+  Future<void> _disposePlayerControllers() async {
+    try {
+      _chewieController?.pause();
+      _chewieController?.dispose();
+      _chewieController = null;
+    } catch (_) {}
+    try {
+      if (_videoPlayerController != null) {
+        _videoPlayerController!.removeListener(_playerListener);
+        await _videoPlayerController!.dispose();
+        _videoPlayerController = null;
+      }
+    } catch (_) {}
+  }
+
+  void _playerListener() {
+    if (!mounted || _videoPlayerController == null) return;
+    try {
+      final val = _videoPlayerController!.value;
+      if (val.position > Duration.zero) {
+        _lastPlaybackPosition = val.position;
+      }
+      if (val.hasError && !_isAutoRecovering) {
+        debugPrint("خطأ استشعار مشغل الفيديو: ${val.errorDescription}");
+        _autoRecoverPlayer();
+      }
+    } catch (_) {}
+  }
+
+  /// التقاط وتشغيل الفيديو المباشر مع نظام تبديل تلقائي فائق القوة ومقاوم للتعطل
+  Future<void> _initDirectStreamPlayer(yt.Video video, {bool forceFresh = false, int startIndex = 0}) async {
     if (!mounted) return;
     setState(() {
       _isLoadingPlayer = true;
       _playerError = null;
     });
 
-    // تحرير المشغلات السابقة بأمان
-    try {
-      _chewieController?.pause();
-      _chewieController?.dispose();
-      _chewieController = null;
-      await _videoPlayerController?.dispose();
-      _videoPlayerController = null;
-    } catch (_) {}
+    await _disposePlayerControllers();
 
     try {
-      final streamData = await _backend.getPlayableStream(video.id.value);
-      final String streamUrl = streamData['url'] as String;
+      final streamData = await _backend.getPlayableStream(video.id.value, forceFresh: forceFresh);
+      final rawStreams = List<Map<String, dynamic>>.from(streamData['allStreams'] ?? []);
 
-      _videoPlayerController = VideoPlayerController.networkUrl(
-        Uri.parse(streamUrl),
-        httpHeaders: const {
-          'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36',
-          'Referer': 'https://www.youtube.com/',
-        },
-      );
+      _candidateStreams = rawStreams.isNotEmpty
+          ? rawStreams
+          : [
+              {'url': streamData['url'], 'quality': streamData['quality'] ?? 'عادية'}
+            ];
 
-      await _videoPlayerController!.initialize();
+      bool initializedSuccessfully = false;
+      _currentCandidateIndex = startIndex.clamp(0, max(0, _candidateStreams.length - 1));
 
-      if (!mounted) return;
+      for (int i = _currentCandidateIndex; i < _candidateStreams.length; i++) {
+        final candidate = _candidateStreams[i];
+        final String? streamUrl = candidate['url']?.toString();
+        if (streamUrl == null || streamUrl.isEmpty) continue;
 
-      _chewieController = ChewieController(
-        videoPlayerController: _videoPlayerController!,
-        autoPlay: true,
-        looping: false,
-        allowFullScreen: true,
-        allowPlaybackSpeedChanging: true,
-        showControls: true,
-        aspectRatio: _videoPlayerController!.value.aspectRatio > 0
-            ? _videoPlayerController!.value.aspectRatio
-            : 16 / 9,
-        materialProgressColors: ChewieProgressColors(
-          playedColor: AppColors.cyan,
-          handleColor: AppColors.cyan,
-          backgroundColor: Colors.white24,
-          bufferedColor: Colors.white54,
-        ),
-      );
+        try {
+          debugPrint("محاولة تشغيل دفق يوتيوب [$i / ${_candidateStreams.length}]: ${candidate['quality']}...");
+          final controller = VideoPlayerController.networkUrl(
+            Uri.parse(streamUrl),
+            httpHeaders: const {
+              'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36',
+              'Referer': 'https://www.youtube.com/',
+            },
+          );
 
-      setState(() {
-        _isLoadingPlayer = false;
-      });
-    } catch (e) {
-      debugPrint('خطأ في تشغيل الفيديو المباشر: $e');
+          await controller.initialize().timeout(const Duration(seconds: 12));
+
+          if (!mounted) {
+            controller.dispose();
+            return;
+          }
+
+          _videoPlayerController = controller;
+          _videoPlayerController!.addListener(_playerListener);
+
+          if (_lastPlaybackPosition > Duration.zero && _lastPlaybackPosition < _videoPlayerController!.value.duration) {
+            try {
+              await _videoPlayerController!.seekTo(_lastPlaybackPosition);
+            } catch (_) {}
+          }
+
+          _chewieController = ChewieController(
+            videoPlayerController: _videoPlayerController!,
+            autoPlay: true,
+            looping: false,
+            allowFullScreen: true,
+            allowPlaybackSpeedChanging: true,
+            showControls: true,
+            aspectRatio: _videoPlayerController!.value.aspectRatio > 0
+                ? _videoPlayerController!.value.aspectRatio
+                : 16 / 9,
+            materialProgressColors: ChewieProgressColors(
+              playedColor: AppColors.cyan,
+              handleColor: AppColors.cyan,
+              backgroundColor: Colors.white24,
+              bufferedColor: Colors.white54,
+            ),
+            errorBuilder: (context, errorMessage) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.refresh_rounded, color: AppColors.cyan, size: 36),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'انقطع البث مؤقتاً، جاري الاستئناف التلقائي...',
+                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 10),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.cyan,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        ),
+                        onPressed: () => _autoRecoverPlayer(),
+                        icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                        label: const Text('إعادة التشغيل الآن', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+
+          _currentCandidateIndex = i;
+          initializedSuccessfully = true;
+          break;
+        } catch (initErr) {
+          debugPrint("فشل تهيئة الدفق [$i]: $initErr");
+        }
+      }
+
+      // إذا فشلت كافة التدفقات المخزنة، نحاول مرة أخيرة عبر جلب مانيفست جديد تماماً من يوتيوب
+      if (!initializedSuccessfully && !forceFresh) {
+        debugPrint("فشلت كافة التدفقات السابقة، جلب مانيفست جديد نقي من يوتيوب...");
+        return _initDirectStreamPlayer(video, forceFresh: true, startIndex: 0);
+      }
+
       if (mounted) {
         setState(() {
           _isLoadingPlayer = false;
-          _playerError = 'تعذر تشغيل هذا المقطع مباشرة عبر خادم البث، يرجى إعادة المحاولة أو التحميل.';
+          if (!initializedSuccessfully) {
+            _playerError = 'تعذر تشغيل هذا المقطع حالياً بسبب قيود المصدر، يرجى إعادة المحاولة أو تنزيل المقطع.';
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('خطأ عام في مشغل الفيديو: $e');
+      if (!forceFresh) {
+        return _initDirectStreamPlayer(video, forceFresh: true);
+      }
+      if (mounted) {
+        setState(() {
+          _isLoadingPlayer = false;
+          _playerError = 'تعذر تشغيل هذا المقطع، يرجى النقر على إعادة المحاولة أو التحميل.';
         });
       }
     }
+  }
+
+  /// استعادة المشغل تلقائياً عند أي انقطاع أثناء التشغيل
+  Future<void> _autoRecoverPlayer() async {
+    if (_isAutoRecovering || !mounted) return;
+    _isAutoRecovering = true;
+    debugPrint("بدء الاستعادة التلقائية لمشغل الفيديو من الموضع ${_lastPlaybackPosition.inSeconds} ثانية...");
+
+    final nextIndex = _currentCandidateIndex + 1;
+    if (nextIndex < _candidateStreams.length) {
+      await _initDirectStreamPlayer(_currentVideo, startIndex: nextIndex);
+    } else {
+      await _initDirectStreamPlayer(_currentVideo, forceFresh: true, startIndex: 0);
+    }
+    _isAutoRecovering = false;
   }
 
   Future<void> _fetchRelatedVideos() async {
@@ -396,8 +519,11 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
   @override
   void dispose() {
     if (!_isBackgroundAudioEnabled) {
-      _chewieController?.dispose();
-      _videoPlayerController?.dispose();
+      try {
+        _videoPlayerController?.removeListener(_playerListener);
+        _chewieController?.dispose();
+        _videoPlayerController?.dispose();
+      } catch (_) {}
     }
     _relatedScrollController.dispose();
     _yt.close();

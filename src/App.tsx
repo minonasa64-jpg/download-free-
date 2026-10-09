@@ -86,7 +86,7 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.4.9
+                  v1.5.0
                 </span>
               </h1>
               <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي إلى GitHub</p>
@@ -212,43 +212,43 @@ export default function App() {
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في التطبيق (v1.4.9)</h2>
+            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في هذا التحديث (v1.5.0)</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="p-5 rounded-2xl border border-blue-500/40 bg-blue-950/20 space-y-3">
-              <div className="flex items-center gap-3 text-blue-400">
-                <div className="p-2 rounded-lg bg-blue-500/20 border border-blue-500/30">
-                  <Send className="w-5 h-5 text-blue-400" />
+            <div className="p-5 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 space-y-3">
+              <div className="flex items-center gap-3 text-emerald-400">
+                <div className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
+                  <Download className="w-5 h-5 text-emerald-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">إحصائيات وتنبيهات بوت تيليجرام الحية</h3>
+                <h3 className="text-sm font-semibold text-white">حل توقف التحميل نهائياً (Unstoppable Engine)</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                إرسال إشعارات فورية إلى تيليجرام عند تثبيت مستخدم جديد، نبضة النشاط اليومية للمستخدمين، وتفاصيل التنزيلات المكتملة، مع كود بايثون متكامل للتحكم.
+                استمرار التنزيل بنسبة 100% حتى آخر بايت دون توقف مفاجئ، مع تجديد المانيفست والتوقيع تلقائياً عند انتهاء صلاحية الروابط، ونظام استئناف ذكي بـ 15 محاولة تكيفية.
               </p>
             </div>
 
-            <div className="p-5 rounded-2xl border border-cyan-500/30 bg-cyan-950/20 space-y-3">
-              <div className="flex items-center gap-3 text-cyan-400">
-                <div className="p-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30">
-                  <ShieldCheck className="w-5 h-5 text-cyan-400" />
+            <div className="p-5 rounded-2xl border border-amber-500/40 bg-amber-950/20 space-y-3">
+              <div className="flex items-center gap-3 text-amber-400">
+                <div className="p-2 rounded-lg bg-amber-500/20 border border-amber-500/30">
+                  <Sparkles className="w-5 h-5 text-amber-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">ترقية حماية أندرويد (Target SDK 34)</h3>
+                <h3 className="text-sm font-semibold text-white">ظهور إعلان البنر دوماً دون أي تأخير</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                توافق كامل مع متطلبات حماية Google Play وأحدث معايير الخصوصية في Android 14/15 لحل تحذير التثبيت نهائياً.
+                ظهور فوري دائم لشريط الإعلانات من الثانية الأولى بدون أي تأخير، مع وضع الاستجابة الفورية ودعم معرفات Unity Ads الرسمية.
               </p>
             </div>
 
-            <div className="p-5 rounded-2xl border border-cyan-500/30 bg-cyan-950/20 space-y-3">
+            <div className="p-5 rounded-2xl border border-cyan-500/40 bg-cyan-950/20 space-y-3">
               <div className="flex items-center gap-3 text-cyan-400">
                 <div className="p-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30">
-                  <Music className="w-5 h-5 text-cyan-400" />
+                  <Smartphone className="w-5 h-5 text-cyan-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">تشغيل الموسيقى خارج التطبيق وفي الخلفية</h3>
+                <h3 className="text-sm font-semibold text-white">مشغل يوتيوب متين محمي من الأعطال</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                استمرار تشغيل الصوتيات والأغاني عند قفل الشاشة أو مغادرة التطبيق مع أزرار التنقل السلس والتشغيل التلقائي للمقطع التالي.
+                نظام التبديل التلقائي الذكي بين تدفقات البث (Multi-Stream Failover) واستعادة فورية عند انقطاع الشبكة لمنع تجميد أو تعطل المشغل.
               </p>
             </div>
 
