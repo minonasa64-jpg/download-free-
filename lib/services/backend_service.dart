@@ -1914,10 +1914,29 @@ class BackendService {
             client.idleTimeout = const Duration(seconds: 30);
             client.badCertificateCallback = (cert, host, port) => true;
 
-            // هام: نمرر الرابط الموقّع كما هو بدون إضافة range لمعلمات الاستعلام لتفادي خطأ 403 مع رؤوس مطابقة لمحرك YoutubeExplode
-            final req = await client.getUrl(Uri.parse(currentStreamUrl));
-            req.headers.set("Range", "bytes=$downloadedBytes-$endByte");
-            req.headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.18 Safari/537.36");
+            Uri targetUri = Uri.parse(currentStreamUrl);
+            final bool isGoogleVideo = targetUri.host.contains('googlevideo.com');
+            final bool isAndroidClient = targetUri.queryParameters['c'] == 'ANDROID';
+
+            // إذا كان الرابط من خوادم googlevideo وعميله ليس أندرويد (مثل iOS أو Web)، يجب إضافة معلمة range إلى الرابط نفسه
+            // وإذا تكررت المحاولة بعد خطأ 403 نقوم بتبديل الطريقة لضمان قبول الخادم
+            final bool useQueryParam = isGoogleVideo && (!isAndroidClient || chunkAttempt % 2 == 0);
+            if (useQueryParam) {
+              final newParams = Map<String, String>.from(targetUri.queryParameters);
+              newParams['range'] = '$downloadedBytes-$endByte';
+              targetUri = targetUri.replace(queryParameters: newParams);
+            }
+
+            final req = await client.getUrl(targetUri);
+            if (!useQueryParam) {
+              req.headers.set("Range", "bytes=$downloadedBytes-$endByte");
+            }
+
+            if (isAndroidClient && chunkAttempt % 2 != 0) {
+              req.headers.set("User-Agent", "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36");
+            } else {
+              req.headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.18 Safari/537.36");
+            }
             req.headers.set("Cookie", "CONSENT=YES+cb");
             req.headers.set("Referer", "https://www.youtube.com/");
             req.headers.set("Accept", "*/*");

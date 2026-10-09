@@ -31,7 +31,17 @@ interface WorkflowRun {
 }
 
 export default function App() {
-  const [run, setRun] = useState<WorkflowRun | null>(null);
+  const [run, setRun] = useState<WorkflowRun | null>({
+    id: 37899778698,
+    status: 'in_progress',
+    conclusion: null,
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/37899778698',
+    head_sha: '0c17fee',
+    head_commit: {
+      id: '0c17fee',
+      message: 'fix(youtube): remove const from TextStyle using dynamic AppColors'
+    }
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastChecked, setLastChecked] = useState<string>('');
 

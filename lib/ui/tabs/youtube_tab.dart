@@ -152,12 +152,12 @@ class _YoutubeTabState extends State<YoutubeTab> {
     });
 
     final queriesToTry = [
-      customQuery ?? 'طبيعة خلابة علوم وتكنولوجيا 4k',
-      'relaxing 4k nature documentary',
-      'space universe science discovery 4k',
-      'drone scenic travel 4k',
-      'فيديوهات علمية وثائقية مذهلة',
-      'documentary wildlife nature technology',
+      customQuery ?? 'طبيعة وثائقي 4K',
+      'nature 4k',
+      'technology science 4k',
+      'documentary 4k',
+      'wildlife 4k',
+      'relaxing 4k nature landscape',
     ];
 
     List<yt.Video> list = [];
@@ -165,7 +165,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
 
     for (final q in queriesToTry) {
       try {
-        results = await _yt.search.search(q).timeout(const Duration(seconds: 8));
+        results = await _yt.search.search(q).timeout(const Duration(seconds: 6));
         list = results.whereType<yt.Video>().where(_isSafeVideo).toList();
         if (list.isNotEmpty) break;
       } catch (e) {
