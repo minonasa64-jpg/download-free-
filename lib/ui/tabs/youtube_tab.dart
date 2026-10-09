@@ -573,13 +573,13 @@ class _YoutubeTabState extends State<YoutubeTab> {
               const SizedBox(height: 16),
               Text(
                 isSearchingQuery ? _backend.t('no_results') : 'تعذر تحميل الفيديوهات حالياً',
-                style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Text(
                 isSearchingQuery ? 'جرب البحث بكلمات دلالية أخرى' : 'يرجى التحقق من اتصالك بالإنترنت والضغط على إعادة المحاولة',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
