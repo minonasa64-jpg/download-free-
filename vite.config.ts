@@ -40,13 +40,13 @@ function apiPlugin(): Plugin {
         res.end(JSON.stringify({
           success: true,
           latestRun: {
-            id: 36999415543,
+            id: 37901720258,
             status: 'completed',
             conclusion: 'success',
-            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/36999415543',
+            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/37901720258',
             head_commit: {
-              id: '1b73df6',
-              message: 'fix(links,youtube): fix link downloading for all platforms, remove most-related button and bump to v1.4.8'
+              id: '63f1c87',
+              message: 'fix(downloads,youtube,ads): resilient chunked downloads, fast infinite youtube feed, rotating ads v1.4.9'
             }
           },
           runs: []
