@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 38034700190,
-    status: 'completed',
-    conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38034700190',
-    head_sha: 'd5e886a',
+    id: 38050677630,
+    status: 'in_progress',
+    conclusion: null,
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38050677630',
+    head_sha: '43cc524',
     head_commit: {
-      id: 'd5e886a',
-      message: 'fix(dart): resolve min/max method undefined and type cast issues in ad_service and watch_video_screen'
+      id: '43cc524',
+      message: 'fix(download): overhaul stream downloading with standard Range headers, guarantee audio+video merge with ultrafast x264, rotate ads dynamically, and release v1.5.2'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
