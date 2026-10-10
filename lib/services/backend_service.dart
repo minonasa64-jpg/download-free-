@@ -878,6 +878,20 @@ class BackendService {
     }
   }
 
+  Future<bool> _isDirWritable(Directory dir) async {
+    try {
+      final testFile = File('${dir.path}/.test_${DateTime.now().millisecondsSinceEpoch}');
+      await testFile.writeAsString('1');
+      if (await testFile.exists()) {
+        await testFile.delete();
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<Directory> _getDownloadsDir() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -885,37 +899,40 @@ class BackendService {
       if (customPath != null && customPath.isNotEmpty && customPath != 'مسار Boykta العام') {
         final dir = Directory(customPath);
         if (!await dir.exists()) await dir.create(recursive: true);
-        return dir;
+        if (await _isDirWritable(dir)) return dir;
+      }
+    } catch (_) {}
+
+    final candidateDirs = [
+      '/storage/emulated/0/Download/Boykta',
+      '/storage/emulated/0/Movies/Boykta',
+    ];
+
+    for (final p in candidateDirs) {
+      try {
+        final dir = Directory(p);
+        if (!await dir.exists()) await dir.create(recursive: true);
+        if (await _isDirWritable(dir)) return dir;
+      } catch (_) {}
+    }
+
+    try {
+      final extDir = await getExternalStorageDirectory();
+      if (extDir != null) {
+        final dir = Directory('${extDir.path}/Boykta');
+        if (!await dir.exists()) await dir.create(recursive: true);
+        if (await _isDirWritable(dir)) return dir;
       }
     } catch (_) {}
 
     try {
-      Directory moviesDir = Directory('/storage/emulated/0/Movies/Boykta');
-      if (!await moviesDir.exists()) await moviesDir.create(recursive: true);
-      return moviesDir;
-    } catch (_) {
-      try {
-        Directory dlDir = Directory('/storage/emulated/0/Download/Boykta');
-        if (!await dlDir.exists()) await dlDir.create(recursive: true);
-        return dlDir;
-      } catch (_) {
-        try {
-          final extDir = await getExternalStorageDirectory();
-          if (extDir != null) {
-            final dir = Directory('${extDir.path}/Boykta');
-            if (!await dir.exists()) await dir.create(recursive: true);
-            return dir;
-          }
-        } catch (_) {}
-        try {
-          final docDir = await getApplicationDocumentsDirectory();
-          final dir = Directory('${docDir.path}/Boykta');
-          if (!await dir.exists()) await dir.create(recursive: true);
-          return dir;
-        } catch (_) {}
-        return Directory.systemTemp;
-      }
-    }
+      final docDir = await getApplicationDocumentsDirectory();
+      final dir = Directory('${docDir.path}/Boykta');
+      if (!await dir.exists()) await dir.create(recursive: true);
+      return dir;
+    } catch (_) {}
+
+    return Directory.systemTemp;
   }
 
     Future<String> downloadAndMerge({
@@ -1253,18 +1270,7 @@ class BackendService {
                 tempMergedPath,
               ],
             },
-            // محاولة 3: حاوية Matroska الفائقة (MKV) التي تقبل أي كودك فيديو مع أي كودك صوت بدون مشاكل فائق السرعة
-            {
-              'path': tempMergedMkv,
-              'args': [
-                '-y',
-                '-i', tempVideoPath,
-                '-i', tempAudioPath,
-                '-c', 'copy',
-                tempMergedMkv,
-              ],
-            },
-            // محاولة 4: ربط متساهل مع وسم VP9 داخل حاوية MP4 وخيار strict -2
+            // محاولة 3: ربط متساهل مع وسم VP9 داخل حاوية MP4 وخيار strict -2
             {
               'path': tempMergedPath,
               'args': [
@@ -1278,6 +1284,24 @@ class BackendService {
                 '-c:a', 'aac',
                 '-b:a', '192k',
                 '-strict', '-2',
+                '-movflags', '+faststart',
+                tempMergedPath,
+              ],
+            },
+            // محاولة 4: ترميز فائق السرعة H.264 + AAC يضمن 100% إنتاج ملف MP4 أصلي بصوت وصورة متوافق مع كافة المشغلات
+            {
+              'path': tempMergedPath,
+              'args': [
+                '-y',
+                '-i', tempVideoPath,
+                '-i', tempAudioPath,
+                '-map', '0:v:0',
+                '-map', '1:a:0',
+                '-c:v', 'libx264',
+                '-preset', 'ultrafast',
+                '-crf', '22',
+                '-c:a', 'aac',
+                '-b:a', '192k',
                 '-movflags', '+faststart',
                 tempMergedPath,
               ],
@@ -1297,6 +1321,17 @@ class BackendService {
                 '-b:a', '192k',
                 '-movflags', '+faststart',
                 tempMergedPath,
+              ],
+            },
+            // محاولة 6: حاوية Matroska الفائقة (MKV) إذا كان الملف كودك خاص
+            {
+              'path': tempMergedMkv,
+              'args': [
+                '-y',
+                '-i', tempVideoPath,
+                '-i', tempAudioPath,
+                '-c', 'copy',
+                tempMergedMkv,
               ],
             },
           ];
@@ -1354,14 +1389,20 @@ class BackendService {
           debugPrint("تنبيه: حجم ملف الصوت غير كافٍ للدمج ($audioSize بايت)");
         }
 
-        final outFile = File(finalOutputPath);
+        // إذا كان الملف المدمج الناتج MKV، نعدل مسار الإخراج النهائي ليكون .mkv متطابقاً مع الحاوية
+        String targetDestination = finalOutputPath;
+        if (mergeSucceeded && successfulMergedPath.endsWith('.mkv') && !targetDestination.toLowerCase().endsWith('.mkv')) {
+          targetDestination = '${targetDestination.substring(0, targetDestination.lastIndexOf('.'))}.mkv';
+        }
+
+        final outFile = File(targetDestination);
         if (await outFile.exists()) {
           try { await outFile.delete(); } catch (_) {}
         }
 
         if (mergeSucceeded && await File(successfulMergedPath).exists()) {
           onStatusChanged('تم الدمج بنجاح!');
-          await File(successfulMergedPath).copy(finalOutputPath);
+          await File(successfulMergedPath).copy(targetDestination);
           try { await File(tempMergedPath).delete(); } catch (_) {}
           try { await File(tempMergedMkv).delete(); } catch (_) {}
           try { await File(tempVideoPath).delete(); } catch (_) {}
@@ -1372,17 +1413,17 @@ class BackendService {
           final vFile = File(tempVideoPath);
           final vPart = File('$tempVideoPath.part');
           if (await vFile.exists() && await vFile.length() > 0) {
-            await vFile.copy(finalOutputPath);
+            await vFile.copy(targetDestination);
             try { await vFile.delete(); } catch (_) {}
             try { await File(tempAudioPath).delete(); } catch (_) {}
           } else if (await vPart.exists() && await vPart.length() > 0) {
-            await vPart.copy(finalOutputPath);
+            await vPart.copy(targetDestination);
             try { await vPart.delete(); } catch (_) {}
             try { await File(tempAudioPath).delete(); } catch (_) {}
           } else {
             await _downloadFile(
               url: selectedUrl,
-              savePath: finalOutputPath,
+              savePath: targetDestination,
               onReceiveProgress: (r, t) => updateProgress(r, t, status: 'جاري الحفظ النهائي...'),
               videoId: videoId,
               streamTag: videoTag,
@@ -1898,184 +1939,109 @@ class BackendService {
       }
     }
 
-    // المرحلة 2: محرك النطاقات المجزأة التوربو فائق الثبات والمقاوم لأي توقف
+    // المرحلة 2: محرك التنزيل الانسيابي التوربو المقاوم للانقطاع مع الاستئناف الذكي
     downloadedBytes = await partFile.length();
 
-    if (totalBytes > 0 && downloadedBytes < totalBytes) {
-      // تجزئة ذكية (2 ميغابايت) لسرعة استجابة واستئناف فوري بدون أي فقدان للبيانات
-      const int chunkSize = 2 * 1024 * 1024;
+    if (totalBytes <= 0 || downloadedBytes < (totalBytes * 0.99)) {
+      int retryAttempts = 0;
+      const int maxRetries = 8;
       int lastProgressTime = 0;
 
-      while (downloadedBytes < totalBytes) {
-        final int endByte = min(downloadedBytes + chunkSize - 1, totalBytes - 1);
-        bool chunkSuccess = false;
-        int chunkAttempt = 0;
-
-        while (!chunkSuccess && chunkAttempt < 15) {
-          chunkAttempt++;
-          IOSink? chunkSink;
-          HttpClient? client;
-
-          try {
-            // عند تكرار الفشل في الرابط، نقوم بتجديد المانيفست والرابط فوراً لتجاوز انتهاء صلاحية التوقيع
-            if (chunkAttempt > 1 && targetVideoId != null && targetVideoId.isNotEmpty) {
-              debugPrint("تجديد رابط يوتيوب تلقائياً لتفادي انتهاء الصلاحية (محاولة $chunkAttempt)...");
-              _streamManifestCache.remove(targetVideoId);
-              try {
-                final freshManifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
-                _streamManifestCache[targetVideoId] = freshManifest;
-                StreamInfo? freshStream;
-                if (targetTag != null) {
-                  for (final s in freshManifest.streams) {
-                    if (s.tag == targetTag) {
-                      freshStream = s;
-                      break;
-                    }
-                  }
-                }
-                final isAudioDownload = savePath.contains('raw_a_') || savePath.contains('aud_') || savePath.endsWith('.mp3') || savePath.endsWith('.m4a') || savePath.endsWith('.dat');
-                if (freshStream == null) {
-                  if (isAudioDownload && freshManifest.audioOnly.isNotEmpty) {
-                    freshStream = freshManifest.audioOnly.withHighestBitrate();
-                  } else {
-                    freshStream = freshManifest.muxed.isNotEmpty
-                        ? freshManifest.muxed.first
-                        : freshManifest.streams.first;
-                  }
-                }
-                if (freshStream != null) {
-                  currentStreamUrl = freshStream.url.toString();
-                  targetTag = freshStream.tag;
-                  if (freshStream.size.totalBytes > 0) {
-                    totalBytes = freshStream.size.totalBytes;
-                  }
-                }
-              } catch (_) {}
-            }
-
-            client = HttpClient();
-            client.connectionTimeout = const Duration(seconds: 25);
-            client.idleTimeout = const Duration(seconds: 35);
-            client.badCertificateCallback = (cert, host, port) => true;
-
-            Uri targetUri = Uri.parse(currentStreamUrl);
-            final bool isGoogleVideo = targetUri.host.contains('googlevideo.com');
-            final bool isAndroidClient = targetUri.queryParameters['c'] == 'ANDROID';
-
-            final bool useQueryParam = isGoogleVideo && (!isAndroidClient || chunkAttempt % 2 == 0);
-            if (useQueryParam) {
-              final newParams = Map<String, String>.from(targetUri.queryParameters);
-              newParams['range'] = '$downloadedBytes-$endByte';
-              targetUri = targetUri.replace(queryParameters: newParams);
-            }
-
-            final req = await client.getUrl(targetUri);
-            if (!useQueryParam) {
-              req.headers.set("Range", "bytes=$downloadedBytes-$endByte");
-            }
-
-            if (isAndroidClient && chunkAttempt % 2 != 0) {
-              req.headers.set("User-Agent", "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36");
-            } else {
-              req.headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.18 Safari/537.36");
-            }
-            req.headers.set("Cookie", "CONSENT=YES+cb");
-            req.headers.set("Referer", "https://www.youtube.com/");
-            req.headers.set("Accept", "*/*");
-            req.headers.set("Accept-Encoding", "identity");
-
-            final res = await req.close();
-
-            if (res.statusCode == 403 || res.statusCode == 410 || res.statusCode == 400) {
-              client.close(force: true);
-              await Future.delayed(Duration(milliseconds: 200 * chunkAttempt));
-              continue;
-            }
-
-            if (res.statusCode != 200 && res.statusCode != 206) {
-              client.close(force: true);
-              throw Exception("HTTP status ${res.statusCode}");
-            }
-
-            chunkSink = partFile.openWrite(mode: FileMode.append);
-            int bytesInChunk = 0;
-
-            await for (final data in res) {
-              chunkSink.add(data);
-              bytesInChunk += data.length;
-              final now = DateTime.now().millisecondsSinceEpoch;
-              if (now - lastProgressTime > 120) {
-                lastProgressTime = now;
-                onReceiveProgress(downloadedBytes + bytesInChunk, totalBytes);
-              }
-            }
-
-            await chunkSink.flush();
-            await chunkSink.close();
-            chunkSink = null;
-            client.close(force: true);
-
-            if (bytesInChunk > 0) {
-              downloadedBytes += bytesInChunk;
-              chunkSuccess = true;
-              onReceiveProgress(downloadedBytes, totalBytes);
-            } else {
-              throw Exception("مقطع فارغ");
-            }
-          } catch (chunkErr) {
-            debugPrint("محاولة تحميل المقطع $downloadedBytes-$endByte (محاولة $chunkAttempt): $chunkErr");
-            try { await chunkSink?.flush(); } catch (_) {}
-            try { await chunkSink?.close(); } catch (_) {}
-            chunkSink = null;
-            client?.close(force: true);
-            downloadedBytes = await partFile.length();
-
-            if (chunkAttempt >= 15) {
-              debugPrint("توقف بعد 15 محاولة للمقطع $downloadedBytes-$endByte");
-              break;
-            }
-            await Future.delayed(Duration(milliseconds: 250 * min(chunkAttempt, 6)));
-          }
-        }
-
-        if (!chunkSuccess) {
-          downloadedBytes = await partFile.length();
-          if (downloadedBytes < (totalBytes * 0.95)) {
-            throw Exception("تعذر استكمال المقطع الحالي بسبب انقطاع الشبكة ($downloadedBytes من أصل $totalBytes بايت). تم حفظ التقدم للاستئناف.");
-          }
+      while (retryAttempts < maxRetries) {
+        downloadedBytes = await partFile.length();
+        if (totalBytes > 0 && downloadedBytes >= (totalBytes * 0.99)) {
           break;
         }
-      }
-    } else if (downloadedBytes == 0) {
-      // تدفق انسيابي للملفات غير محددة الحجم مسبقاً
-      IOSink? streamSink;
-      HttpClient? client;
-      try {
-        streamSink = partFile.openWrite(mode: FileMode.write);
-        client = HttpClient();
-        client.connectionTimeout = const Duration(seconds: 25);
-        client.idleTimeout = const Duration(seconds: 40);
-        client.badCertificateCallback = (cert, host, port) => true;
 
-        final req = await client.getUrl(Uri.parse(currentStreamUrl));
-        req.headers.set("User-Agent", "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36");
-        req.headers.set("Referer", "https://www.youtube.com/");
-        req.headers.set("Accept", "*/*");
-        req.headers.set("Accept-Encoding", "identity");
+        retryAttempts++;
+        IOSink? streamSink;
+        HttpClient? client;
 
-        final res = await req.close();
-        if (res.statusCode == 200 || res.statusCode == 206) {
-          int received = 0;
-          int cl = res.contentLength;
-          int lastProgressTime = 0;
+        try {
+          // تجديد رابط يوتيوب والمانيفست فوراً عند تكرار الفشل لتفادي انتهاء صلاحية التوقيع
+          if (retryAttempts > 1 && targetVideoId != null && targetVideoId.isNotEmpty) {
+            debugPrint("تجديد رابط دفق يوتيوب تلقائياً لتفادي انتهاء الصلاحية (محاولة $retryAttempts)...");
+            _streamManifestCache.remove(targetVideoId);
+            try {
+              final freshManifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
+              _streamManifestCache[targetVideoId] = freshManifest;
+              StreamInfo? freshStream;
+              if (targetTag != null) {
+                for (final s in freshManifest.streams) {
+                  if (s.tag == targetTag) {
+                    freshStream = s;
+                    break;
+                  }
+                }
+              }
+              final isAudioDownload = savePath.contains('raw_a_') || savePath.contains('aud_') || savePath.endsWith('.mp3') || savePath.endsWith('.m4a') || savePath.endsWith('.dat');
+              if (freshStream == null) {
+                if (isAudioDownload && freshManifest.audioOnly.isNotEmpty) {
+                  freshStream = freshManifest.audioOnly.withHighestBitrate();
+                } else {
+                  freshStream = freshManifest.muxed.isNotEmpty
+                      ? freshManifest.muxed.first
+                      : freshManifest.streams.first;
+                }
+              }
+              if (freshStream != null) {
+                currentStreamUrl = freshStream.url.toString();
+                targetTag = freshStream.tag;
+                if (freshStream.size.totalBytes > 0) {
+                  totalBytes = freshStream.size.totalBytes;
+                }
+              }
+            } catch (_) {}
+          }
 
-          await for (final data in res) {
-            streamSink.add(data);
-            received += data.length;
+          client = HttpClient();
+          client.connectionTimeout = const Duration(seconds: 30);
+          client.idleTimeout = const Duration(seconds: 45);
+          client.badCertificateCallback = (cert, host, port) => true;
+
+          final req = await client.getUrl(Uri.parse(currentStreamUrl));
+          req.headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+          req.headers.set("Referer", "https://www.youtube.com/");
+          req.headers.set("Accept", "*/*");
+          req.headers.set("Accept-Encoding", "identity");
+
+          // استخدام ترويسة Range القياسية بدون تشويه معلمات الرابط الموقع
+          if (downloadedBytes > 0) {
+            req.headers.set("Range", "bytes=$downloadedBytes-");
+          }
+
+          final res = await req.close();
+
+          if (res.statusCode == 403 || res.statusCode == 410) {
+            client.close(force: true);
+            await Future.delayed(Duration(milliseconds: 300 * retryAttempts));
+            continue;
+          }
+
+          if (res.statusCode != 200 && res.statusCode != 206) {
+            client.close(force: true);
+            throw Exception("HTTP status ${res.statusCode}");
+          }
+
+          final bool isPartial = (res.statusCode == 206);
+          if (!isPartial && downloadedBytes > 0) {
+            downloadedBytes = 0;
+            streamSink = partFile.openWrite(mode: FileMode.write);
+          } else {
+            streamSink = partFile.openWrite(mode: FileMode.append);
+          }
+
+          if (totalBytes <= 0 && res.contentLength > 0) {
+            totalBytes = downloadedBytes + res.contentLength;
+          }
+
+          await for (final chunk in res) {
+            streamSink.add(chunk);
+            downloadedBytes += chunk.length;
             final now = DateTime.now().millisecondsSinceEpoch;
-            if (now - lastProgressTime > 120) {
+            if (now - lastProgressTime > 120 || (totalBytes > 0 && downloadedBytes >= totalBytes)) {
               lastProgressTime = now;
-              onReceiveProgress(received, cl > 0 ? cl : -1);
+              onReceiveProgress(downloadedBytes, totalBytes > 0 ? totalBytes : -1);
             }
           }
 
@@ -2084,14 +2050,20 @@ class BackendService {
           streamSink = null;
           client.close(force: true);
 
+          final len = await partFile.length();
+          downloadedBytes = len;
+          if (totalBytes <= 0 || downloadedBytes >= (totalBytes * 0.98)) {
+            break;
+          }
+        } catch (e) {
+          debugPrint("محاولة استئناف التنزيل الانسيابي (محاولة $retryAttempts): $e");
+          try { await streamSink?.flush(); } catch (_) {}
+          try { await streamSink?.close(); } catch (_) {}
+          streamSink = null;
+          client?.close(force: true);
           downloadedBytes = await partFile.length();
-          totalBytes = downloadedBytes;
+          await Future.delayed(Duration(milliseconds: 400 * min(retryAttempts, 5)));
         }
-      } catch (e) {
-        try { await streamSink?.flush(); } catch (_) {}
-        try { await streamSink?.close(); } catch (_) {}
-        streamSink = null;
-        client?.close(force: true);
       }
     }
 
@@ -2413,8 +2385,15 @@ class BackendService {
       Set<String> visitedPaths = {};
 
       List<Directory> targetDirs = [];
-      try { targetDirs.add(Directory('/storage/emulated/0/Movies/Boykta')); } catch (_) {}
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final customPath = prefs.getString('download_path');
+        if (customPath != null && customPath.isNotEmpty && customPath != 'مسار Boykta العام') {
+          targetDirs.add(Directory(customPath));
+        }
+      } catch (_) {}
       try { targetDirs.add(Directory('/storage/emulated/0/Download/Boykta')); } catch (_) {}
+      try { targetDirs.add(Directory('/storage/emulated/0/Movies/Boykta')); } catch (_) {}
       try {
         final extDir = await getExternalStorageDirectory();
         if (extDir != null) targetDirs.add(Directory('${extDir.path}/Boykta'));
@@ -2428,8 +2407,11 @@ class BackendService {
         if (await dir.exists()) {
           for (var f in dir.listSync()) {
             if (f is File && !visitedPaths.contains(f.path)) {
-              visitedPaths.add(f.path);
-              allFiles.add(f);
+              final lower = f.path.toLowerCase();
+              if (!lower.endsWith('.part') && !lower.contains('raw_v_') && !lower.contains('raw_a_')) {
+                visitedPaths.add(f.path);
+                allFiles.add(f);
+              }
             }
           }
         }

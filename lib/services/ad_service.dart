@@ -169,6 +169,9 @@ class AdService {
 
   // إظهار الإعلان البيني عند التنزيل أو التنقل مع حماية كاملة من تعليق واجهة المستخدم
   void showInterstitialAd({VoidCallback? onAdClosed}) {
+    // تدوير معرّف الإعلان البيني في كل طلب لضمان تغير الإعلان وظهور إعلانات متنوعة
+    _interstitialPlacementIndex = (_interstitialPlacementIndex + 1) % _candidateInterstitialPlacements.length;
+
     if (!_isInitialized || !_isInterstitialLoaded) {
       debugPrint("Unity Ads: Interstitial not ready yet or SDK not initialized. Proceeding smoothly.");
       if (onAdClosed != null) onAdClosed();
@@ -193,19 +196,16 @@ class AdService {
         onSkipped: (placementId) {
           debugPrint("Unity Ads: Interstitial ad skipped by user: $placementId");
           if (onAdClosed != null) onAdClosed();
-          _interstitialPlacementIndex = (_interstitialPlacementIndex + 1) % _candidateInterstitialPlacements.length;
           loadInterstitialAd();
         },
         onComplete: (placementId) {
           debugPrint("Unity Ads: Interstitial ad completed playback: $placementId");
           if (onAdClosed != null) onAdClosed();
-          _interstitialPlacementIndex = (_interstitialPlacementIndex + 1) % _candidateInterstitialPlacements.length;
           loadInterstitialAd();
         },
         onFailed: (placementId, error, message) {
           debugPrint("Unity Ads: Interstitial ad show failed ($error): $message");
           if (onAdClosed != null) onAdClosed();
-          _interstitialPlacementIndex = (_interstitialPlacementIndex + 1) % _candidateInterstitialPlacements.length;
           loadInterstitialAd();
         },
       );
@@ -256,34 +256,76 @@ class _SmartUnityBannerState extends State<_SmartUnityBanner> with SingleTickerP
   final List<Map<String, dynamic>> _sponsorMessages = [
     {
       'title': '⚡ Boykta Pro VIP',
-      'subtitle': 'تنزيل فائق السرعة بدقة 4K مجاناً',
+      'subtitle': 'تنزيل فائق السرعة بدقة 4K مجاناً وبدون قيود',
       'icon': Icons.bolt_rounded,
       'color': Colors.cyanAccent,
     },
     {
-      'title': '🚀 محرك التنزيل الذكي نشط',
-      'subtitle': 'استئناف فوري بدون انقطاع أو فقدان للبيانات',
-      'icon': Icons.rocket_launch_rounded,
+      'title': '🛡️ Boykta Secure VPN',
+      'subtitle': 'تصفح آمن ومحمي بأعلى سرعة وتشفير عسكري',
+      'icon': Icons.shield_rounded,
       'color': Colors.lightGreenAccent,
     },
     {
-      'title': '💎 Boykta Downloader',
-      'subtitle': 'تطبيقك المفضل لتحميل كافة الفيديوهات والموسيقى',
-      'icon': Icons.verified_rounded,
+      'title': '🎬 سينما برو السينمائية',
+      'subtitle': 'مشاهدة فورية بدقة Full HD لكافة المقاطع المفضلة',
+      'icon': Icons.movie_filter_rounded,
       'color': Colors.amberAccent,
+    },
+    {
+      'title': '🎵 مشغل الموسيقى الذكي',
+      'subtitle': 'استماع مستمر في الخلفية حتى مع إغلاق الشاشة',
+      'icon': Icons.headphones_rounded,
+      'color': Colors.purpleAccent,
+    },
+    {
+      'title': '🚀 محرك التنزيل التوربو 16x',
+      'subtitle': 'استئناف فوري بدون أي انقطاع أو فقدان للبيانات',
+      'icon': Icons.rocket_launch_rounded,
+      'color': Colors.orangeAccent,
+    },
+    {
+      'title': '🔒 الخزنة السرية الآمنة',
+      'subtitle': 'احمِ فيديوهاتك وملفاتك الحساسة برمز PIN وبصمة',
+      'icon': Icons.lock_person_rounded,
+      'color': Colors.tealAccent,
+    },
+    {
+      'title': '📶 مشاركة Wi-Fi للكمبيوتر',
+      'subtitle': 'نقل وتصفح تنزيلاتك على شاشة الحاسوب بلمسة واحدة',
+      'icon': Icons.wifi_tethering_rounded,
+      'color': Colors.lightBlueAccent,
+    },
+    {
+      'title': '💎 الإصدار الذهبي الشامل',
+      'subtitle': 'أفضل تطبيق لتحميل الموسيقى والفيديوهات بكل سهولة',
+      'icon': Icons.verified_rounded,
+      'color': Colors.pinkAccent,
     },
   ];
 
   String get _currentPlacement => _candidatePlacements[_placementIndex % _candidatePlacements.length];
 
+  Timer? _unityBannerRotationTimer;
+
   @override
   void initState() {
     super.initState();
-    // تدوير رسائل البنر الفوري كل 8 ثوانٍ ليكون حيوياً وجذاباً دوماً
-    _sponsorRotationTimer = Timer.periodic(const Duration(seconds: 8), (timer) {
+    // تدوير رسائل البنر الفوري الجذاب كل 6 ثوانٍ مع انتقال سلس ورائع
+    _sponsorRotationTimer = Timer.periodic(const Duration(seconds: 6), (timer) {
       if (mounted) {
         setState(() {
           _sponsorMessageIndex = (_sponsorMessageIndex + 1) % _sponsorMessages.length;
+        });
+      }
+    });
+
+    // تدوير وتحديث إعلانات Unity Ads كل 28 ثانية لضمان ظهور إعلانات جديدة ومتغيرة دوماً
+    _unityBannerRotationTimer = Timer.periodic(const Duration(seconds: 28), (timer) {
+      if (mounted) {
+        setState(() {
+          _placementIndex = (_placementIndex + 1) % _candidatePlacements.length;
+          _bannerKey = UniqueKey();
         });
       }
     });
@@ -342,6 +384,7 @@ class _SmartUnityBannerState extends State<_SmartUnityBanner> with SingleTickerP
   @override
   void dispose() {
     _sponsorRotationTimer?.cancel();
+    _unityBannerRotationTimer?.cancel();
     _retryTimer?.cancel();
     AdService().bannerRefreshNotifier.removeListener(_onExternalRefresh);
     super.dispose();
@@ -375,85 +418,95 @@ class _SmartUnityBannerState extends State<_SmartUnityBanner> with SingleTickerP
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // 1. إعلان البنر الفوري الجذاب (يظهر من اللحظة الأولى دون انتظار أي ثانية)
-              Container(
-                width: 320,
-                height: 50,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFF1E2235),
-                      const Color(0xFF151824),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              // 1. إعلان البنر الفوري الجذاب والمتحرك بسلاسة تامة
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 500),
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: child,
+                  );
+                },
+                child: Container(
+                  key: ValueKey<int>(_sponsorMessageIndex),
+                  width: 320,
+                  height: 50,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Color(0xFF1E2235),
+                        Color(0xFF151824),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                   ),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: (currentMsg['color'] as Color).withOpacity(0.15),
-                        shape: BoxShape.circle,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: (currentMsg['color'] as Color).withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          currentMsg['icon'] as IconData,
+                          size: 18,
+                          color: currentMsg['color'] as Color,
+                        ),
                       ),
-                      child: Icon(
-                        currentMsg['icon'] as IconData,
-                        size: 18,
-                        color: currentMsg['color'] as Color,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            currentMsg['title'] as String,
-                            style: TextStyle(
-                              color: currentMsg['color'] as Color,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              currentMsg['title'] as String,
+                              style: TextStyle(
+                                color: currentMsg['color'] as Color,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            currentMsg['subtitle'] as String,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
-                              fontSize: 10,
+                            Text(
+                              currentMsg['subtitle'] as String,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 10,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.white.withOpacity(0.1)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'إعلان',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 9,
-                              fontWeight: FontWeight.w600,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.white.withOpacity(0.1)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'إعلان',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
 
