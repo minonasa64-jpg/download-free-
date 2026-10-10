@@ -328,7 +328,8 @@ class _SmartUnityBannerState extends State<_SmartUnityBanner> with SingleTickerP
     if (_retryCount < 10 && mounted) {
       _retryCount++;
       _retryTimer?.cancel();
-      _retryTimer = Timer(Duration(seconds: 3 * min(_retryCount, 4)), () {
+      final int retryDelay = 3 * (_retryCount < 4 ? _retryCount : 4);
+      _retryTimer = Timer(Duration(seconds: retryDelay), () {
         if (mounted) {
           setState(() {
             _bannerKey = UniqueKey();

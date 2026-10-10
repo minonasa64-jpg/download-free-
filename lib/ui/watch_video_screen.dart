@@ -110,7 +110,8 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
             ];
 
       bool initializedSuccessfully = false;
-      _currentCandidateIndex = startIndex.clamp(0, max(0, _candidateStreams.length - 1));
+      final int maxCandidateIndex = _candidateStreams.isEmpty ? 0 : _candidateStreams.length - 1;
+      _currentCandidateIndex = startIndex < 0 ? 0 : (startIndex > maxCandidateIndex ? maxCandidateIndex : startIndex);
 
       for (int i = _currentCandidateIndex; i < _candidateStreams.length; i++) {
         final candidate = _candidateStreams[i];
