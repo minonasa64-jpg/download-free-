@@ -166,7 +166,7 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.refresh_rounded, color: AppColors.cyan, size: 36),
+                      Icon(Icons.refresh_rounded, color: AppColors.cyan, size: 36),
                       const SizedBox(height: 8),
                       const Text(
                         'انقطع البث مؤقتاً، جاري الاستئناف التلقائي...',
