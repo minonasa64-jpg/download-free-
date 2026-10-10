@@ -40,13 +40,13 @@ function apiPlugin(): Plugin {
         res.end(JSON.stringify({
           success: true,
           latestRun: {
-            id: 38034700190,
+            id: 38050677630,
             status: 'completed',
             conclusion: 'success',
-            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38034700190',
+            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38050677630',
             head_commit: {
-              id: 'd5e886a',
-              message: 'fix(dart): resolve min/max method undefined and type cast issues in ad_service and watch_video_screen v1.5.1'
+              id: '43cc524',
+              message: 'fix(download): overhaul stream downloading with standard Range headers, guarantee audio+video merge with ultrafast x264, rotate ads dynamically, and release v1.5.2'
             }
           },
           runs: []
