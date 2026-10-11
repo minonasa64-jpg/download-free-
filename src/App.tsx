@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 38050677630,
-    status: 'completed',
-    conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38050677630',
-    head_sha: '43cc524',
+    id: 38159459542,
+    status: 'in_progress',
+    conclusion: null,
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38159459542',
+    head_sha: '892081c',
     head_commit: {
-      id: '43cc524',
-      message: 'fix(download): overhaul stream downloading with standard Range headers, guarantee audio+video merge with ultrafast x264, rotate ads dynamically, and release v1.5.2'
+      id: '892081c',
+      message: 'fix(v1.5.3): guarantee video+audio playback from links, enforce interstitial ads, show banner immediately, and remove annoying youtube search bar'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);

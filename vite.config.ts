@@ -40,13 +40,13 @@ function apiPlugin(): Plugin {
         res.end(JSON.stringify({
           success: true,
           latestRun: {
-            id: 38050677630,
-            status: 'completed',
-            conclusion: 'success',
-            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38050677630',
+            id: 38159459542,
+            status: 'in_progress',
+            conclusion: null,
+            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38159459542',
             head_commit: {
-              id: '43cc524',
-              message: 'fix(download): overhaul stream downloading with standard Range headers, guarantee audio+video merge with ultrafast x264, rotate ads dynamically, and release v1.5.2'
+              id: '892081c',
+              message: 'fix(v1.5.3): guarantee video+audio playback from links, enforce interstitial ads, show banner immediately, and remove annoying youtube search bar'
             }
           },
           runs: []
