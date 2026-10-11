@@ -1050,14 +1050,31 @@ class UniversalExtractorService {
           final uri = Uri.parse(url);
           audioUrl = '${uri.scheme}://${uri.host}$audioUrl';
         }
-        return _buildSimpleMediaResult(
-          id: 'web_audio_${DateTime.now().millisecondsSinceEpoch}',
-          title: title,
-          thumbnail: thumbnail,
-          videoUrl: audioUrl,
-          platform: 'audio',
-          author: Uri.tryParse(url)?.host ?? 'Web',
-        );
+        return {
+          'id': 'web_audio_${DateTime.now().millisecondsSinceEpoch}',
+          'title': title.isNotEmpty ? title : 'ملف صوتي من الإنترنت',
+          'thumbnail': thumbnail,
+          'author': Uri.tryParse(url)?.host ?? 'Web',
+          'platform': 'audio',
+          'highestAudioUrl': audioUrl,
+          'highestAudioTag': null,
+          'video': <Map<String, dynamic>>[],
+          'audio': [
+            {
+              'url': audioUrl,
+              'quality_name': 'مسار صوتي نقي MP3',
+              'quality_order': 192,
+              'quality_badge': 'HQ',
+              'quality_desc': 'استخراج الصوت الأصلي من المصدر',
+              'size': 'صوت نقي',
+              'size_bytes': 0,
+              'ext': 'mp3',
+              'needs_merge': false,
+              'platform': 'audio',
+            }
+          ],
+          'subtitles': [],
+        };
       }
     } catch (e) {
       debugPrint('HTML Scraper خطأ: $e');

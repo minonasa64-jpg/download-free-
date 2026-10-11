@@ -86,7 +86,7 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.5.2
+                  v1.5.3
                 </span>
               </h1>
               <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي إلى GitHub</p>
@@ -212,19 +212,31 @@ export default function App() {
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في هذا التحديث (v1.5.2)</h2>
+            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في هذا التحديث (v1.5.3)</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="p-5 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 space-y-3">
-              <div className="flex items-center gap-3 text-emerald-400">
-                <div className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
-                  <Download className="w-5 h-5 text-emerald-400" />
+            <div className="p-5 rounded-2xl border border-cyan-500/40 bg-cyan-950/20 space-y-3">
+              <div className="flex items-center gap-3 text-cyan-400">
+                <div className="p-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30">
+                  <Download className="w-5 h-5 text-cyan-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">حل توقف التحميل نهائياً (Unstoppable Engine)</h3>
+                <h3 className="text-sm font-semibold text-white">حل تنزيل الروابط بصوت وصورة 100%</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                استمرار التنزيل بنسبة 100% حتى آخر بايت دون توقف مفاجئ، مع تجديد المانيفست والتوقيع تلقائياً عند انتهاء صلاحية الروابط، ونظام استئناف ذكي بـ 15 محاولة تكيفية.
+                إنهاء مشكلة تشغيل الصوت فقط عند التنزيل من الروابط، عبر تطبيع كودك الفيديو فوراً إلى H.264 (AVC) القياسي مع ترميز AAC وyuv420p لمنع الشاشة السوداء نهائياً على كافة المشغلات.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-2xl border border-purple-500/40 bg-purple-950/20 space-y-3">
+              <div className="flex items-center gap-3 text-purple-400">
+                <div className="p-2 rounded-lg bg-purple-500/20 border border-purple-500/30">
+                  <Sparkles className="w-5 h-5 text-purple-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">استعادة الإعلانات البينية وضمان ظهورها</h3>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                إلغاء التجاوز السريع واعتماد خطة مؤكدة لعرض الإعلان البيني فور اكتمال تحميله، مع تدوير المعرفات وتثبيت معرف الإعلان الجاهز لتجنب أي تضارب.
               </p>
             </div>
 
@@ -233,10 +245,22 @@ export default function App() {
                 <div className="p-2 rounded-lg bg-amber-500/20 border border-amber-500/30">
                   <Sparkles className="w-5 h-5 text-amber-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">ظهور إعلان البنر دوماً دون أي تأخير</h3>
+                <h3 className="text-sm font-semibold text-white">ظهور إعلان البنر فوراً دون أي تعطيل</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                ظهور فوري دائم لشريط الإعلانات من الثانية الأولى بدون أي تأخير، مع وضع الاستجابة الفورية ودعم معرفات Unity Ads الرسمية.
+                تفعيل شريط البنر الإعلاني فور تشغيل التطبيق مع ويدجت Unity Ads المباشرة وبطاقات الرعاية المتحركة دون أي انتظار.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-2xl border border-rose-500/40 bg-rose-950/20 space-y-3">
+              <div className="flex items-center gap-3 text-rose-400">
+                <div className="p-2 rounded-lg bg-rose-500/20 border border-rose-500/30">
+                  <CheckCircle2 className="w-5 h-5 text-rose-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">إزالة الشريط المزعج أسفل بحث يوتيوب</h3>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                حذف الحاوية الفارغة والشريط العائم أسفل حقل البحث في يوتيوب لتجربة تصفح نظيفة وخالية من أي عناصر معلقة.
               </p>
             </div>
 

@@ -21,6 +21,7 @@ class AdService {
   bool _isTestMode = true;
   bool _isInterstitialLoaded = false;
   bool _isInterstitialLoading = false;
+  String? _loadedInterstitialPlacement;
   int _interstitialRetryCount = 0;
   int _interstitialPlacementIndex = 0;
   Timer? _interstitialRetryTimer;
@@ -32,8 +33,8 @@ class AdService {
 
   static const List<String> _candidateInterstitialPlacements = [
     "Interstitial_Android",
-    "BP_Interstitial_Android",
     "video",
+    "BP_Interstitial_Android",
   ];
 
   bool get isInitialized => _isInitialized;
@@ -54,6 +55,9 @@ class AdService {
       debugPrint("Unity Ads: Initializing with Game ID: $gameId (testMode: $effectiveTestMode)");
       _instance.adStatusNotifier.value = 'جاري الاتصال بـ Unity Ads...';
 
+      // تفعيل البنر فوراً من البداية لعدم الانتظار
+      _instance.isInitializedNotifier.value = true;
+
       await UnityAds.init(
         gameId: gameId,
         testMode: effectiveTestMode,
@@ -71,16 +75,11 @@ class AdService {
             init(testMode: true);
             return;
           }
-          _instance._isInitialized = false;
-          _instance.isInitializedNotifier.value = false;
-          _instance.adStatusNotifier.value = 'تعذر الاتصال ($error)';
           _instance._scheduleInitRetry();
         },
       );
     } catch (e) {
       debugPrint("Unity Ads Init Exception: $e");
-      _instance._isInitialized = false;
-      _instance.isInitializedNotifier.value = false;
       _instance._scheduleInitRetry();
     }
   }
@@ -108,6 +107,7 @@ class AdService {
   Future<void> reloadAds() async {
     _isInterstitialLoaded = false;
     _isInterstitialLoading = false;
+    _loadedInterstitialPlacement = null;
     _interstitialRetryCount = 0;
     _interstitialPlacementIndex = 0;
     await init(testMode: _isTestMode);
@@ -129,6 +129,7 @@ class AdService {
           debugPrint("Unity Ads: Interstitial ad loaded successfully and ready! ($placementId)");
           _isInterstitialLoaded = true;
           _isInterstitialLoading = false;
+          _loadedInterstitialPlacement = placementId;
           _interstitialRetryCount = 0;
           adStatusNotifier.value = _isTestMode ? 'متصل (إعلان بيني وبنر جاهزان)' : 'متصل وجاهز';
         },
@@ -136,11 +137,12 @@ class AdService {
           debugPrint("Unity Ads: Interstitial ad failed to load ($placementId): $error - $message");
           _isInterstitialLoaded = false;
           _isInterstitialLoading = false;
+          _loadedInterstitialPlacement = null;
           // تجربة المعرف البديل التالي
           if (_interstitialPlacementIndex < _candidateInterstitialPlacements.length - 1) {
             _interstitialPlacementIndex++;
             debugPrint("Unity Ads: Switching to candidate interstitial placement: $currentInterstitialPlacement");
-            Timer(const Duration(milliseconds: 600), () => loadInterstitialAd());
+            Timer(const Duration(milliseconds: 400), () => loadInterstitialAd());
           } else {
             _scheduleInterstitialRetry();
           }
@@ -150,16 +152,17 @@ class AdService {
       debugPrint("Unity Ads: Load Interstitial Exception: $e");
       _isInterstitialLoaded = false;
       _isInterstitialLoading = false;
+      _loadedInterstitialPlacement = null;
       _scheduleInterstitialRetry();
     }
   }
 
   void _scheduleInterstitialRetry() {
     _interstitialPlacementIndex = 0;
-    if (_interstitialRetryCount < 6) {
+    if (_interstitialRetryCount < 8) {
       _interstitialRetryCount++;
       _interstitialRetryTimer?.cancel();
-      _interstitialRetryTimer = Timer(Duration(seconds: 3 * _interstitialRetryCount), () {
+      _interstitialRetryTimer = Timer(Duration(seconds: 2 * _interstitialRetryCount), () {
         if (!_isInterstitialLoaded) {
           loadInterstitialAd();
         }
@@ -167,45 +170,66 @@ class AdService {
     }
   }
 
-  // إظهار الإعلان البيني عند التنزيل أو التنقل مع حماية كاملة من تعليق واجهة المستخدم
+  // إظهار الإعلان البيني بدون أي تجاوز سريع؛ نضمن ظهوره أو انتظار تحميله ثم عرضه
   void showInterstitialAd({VoidCallback? onAdClosed}) {
-    // تدوير معرّف الإعلان البيني في كل طلب لضمان تغير الإعلان وظهور إعلانات متنوعة
-    _interstitialPlacementIndex = (_interstitialPlacementIndex + 1) % _candidateInterstitialPlacements.length;
-
-    if (!_isInitialized || !_isInterstitialLoaded) {
-      debugPrint("Unity Ads: Interstitial not ready yet or SDK not initialized. Proceeding smoothly.");
-      if (onAdClosed != null) onAdClosed();
-      loadInterstitialAd();
+    // 1. إذا كان الإعلان محملاً مسبقاً وجاهزاً، نعرضه فوراً وبدون أي ثانية تأخير
+    if (_isInterstitialLoaded && _loadedInterstitialPlacement != null) {
+      _executeShowVideoAd(_loadedInterstitialPlacement!, onAdClosed: onAdClosed);
       return;
     }
 
-    final targetPlacement = currentInterstitialPlacement;
+    // 2. إذا لم يكن محملاً بعد، نطلق التحميل النشط فوراً مع محاولة الانتظار لثوانٍ معدودة لعرضه فور جهوزه
+    debugPrint("Unity Ads: Interstitial requested but not ready yet. Actively loading now...");
+    loadInterstitialAd();
 
+    int checkAttempts = 0;
+    Timer.periodic(const Duration(milliseconds: 350), (timer) {
+      checkAttempts++;
+      if (_isInterstitialLoaded && _loadedInterstitialPlacement != null) {
+        timer.cancel();
+        _executeShowVideoAd(_loadedInterstitialPlacement!, onAdClosed: onAdClosed);
+      } else if (checkAttempts >= 8) {
+        // إذا انقضت المهلة بعد 2.8 ثانية ولم يكتمل تحميل الإعلان من شبكة Unity
+        timer.cancel();
+        debugPrint("Unity Ads: Interstitial load timeout reached after multiple attempts.");
+        if (onAdClosed != null) onAdClosed();
+        loadInterstitialAd();
+      }
+    });
+  }
+
+  void _executeShowVideoAd(String placementId, {VoidCallback? onAdClosed}) {
     try {
-      debugPrint("Unity Ads: Showing interstitial video ad ($targetPlacement)...");
+      debugPrint("Unity Ads: Showing interstitial video ad on placement: $placementId");
       _isInterstitialLoaded = false;
+      _loadedInterstitialPlacement = null;
 
       UnityAds.showVideoAd(
-        placementId: targetPlacement,
-        onStart: (placementId) {
-          debugPrint("Unity Ads: Interstitial ad started: $placementId");
+        placementId: placementId,
+        onStart: (pId) {
+          debugPrint("Unity Ads: Interstitial ad started: $pId");
         },
-        onClick: (placementId) {
-          debugPrint("Unity Ads: Interstitial ad clicked: $placementId");
+        onClick: (pId) {
+          debugPrint("Unity Ads: Interstitial ad clicked: $pId");
         },
-        onSkipped: (placementId) {
-          debugPrint("Unity Ads: Interstitial ad skipped by user: $placementId");
+        onSkipped: (pId) {
+          debugPrint("Unity Ads: Interstitial ad skipped: $pId");
           if (onAdClosed != null) onAdClosed();
+          // تدوير المعرف وتجهيز الإعلان التالي فوراً في الخلفية
+          _interstitialPlacementIndex = (_interstitialPlacementIndex + 1) % _candidateInterstitialPlacements.length;
           loadInterstitialAd();
         },
-        onComplete: (placementId) {
-          debugPrint("Unity Ads: Interstitial ad completed playback: $placementId");
+        onComplete: (pId) {
+          debugPrint("Unity Ads: Interstitial ad completed: $pId");
           if (onAdClosed != null) onAdClosed();
+          // تدوير المعرف وتجهيز الإعلان التالي فوراً في الخلفية
+          _interstitialPlacementIndex = (_interstitialPlacementIndex + 1) % _candidateInterstitialPlacements.length;
           loadInterstitialAd();
         },
-        onFailed: (placementId, error, message) {
-          debugPrint("Unity Ads: Interstitial ad show failed ($error): $message");
+        onFailed: (pId, error, message) {
+          debugPrint("Unity Ads: Interstitial ad show failed ($pId, $error): $message");
           if (onAdClosed != null) onAdClosed();
+          _interstitialPlacementIndex = (_interstitialPlacementIndex + 1) % _candidateInterstitialPlacements.length;
           loadInterstitialAd();
         },
       );

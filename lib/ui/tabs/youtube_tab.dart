@@ -339,131 +339,14 @@ class _YoutubeTabState extends State<YoutubeTab> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: GestureDetector(
-        onTap: () {
-          if (_showSuggestions) {
-            _searchFocusNode.unfocus();
-            setState(() => _showSuggestions = false);
-          }
-        },
-        behavior: HitTestBehavior.translucent,
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                _buildHeader(),
-                Expanded(
-                  child: _buildBodyContent(),
-                ),
-              ],
-            ),
-            
-            // قائمة اقتراحات وسجل البحث المتطورة
-            if (_showSuggestions && (_searchSuggestions.isNotEmpty || _recentSearches.isNotEmpty))
-              Positioned(
-                top: 75,
-                left: 16,
-                right: 16,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                    child: Container(
-                      constraints: const BoxConstraints(maxHeight: 320),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface.withOpacity(0.96),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: AppColors.cyan.withOpacity(0.3)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.6),
-                            blurRadius: 18,
-                            offset: const Offset(0, 8),
-                          )
-                        ],
-                      ),
-                      child: _buildSuggestionsOrHistoryList(),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSuggestionsOrHistoryList() {
-    final isQueryEmpty = _searchController.text.trim().isEmpty;
-
-    if (isQueryEmpty && _recentSearches.isNotEmpty) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.history_rounded, color: AppColors.cyan, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'سجل عمليات البحث الأخيرة',
-                      style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                GestureDetector(
-                  onTap: _clearAllRecentSearches,
-                  child: const Text(
-                    'مسح الكل',
-                    style: TextStyle(color: AppColors.orange, fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(color: Colors.white10, height: 1),
-          Flexible(
-            child: ListView.builder(
-              shrinkWrap: true,
-              padding: EdgeInsets.zero,
-              itemCount: _recentSearches.length,
-              itemBuilder: (context, index) {
-                final item = _recentSearches[index];
-                return ListTile(
-                  dense: true,
-                  leading: Icon(Icons.history, color: AppColors.textMuted, size: 18),
-                  title: Text(item, style: TextStyle(color: AppColors.textPrimary, fontSize: 13)),
-                  trailing: IconButton(
-                    icon: Icon(Icons.close, color: AppColors.textMuted, size: 16),
-                    onPressed: () => _removeRecentSearch(item),
-                  ),
-                  onTap: () => _performSearch(item),
-                );
-              },
-            ),
+          _buildHeader(),
+          Expanded(
+            child: _buildBodyContent(),
           ),
         ],
-      );
-    }
-
-    return ListView.builder(
-      shrinkWrap: true,
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      itemCount: _searchSuggestions.length,
-      itemBuilder: (context, index) {
-        final suggestion = _searchSuggestions[index];
-        return ListTile(
-          dense: true,
-          leading: Icon(Icons.search_rounded, color: AppColors.cyan, size: 18),
-          title: Text(suggestion, style: TextStyle(color: AppColors.textPrimary, fontSize: 13)),
-          trailing: Icon(Icons.north_west_rounded, color: AppColors.textMuted, size: 14),
-          onTap: () => _performSearch(suggestion),
-        );
-      },
+      ),
     );
   }
 

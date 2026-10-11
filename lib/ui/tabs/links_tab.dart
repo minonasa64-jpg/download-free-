@@ -837,17 +837,19 @@ class _LinksTabState extends State<LinksTab> {
                             AdService().showInterstitialAd();
                           } catch (_) {}
 
+                          final String? targetVideoId = _selectedFormat!['video_id']?.toString() ?? _mediaData?['id']?.toString();
                           final bool isYt = _mediaData?['platform'] == 'youtube' ||
-                              (_selectedFormat!['video_id'] != null && RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(_selectedFormat!['video_id'].toString()));
-                          final bool needsMerge = isYt && (_selectedFormat!['needs_merge'] == true);
+                              (targetVideoId != null && RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(targetVideoId));
+                          final bool needsMerge = isYt && (_selectedFormat!['needs_merge'] == true || (_selectedFormat!['tag'] != 22 && _selectedFormat!['tag'] != 18 && _selectedFormat!['ext'] != 'mp3'));
+                          final String effectiveAudio = highestAudioUrl.isNotEmpty ? highestAudioUrl : (_mediaData?['highestAudioUrl'] ?? '');
 
                           _backend.startDownloadInBackground(
                             selectedUrl: _selectedFormat!['url'],
                             title: title,
-                            ext: _selectedFormat!['ext'] ?? 'mp4',
+                            ext: _selectedFormat!['ext'] == 'mp3' ? 'mp3' : 'mp4',
                             needsMerge: needsMerge,
-                            highestAudioUrl: needsMerge ? highestAudioUrl : '',
-                            videoId: _selectedFormat!['video_id'],
+                            highestAudioUrl: needsMerge ? effectiveAudio : '',
+                            videoId: targetVideoId,
                             videoTag: _selectedFormat!['tag'],
                             highestAudioTag: _mediaData?['highestAudioTag'],
                           );
@@ -875,11 +877,11 @@ class _LinksTabState extends State<LinksTab> {
                           );
                         },
                         icon: const Icon(Icons.download_rounded, color: Colors.white),
-                        label: const Text(
-                          'تحميل',
-                          style: TextStyle(
+                        label: Text(
+                          'تحميل (${_selectedFormat!['quality_name']})',
+                          style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -1055,7 +1057,9 @@ class _LinksTabState extends State<LinksTab> {
       itemCount: formats.length,
       itemBuilder: (context, index) {
         final format = formats[index];
-        final isSelected = _selectedFormat == format;
+        final isSelected = _selectedFormat != null &&
+            (_selectedFormat == format ||
+             (_selectedFormat!['url'] == format['url'] && _selectedFormat!['quality_name'] == format['quality_name']));
         final String? badge = format['quality_badge'];
         final String? desc = format['quality_desc'];
         final int order = format['quality_order'] is int 

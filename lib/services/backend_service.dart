@@ -1109,6 +1109,12 @@ class BackendService {
             videoId: videoId,
             streamTag: videoTag,
           );
+
+          // ضمان تشغيل الفيديو بصوت وصورة نقية 100% والتوافق التام مع كافة المشغلات
+          if (ext != 'mp3' && await File(finalOutputPath).exists()) {
+            onStatusChanged('جاري ضبط وضمان جودة الصورة والصوت عبر FFmpeg...');
+            await _ensureVideoPlayabilityAndSound(finalOutputPath, tempDir, notifId);
+          }
         }
       } else {
         // أسماء مؤقتة آمنة تماماً خالية من أي حروف خاصة أو مسافات لتفادي مشاكل MediaMuxer
@@ -1249,46 +1255,13 @@ class BackendService {
                 '-map', '0:v:0',
                 '-map', '1:a:0',
                 '-c:v', 'copy',
-                '-c:a', 'copy',
-                '-movflags', '+faststart',
-                tempMergedPath,
-              ],
-            },
-            // محاولة 2: نسخ الفيديو مع تحويل الصوت إلى AAC 192k عالي التوافق
-            {
-              'path': tempMergedPath,
-              'args': [
-                '-y',
-                '-i', tempVideoPath,
-                '-i', tempAudioPath,
-                '-map', '0:v:0',
-                '-map', '1:a:0',
-                '-c:v', 'copy',
                 '-c:a', 'aac',
                 '-b:a', '192k',
                 '-movflags', '+faststart',
                 tempMergedPath,
               ],
             },
-            // محاولة 3: ربط متساهل مع وسم VP9 داخل حاوية MP4 وخيار strict -2
-            {
-              'path': tempMergedPath,
-              'args': [
-                '-y',
-                '-i', tempVideoPath,
-                '-i', tempAudioPath,
-                '-map', '0:v:0',
-                '-map', '1:a:0',
-                '-c:v', 'copy',
-                '-tag:v', 'vp09',
-                '-c:a', 'aac',
-                '-b:a', '192k',
-                '-strict', '-2',
-                '-movflags', '+faststart',
-                tempMergedPath,
-              ],
-            },
-            // محاولة 4: ترميز فائق السرعة H.264 + AAC يضمن 100% إنتاج ملف MP4 أصلي بصوت وصورة متوافق مع كافة المشغلات
+            // محاولة 2: ترميز توربو فائق السرعة H.264 (AVC) + AAC مع yuv420p لضمان 100% ظهور الصورة والصوت بدون أي شاشة سوداء
             {
               'path': tempMergedPath,
               'args': [
@@ -1299,6 +1272,7 @@ class BackendService {
                 '-map', '1:a:0',
                 '-c:v', 'libx264',
                 '-preset', 'ultrafast',
+                '-pix_fmt', 'yuv420p',
                 '-crf', '22',
                 '-c:a', 'aac',
                 '-b:a', '192k',
@@ -1306,7 +1280,7 @@ class BackendService {
                 tempMergedPath,
               ],
             },
-            // محاولة 5: ترميز فيديو سريع عبر كودك mpeg4 المدمج الأصلي
+            // محاولة 3: ترميز فيديو سريع عبر كودك mpeg4 المدمج الأصلي
             {
               'path': tempMergedPath,
               'args': [
@@ -1316,6 +1290,7 @@ class BackendService {
                 '-map', '0:v:0',
                 '-map', '1:a:0',
                 '-c:v', 'mpeg4',
+                '-pix_fmt', 'yuv420p',
                 '-q:v', '4',
                 '-c:a', 'aac',
                 '-b:a', '192k',
@@ -1323,7 +1298,7 @@ class BackendService {
                 tempMergedPath,
               ],
             },
-            // محاولة 6: حاوية Matroska الفائقة (MKV) إذا كان الملف كودك خاص
+            // محاولة 4: حاوية Matroska الفائقة (MKV) إذا كان الملف كودك خاص
             {
               'path': tempMergedMkv,
               'args': [
@@ -1429,6 +1404,7 @@ class BackendService {
               streamTag: videoTag,
             );
           }
+          await _ensureVideoPlayabilityAndSound(targetDestination, tempDir, notifId);
         }
       }
 
@@ -1488,6 +1464,78 @@ class BackendService {
       throw Exception('حدث خطأ: $e');
     }
   }
+
+  /// ضمان توافق الفيديو وظهور الصورة والصوت 100% على كافة الأجهزة والمشغلات
+  Future<void> _ensureVideoPlayabilityAndSound(String filePath, Directory tempDir, int notifId) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) return;
+      final int originalSize = await file.length();
+      if (originalSize < 1024) return;
+
+      final tempOut = '${tempDir.path}/norm_${notifId}.mp4';
+      try { if (await File(tempOut).exists()) await File(tempOut).delete(); } catch (_) {}
+
+      // 1. محاولة ريمكس فائق السرعة لنقل الفيديو وتحويل الصوت إلى AAC مع موضع البداية السريع +faststart
+      bool normalized = false;
+      try {
+        final session = await FFmpegKit.executeWithArguments([
+          '-y',
+          '-i', filePath,
+          '-c:v', 'copy',
+          '-c:a', 'aac',
+          '-b:a', '192k',
+          '-movflags', '+faststart',
+          tempOut,
+        ]);
+        final code = await session.getReturnCode();
+        final nFile = File(tempOut);
+        if (ReturnCode.isSuccess(code) && await nFile.exists() && (await nFile.length()) > (originalSize * 0.7)) {
+          normalized = true;
+        }
+      } catch (_) {}
+
+      // 2. إذا فشل الريمكس (مثلاً الفيديو كودك VP9 أو HEVC أو AV1 يسبب شاشة سوداء على مشغلات أندرويد)
+      // نقوم بترميز الفيديو فوراً بخيار libx264 ultrafast لضمان ظهور الصورة والصوت 100%
+      if (!normalized) {
+        try {
+          if (await File(tempOut).exists()) {
+            try { await File(tempOut).delete(); } catch (_) {}
+          }
+          final session2 = await FFmpegKit.executeWithArguments([
+            '-y',
+            '-i', filePath,
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',
+            '-pix_fmt', 'yuv420p',
+            '-crf', '22',
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            '-movflags', '+faststart',
+            tempOut,
+          ]);
+          final code2 = await session2.getReturnCode();
+          final nFile2 = File(tempOut);
+          if (ReturnCode.isSuccess(code2) && await nFile2.exists() && (await nFile2.length()) > (originalSize * 0.5)) {
+            normalized = true;
+          }
+        } catch (e) {
+          debugPrint('استثناء أثناء تطبيع كودك الفيديو: $e');
+        }
+      }
+
+      if (normalized && await File(tempOut).exists()) {
+        try {
+          await File(tempOut).copy(filePath);
+          await File(tempOut).delete();
+          debugPrint('تم تطبيع كودك الفيديو بنجاح لضمان ظهور الصوت والصورة: $filePath');
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('تنبيه أثناء تطبيع الفيديو: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> getPlayableStream(String videoId, {bool forceFresh = false}) async {
     try {
       if (forceFresh) {
