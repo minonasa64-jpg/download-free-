@@ -951,7 +951,9 @@ class BackendService {
         .replaceAll(RegExp(r'[\u{10000}-\u{10FFFF}]', unicode: true), '')
         .replaceAll(RegExp(r'[\uD800-\uDFFF]'), '')
         // 2. إزالة كافة الرموز الممنوعة في نظام ملفات أندرويد و Linux و FAT32
-        .replaceAll(RegExp(r'[\\/:*?"<>|\r\n\t\x00-\x1f#%&{}\\<>*?/$!\'":@+`|=~^;,]'), ' ')
+        .replaceAll(RegExp(r'[\x00-\x1f\x7f\\/:*?"<>|#%&{}!@+`|=~^;,]'), ' ')
+        .replaceAll("'", ' ')
+        .replaceAll(r'$', ' ')
         // 3. توحيد المسافات
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
@@ -1059,7 +1061,7 @@ class BackendService {
     }
   }
 
-  Future<void> _safeFinalizeFile(File partFile, String targetSavePath) async {
+  Future<File> _safeFinalizeFile(File partFile, String targetSavePath) async {
     try {
       final finalFile = File(targetSavePath);
       if (!await finalFile.parent.exists()) {
@@ -1070,9 +1072,11 @@ class BackendService {
       }
       try {
         await partFile.rename(targetSavePath);
+        return finalFile;
       } catch (_) {
         await partFile.copy(targetSavePath);
         try { await partFile.delete(); } catch (_) {}
+        return finalFile;
       }
     } catch (e) {
       debugPrint("تعذر نقل الملف إلى $targetSavePath ($e). حفظ في المسار الآمن...");
@@ -1085,9 +1089,11 @@ class BackendService {
       }
       try {
         await partFile.rename(safeDest);
+        return safeFile;
       } catch (_) {
         await partFile.copy(safeDest);
         try { await partFile.delete(); } catch (_) {}
+        return safeFile;
       }
     }
   }
@@ -2050,10 +2056,10 @@ class BackendService {
       }
 
       if (downloadedSuccessfully && await partFile.exists() && await partFile.length() > 0) {
-        await _safeFinalizeFile(partFile, savePath);
-        final finalLen = await File(savePath).exists() ? await File(savePath).length() : await partFile.length();
+        final finalizedFile = await _safeFinalizeFile(partFile, savePath);
+        final finalLen = await finalizedFile.exists() ? await finalizedFile.length() : await partFile.length();
         onReceiveProgress(finalLen, finalLen);
-        debugPrint("تم تنزيل الوسائط الخارجية بنجاح 100%: $savePath ($finalLen بايت)");
+        debugPrint("تم تنزيل الوسائط الخارجية بنجاح 100%: ${finalizedFile.path} ($finalLen بايت)");
         try {
           final isAudio = savePath.toLowerCase().endsWith('.mp3') ||
               savePath.toLowerCase().endsWith('.m4a') ||
@@ -2334,9 +2340,10 @@ class BackendService {
       throw Exception("لم يكتمل التنزيل بالكامل ($downloadedBytes من أصل $totalBytes بايت). تم حفظ الجزء المنزّل للاستئناف.");
     }
 
-    await _safeFinalizeFile(partFile, savePath);
-    onReceiveProgress(downloadedBytes, totalBytes > 0 ? totalBytes : downloadedBytes);
-    debugPrint("تم التنزيل بنجاح 100% بحجم $downloadedBytes بايت وحفظه في $savePath");
+    final finalizedFile = await _safeFinalizeFile(partFile, savePath);
+    final finalLen = await finalizedFile.exists() ? await finalizedFile.length() : downloadedBytes;
+    onReceiveProgress(finalLen, totalBytes > 0 ? totalBytes : finalLen);
+    debugPrint("تم التنزيل بنجاح 100% بحجم $finalLen بايت وحفظه في ${finalizedFile.path}");
 
     try {
       final isAudio = savePath.toLowerCase().endsWith('.mp3') ||
