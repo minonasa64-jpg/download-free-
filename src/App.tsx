@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 38281674343,
+    id: 38288648092,
     status: 'in_progress',
     conclusion: null,
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38281674343',
-    head_sha: '737ccb7',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38288648092',
+    head_sha: 'b5de020',
     head_commit: {
-      id: '737ccb7',
-      message: 'feat(v1.5.6): deliver pure lossless 1080p FHD/2K/4K visual quality, studio CRF 17 encoding, bit-perfect direct copy and eliminate compression blur'
+      id: 'b5de020',
+      message: 'fix: resolve RegExp syntax error in sanitizeFileName to fix kernel_snapshot build failure'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
