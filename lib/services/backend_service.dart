@@ -943,18 +943,73 @@ class BackendService {
     }
   }
 
+  static String sanitizeFileName(String input) {
+    if (input.isEmpty) return 'media_${DateTime.now().millisecondsSinceEpoch}';
+
+    // 1. إزالة كافة الرموز التعبيرية (Emojis) واليونيكود غير المتوافق مع أنظمة الملفات (F2FS / FAT32)
+    String clean = input
+        .replaceAll(RegExp(r'[\u{10000}-\u{10FFFF}]', unicode: true), '')
+        .replaceAll(RegExp(r'[\uD800-\uDFFF]'), '')
+        // 2. إزالة كافة الرموز الممنوعة في نظام ملفات أندرويد و Linux و FAT32
+        .replaceAll(RegExp(r'[\\/:*?"<>|\r\n\t\x00-\x1f#%&{}\\<>*?/$!\'":@+`|=~^;,]'), ' ')
+        // 3. توحيد المسافات
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    // 4. إزالة النقاط والمسافات والشرطات من بداية ونهاية الاسم لمنع أسماء الملفات المخفية (...file)
+    clean = clean.replaceAll(RegExp(r'^[.\s_-]+'), '').replaceAll(RegExp(r'[.\s_-]+$'), '');
+
+    // 5. إذا أصبح الاسم فارغاً بعد التنظيف
+    if (clean.isEmpty) {
+      clean = 'media_${DateTime.now().millisecondsSinceEpoch}';
+    }
+
+    // 6. تقصير الاسم لتفادي تجاوز الحد الأقصى لطول المسار في نظام الملفات (60 حرفاً كحد أقصى)
+    if (clean.length > 60) {
+      clean = clean.substring(0, 60).trim();
+      clean = clean.replaceAll(RegExp(r'[.\s_-]+$'), '');
+    }
+
+    if (clean.isEmpty) {
+      clean = 'media_${DateTime.now().millisecondsSinceEpoch}';
+    }
+
+    return clean;
+  }
+
   Future<bool> _isDirWritable(Directory dir) async {
     try {
-      final testFile = File('${dir.path}/.test_${DateTime.now().millisecondsSinceEpoch}');
-      await testFile.writeAsString('1');
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      final testFile = File('${dir.path}/test_writable_${DateTime.now().millisecondsSinceEpoch}.tmp');
+      await testFile.writeAsString('ok');
       if (await testFile.exists()) {
-        await testFile.delete();
+        try { await testFile.delete(); } catch (_) {}
         return true;
       }
       return false;
     } catch (_) {
       return false;
     }
+  }
+
+  Future<Directory> _getGuaranteedWritableDir() async {
+    try {
+      final extDir = await getExternalStorageDirectory();
+      if (extDir != null) {
+        final dir = Directory('${extDir.path}/Boykta');
+        if (!await dir.exists()) await dir.create(recursive: true);
+        return dir;
+      }
+    } catch (_) {}
+    try {
+      final docDir = await getApplicationDocumentsDirectory();
+      final dir = Directory('${docDir.path}/Boykta');
+      if (!await dir.exists()) await dir.create(recursive: true);
+      return dir;
+    } catch (_) {}
+    return Directory.systemTemp;
   }
 
   Future<Directory> _getDownloadsDir() async {
@@ -981,26 +1036,63 @@ class BackendService {
       } catch (_) {}
     }
 
-    try {
-      final extDir = await getExternalStorageDirectory();
-      if (extDir != null) {
-        final dir = Directory('${extDir.path}/Boykta');
-        if (!await dir.exists()) await dir.create(recursive: true);
-        if (await _isDirWritable(dir)) return dir;
-      }
-    } catch (_) {}
-
-    try {
-      final docDir = await getApplicationDocumentsDirectory();
-      final dir = Directory('${docDir.path}/Boykta');
-      if (!await dir.exists()) await dir.create(recursive: true);
-      return dir;
-    } catch (_) {}
-
-    return Directory.systemTemp;
+    return _getGuaranteedWritableDir();
   }
 
-    Future<String> downloadAndMerge({
+  Future<File> _safeInitPartFile(String targetPath) async {
+    final partFile = File("$targetPath.part");
+    try {
+      if (!await partFile.exists()) {
+        await partFile.create(recursive: true);
+      }
+      return partFile;
+    } catch (e) {
+      debugPrint("تنبيه: تعذر إنشاء ملف التحميل في $targetPath.part ($e). الانتقال للمسار المضمون...");
+      final fileName = targetPath.split(Platform.pathSeparator).last;
+      final safeName = sanitizeFileName(fileName);
+      final safeDir = await _getGuaranteedWritableDir();
+      final fallbackFile = File('${safeDir.path}/$safeName.part');
+      if (!await fallbackFile.exists()) {
+        await fallbackFile.create(recursive: true);
+      }
+      return fallbackFile;
+    }
+  }
+
+  Future<void> _safeFinalizeFile(File partFile, String targetSavePath) async {
+    try {
+      final finalFile = File(targetSavePath);
+      if (!await finalFile.parent.exists()) {
+        await finalFile.parent.create(recursive: true);
+      }
+      if (await finalFile.exists()) {
+        try { await finalFile.delete(); } catch (_) {}
+      }
+      try {
+        await partFile.rename(targetSavePath);
+      } catch (_) {
+        await partFile.copy(targetSavePath);
+        try { await partFile.delete(); } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint("تعذر نقل الملف إلى $targetSavePath ($e). حفظ في المسار الآمن...");
+      final safeDir = await _getGuaranteedWritableDir();
+      final safeName = sanitizeFileName(targetSavePath.split(Platform.pathSeparator).last);
+      final safeDest = '${safeDir.path}/$safeName';
+      final safeFile = File(safeDest);
+      if (await safeFile.exists()) {
+        try { await safeFile.delete(); } catch (_) {}
+      }
+      try {
+        await partFile.rename(safeDest);
+      } catch (_) {
+        await partFile.copy(safeDest);
+        try { await partFile.delete(); } catch (_) {}
+      }
+    }
+  }
+
+  Future<String> downloadAndMerge({
     required String selectedUrl,
     required String title,
     required String ext,
@@ -1020,17 +1112,8 @@ class BackendService {
       debugPrint('تم تجاهل استثناء الصلاحيات: $e');
     }
 
-    // تنظيف اسم الملف بأمان للحفاظ على الحروف العربية والإنجليزية والأرقام والمسافات
-    String cleanTitle = title
-        .replaceAll(RegExp(r'[\\/:*?"<>|\r\n\t\x00-\x1f]'), '_')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-    if (cleanTitle.isEmpty) {
-      cleanTitle = 'video_${DateTime.now().millisecondsSinceEpoch}';
-    }
-    if (cleanTitle.length > 80) {
-      cleanTitle = cleanTitle.substring(0, 80).trim();
-    }
+    // تنظيف اسم الملف بأمان وتجريده من الرموز والرموز التعبيرية والنقاط الممنوعة لتفادي أخطاء أنظمة الملفات
+    String cleanTitle = sanitizeFileName(title);
 
     // مسارات مرنة ومتوافقة مع كافة إصدارات الأندرويد
     Directory tempDir = await _getTempDir();
@@ -1848,10 +1931,7 @@ class BackendService {
     // =========================================================================
     if (!isYouTube) {
       debugPrint("بدء تنزيل وسائط من منصة خارجية عبر محرك التنزيل الشامل: $url");
-      final partFile = File("$savePath.part");
-      if (!await partFile.exists()) {
-        await partFile.create(recursive: true);
-      }
+      final partFile = await _safeInitPartFile(savePath);
 
       bool downloadedSuccessfully = false;
 
@@ -1970,17 +2050,8 @@ class BackendService {
       }
 
       if (downloadedSuccessfully && await partFile.exists() && await partFile.length() > 0) {
-        final finalFile = File(savePath);
-        if (await finalFile.exists()) {
-          try { await finalFile.delete(); } catch (_) {}
-        }
-        try {
-          await partFile.rename(savePath);
-        } catch (_) {
-          await partFile.copy(savePath);
-          try { await partFile.delete(); } catch (_) {}
-        }
-        final finalLen = await File(savePath).length();
+        await _safeFinalizeFile(partFile, savePath);
+        final finalLen = await File(savePath).exists() ? await File(savePath).length() : await partFile.length();
         onReceiveProgress(finalLen, finalLen);
         debugPrint("تم تنزيل الوسائط الخارجية بنجاح 100%: $savePath ($finalLen بايت)");
         try {
@@ -2077,23 +2148,11 @@ class BackendService {
       } catch (_) {}
     }
 
-    final partFile = File("$savePath.part");
-    if (!await partFile.exists()) {
-      await partFile.create(recursive: true);
-    }
+    final partFile = await _safeInitPartFile(savePath);
     int downloadedBytes = await partFile.length();
 
     if (totalBytes > 0 && downloadedBytes >= totalBytes) {
-      final finalFile = File(savePath);
-      if (await finalFile.exists()) {
-        try { await finalFile.delete(); } catch (_) {}
-      }
-      try {
-        await partFile.rename(savePath);
-      } catch (_) {
-        await partFile.copy(savePath);
-        try { await partFile.delete(); } catch (_) {}
-      }
+      await _safeFinalizeFile(partFile, savePath);
       onReceiveProgress(totalBytes, totalBytes);
       return;
     }
@@ -2124,16 +2183,7 @@ class BackendService {
         downloadedBytes = await partFile.length();
         // إذا اكتمل تنزيل الملف كاملاً (100% أو 99.5% على الأقل)
         if (totalBytes > 0 && downloadedBytes >= (totalBytes * 0.995)) {
-          final finalFile = File(savePath);
-          if (await finalFile.exists()) {
-            try { await finalFile.delete(); } catch (_) {}
-          }
-          try {
-            await partFile.rename(savePath);
-          } catch (_) {
-            await partFile.copy(savePath);
-            try { await partFile.delete(); } catch (_) {}
-          }
+          await _safeFinalizeFile(partFile, savePath);
           onReceiveProgress(totalBytes, totalBytes);
           debugPrint("اكتمل التنزيل بنجاح 100% عبر YoutubeExplode: $downloadedBytes بايت");
           return;
@@ -2284,16 +2334,7 @@ class BackendService {
       throw Exception("لم يكتمل التنزيل بالكامل ($downloadedBytes من أصل $totalBytes بايت). تم حفظ الجزء المنزّل للاستئناف.");
     }
 
-    final finalFile = File(savePath);
-    if (await finalFile.exists()) {
-      try { await finalFile.delete(); } catch (_) {}
-    }
-    try {
-      await partFile.rename(savePath);
-    } catch (_) {
-      await partFile.copy(savePath);
-      try { await partFile.delete(); } catch (_) {}
-    }
+    await _safeFinalizeFile(partFile, savePath);
     onReceiveProgress(downloadedBytes, totalBytes > 0 ? totalBytes : downloadedBytes);
     debugPrint("تم التنزيل بنجاح 100% بحجم $downloadedBytes بايت وحفظه في $savePath");
 
