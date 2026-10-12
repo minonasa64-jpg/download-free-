@@ -18,7 +18,7 @@ class AdService {
   final ValueNotifier<bool> isInitializedNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<String> adStatusNotifier = ValueNotifier<String>('جاري التهيئة...');
 
-  bool _isTestMode = true;
+  bool _isTestMode = false;
   bool _isInterstitialLoaded = false;
   bool _isInterstitialLoading = false;
   String? _loadedInterstitialPlacement;
@@ -43,17 +43,17 @@ class AdService {
   String get currentInterstitialPlacement =>
       _candidateInterstitialPlacements[_interstitialPlacementIndex % _candidateInterstitialPlacements.length];
 
-  // تهيئة نظام إعلانات Unity Ads مع ضمان ظهور الإعلانات دوماً وبدون تأخير
+  // تهيئة نظام إعلانات Unity Ads الحية الرسمية لعرض الإعلانات التجارية الحقيقية بنسبة 100%
   static Future<void> init({bool? testMode}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedTestMode = prefs.getBool('unity_ads_test_mode');
-      // وضع الاختبار نشط افتراضياً لضمان ظهور إعلانات Unity Ads بنسبة 100% فوراً في أي دولة بدون انتظار مراجعة المتجر
-      final effectiveTestMode = testMode ?? savedTestMode ?? true;
+      // الوضع الحقيقي (Live Commercial Ads) هو الافتراضي لعرض إعلانات حقيقية كاملة وتفادي شاشة اختبار Unity Ads
+      final effectiveTestMode = testMode ?? savedTestMode ?? false;
       _instance._isTestMode = effectiveTestMode;
 
-      debugPrint("Unity Ads: Initializing with Game ID: $gameId (testMode: $effectiveTestMode)");
-      _instance.adStatusNotifier.value = 'جاري الاتصال بـ Unity Ads...';
+      debugPrint("Unity Ads: Initializing Live Ads with Game ID: $gameId (testMode: $effectiveTestMode)");
+      _instance.adStatusNotifier.value = 'جاري الاتصال بشبكة الإعلانات الرسمية...';
 
       // تفعيل البنر فوراً من البداية لعدم الانتظار
       _instance.isInitializedNotifier.value = true;
@@ -62,19 +62,14 @@ class AdService {
         gameId: gameId,
         testMode: effectiveTestMode,
         onComplete: () {
-          debugPrint("Unity Ads: Initialized successfully!");
+          debugPrint("Unity Ads: Initialized successfully in live commercial mode!");
           _instance._isInitialized = true;
           _instance.isInitializedNotifier.value = true;
-          _instance.adStatusNotifier.value = 'إعلانات Unity Ads جاهزة ونشطة';
+          _instance.adStatusNotifier.value = 'إعلانات حقيقية حية جاهزة ونشطة';
           _instance.loadInterstitialAd();
         },
         onFailed: (error, message) {
           debugPrint("Unity Ads Init Error ($error): $message");
-          // محاولة فورية بوضع الاختبار لضمان توفر الإعلانات
-          if (!effectiveTestMode) {
-            init(testMode: true);
-            return;
-          }
           _instance._scheduleInitRetry();
         },
       );
@@ -87,8 +82,8 @@ class AdService {
   void _scheduleInitRetry() {
     Timer(const Duration(seconds: 4), () {
       if (!_isInitialized) {
-        debugPrint("Unity Ads: Retrying initialization in test mode...");
-        init(testMode: true);
+        debugPrint("Unity Ads: Retrying initialization...");
+        init(testMode: _instance._isTestMode);
       }
     });
   }

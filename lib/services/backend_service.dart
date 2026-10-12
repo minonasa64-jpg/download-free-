@@ -944,6 +944,7 @@ class BackendService {
     String? videoId,
     int? videoTag,
     int? highestAudioTag,
+    int? qualityOrder,
     required Function(String) onStatusChanged,
     required Function(int, int) onReceiveProgress,
   }) async {
@@ -1113,7 +1114,7 @@ class BackendService {
           // ضمان تشغيل الفيديو بصوت وصورة نقية 100% والتوافق التام مع كافة المشغلات
           if (ext != 'mp3' && await File(finalOutputPath).exists()) {
             onStatusChanged('جاري ضبط وضمان جودة الصورة والصوت عبر FFmpeg...');
-            await _ensureVideoPlayabilityAndSound(finalOutputPath, tempDir, notifId);
+            await _ensureVideoPlayabilityAndSound(finalOutputPath, tempDir, notifId, qualityOrder: qualityOrder);
           }
         }
       } else {
@@ -1404,7 +1405,7 @@ class BackendService {
               streamTag: videoTag,
             );
           }
-          await _ensureVideoPlayabilityAndSound(targetDestination, tempDir, notifId);
+          await _ensureVideoPlayabilityAndSound(targetDestination, tempDir, notifId, qualityOrder: qualityOrder);
         }
       }
 
@@ -1465,8 +1466,8 @@ class BackendService {
     }
   }
 
-  /// ضمان توافق الفيديو وظهور الصورة والصوت 100% على كافة الأجهزة والمشغلات
-  Future<void> _ensureVideoPlayabilityAndSound(String filePath, Directory tempDir, int notifId) async {
+  /// ضمان توافق وترقية جودة الفيديو والصوت عبر FFmpeg Lanczos Super-Resolution
+  Future<void> _ensureVideoPlayabilityAndSound(String filePath, Directory tempDir, int notifId, {int? qualityOrder}) async {
     try {
       final file = File(filePath);
       if (!await file.exists()) return;
@@ -1476,27 +1477,73 @@ class BackendService {
       final tempOut = '${tempDir.path}/norm_${notifId}.mp4';
       try { if (await File(tempOut).exists()) await File(tempOut).delete(); } catch (_) {}
 
-      // 1. محاولة ريمكس فائق السرعة لنقل الفيديو وتحويل الصوت إلى AAC مع موضع البداية السريع +faststart
       bool normalized = false;
-      try {
-        final session = await FFmpegKit.executeWithArguments([
-          '-y',
-          '-i', filePath,
-          '-c:v', 'copy',
-          '-c:a', 'aac',
-          '-b:a', '192k',
-          '-movflags', '+faststart',
-          tempOut,
-        ]);
-        final code = await session.getReturnCode();
-        final nFile = File(tempOut);
-        if (ReturnCode.isSuccess(code) && await nFile.exists() && (await nFile.length()) > (originalSize * 0.7)) {
-          normalized = true;
-        }
-      } catch (_) {}
 
-      // 2. إذا فشل الريمكس (مثلاً الفيديو كودك VP9 أو HEVC أو AV1 يسبب شاشة سوداء على مشغلات أندرويد)
-      // نقوم بترميز الفيديو فوراً بخيار libx264 ultrafast لضمان ظهور الصورة والصوت 100%
+      // 1. إذا طلب المستخدم دقة سينمائية خارقة 4K (2160p) أو 2K (1440p) أو 1080p FHD:
+      // تشغيل خوارزميات FFmpeg Lanczos Super-Resolution لرفع الدقة وتعزيز الحدة والوضوح البصري
+      if (qualityOrder != null && qualityOrder >= 1080) {
+        try {
+          String scaleFilter = 'scale=-2:1080:flags=lanczos,unsharp=5:5:0.7:5:5:0.3';
+          String crf = '16';
+          String aBitrate = '256k';
+
+          if (qualityOrder >= 2160) {
+            scaleFilter = 'scale=-2:2160:flags=lanczos,unsharp=5:5:0.8:5:5:0.4';
+            crf = '15';
+            aBitrate = '320k';
+          } else if (qualityOrder >= 1440) {
+            scaleFilter = 'scale=-2:1440:flags=lanczos,unsharp=5:5:0.8:5:5:0.4';
+            crf = '16';
+            aBitrate = '320k';
+          }
+
+          debugPrint("FFmpeg: بدء ترقية جودة الفيديو عبر Lanczos ($qualityOrder p)...");
+          final sessionEnhance = await FFmpegKit.executeWithArguments([
+            '-y',
+            '-i', filePath,
+            '-vf', scaleFilter,
+            '-c:v', 'libx264',
+            '-preset', 'veryfast',
+            '-pix_fmt', 'yuv420p',
+            '-crf', crf,
+            '-c:a', 'aac',
+            '-b:a', aBitrate,
+            '-movflags', '+faststart',
+            tempOut,
+          ]);
+          final codeEnhance = await sessionEnhance.getReturnCode();
+          final nFile = File(tempOut);
+          if (ReturnCode.isSuccess(codeEnhance) && await nFile.exists() && (await nFile.length()) > (originalSize * 0.4)) {
+            normalized = true;
+            debugPrint("تمت ترقية جودة الفيديو بنجاح عبر FFmpeg Lanczos ($qualityOrder p)!");
+          }
+        } catch (e) {
+          debugPrint('تنبيه أثناء ترقية دقة الفيديو عبر FFmpeg: $e');
+        }
+      }
+
+      // 2. إذا لم يُطلب ترقية أو لم نقم بها: نجرب نسخ الدفق السريع النقي بدون أي فقد للجودة
+      if (!normalized) {
+        try {
+          final session = await FFmpegKit.executeWithArguments([
+            '-y',
+            '-i', filePath,
+            '-c:v', 'copy',
+            '-c:a', 'aac',
+            '-b:a', '256k',
+            '-movflags', '+faststart',
+            tempOut,
+          ]);
+          final code = await session.getReturnCode();
+          final nFile = File(tempOut);
+          if (ReturnCode.isSuccess(code) && await nFile.exists() && (await nFile.length()) > (originalSize * 0.7)) {
+            normalized = true;
+          }
+        } catch (_) {}
+      }
+
+      // 3. إذا فشل النسخ المباشر (مثل كودك VP9 أو AV1 غير المدعوم على مشغلات أندرويد):
+      // نرمز الفيديو عبر libx264 بجودة أستوديو نقية جداً CRF 17 وصوت 256k مع yuv420p
       if (!normalized) {
         try {
           if (await File(tempOut).exists()) {
@@ -1506,11 +1553,11 @@ class BackendService {
             '-y',
             '-i', filePath,
             '-c:v', 'libx264',
-            '-preset', 'ultrafast',
+            '-preset', 'veryfast',
             '-pix_fmt', 'yuv420p',
-            '-crf', '22',
+            '-crf', '17',
             '-c:a', 'aac',
-            '-b:a', '192k',
+            '-b:a', '256k',
             '-movflags', '+faststart',
             tempOut,
           ]);
@@ -1528,7 +1575,7 @@ class BackendService {
         try {
           await File(tempOut).copy(filePath);
           await File(tempOut).delete();
-          debugPrint('تم تطبيع كودك الفيديو بنجاح لضمان ظهور الصوت والصورة: $filePath');
+          debugPrint('تم تطبيع وترقية كودك الفيديو بنجاح لضمان ظهور الصوت والصورة بأعلى دقة: $filePath');
         } catch (_) {}
       }
     } catch (e) {
@@ -2312,6 +2359,7 @@ class BackendService {
     String? videoId,
     int? videoTag,
     int? highestAudioTag,
+    int? qualityOrder,
     Function(String)? onStatusChanged,
     Function(int, int)? onReceiveProgress,
   }) {
@@ -2324,6 +2372,7 @@ class BackendService {
       videoId: videoId,
       videoTag: videoTag,
       highestAudioTag: highestAudioTag,
+      qualityOrder: qualityOrder,
       onStatusChanged: onStatusChanged ?? (_) {},
       onReceiveProgress: onReceiveProgress ?? (_, __) {},
     );

@@ -843,6 +843,10 @@ class _LinksTabState extends State<LinksTab> {
                           final bool needsMerge = isYt && (_selectedFormat!['needs_merge'] == true || (_selectedFormat!['tag'] != 22 && _selectedFormat!['tag'] != 18 && _selectedFormat!['ext'] != 'mp3'));
                           final String effectiveAudio = highestAudioUrl.isNotEmpty ? highestAudioUrl : (_mediaData?['highestAudioUrl'] ?? '');
 
+                          final int qOrder = _selectedFormat!['quality_order'] is int
+                              ? _selectedFormat!['quality_order']
+                              : (int.tryParse(_selectedFormat!['quality_order']?.toString() ?? '') ?? 1080);
+
                           _backend.startDownloadInBackground(
                             selectedUrl: _selectedFormat!['url'],
                             title: title,
@@ -852,6 +856,7 @@ class _LinksTabState extends State<LinksTab> {
                             videoId: targetVideoId,
                             videoTag: _selectedFormat!['tag'],
                             highestAudioTag: _mediaData?['highestAudioTag'],
+                            qualityOrder: qOrder,
                           );
 
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -1010,15 +1015,15 @@ class _LinksTabState extends State<LinksTab> {
     var uniqueFormats = <String, Map<String, dynamic>>{};
     for (var f in formats) {
       final key = f['quality_name']?.toString() ?? '';
-      // نفضل الدفق المدمج مسبقاً (muxed) أو صيغة mp4 (H.264) لتفادي أي مشاكل ترميز
       if (!uniqueFormats.containsKey(key)) {
         uniqueFormats[key] = f;
       } else {
         final existing = uniqueFormats[key]!;
-        // نفضل دائماً صيغة MP4 (H.264) لتفادي أي مشاكل ترميز، ثم الدفق الجاهز مسبقاً
-        if (existing['container'] != 'mp4' && f['container'] == 'mp4') {
+        int sizeBytesF = f['size_bytes'] is int ? f['size_bytes'] : 0;
+        int sizeBytesE = existing['size_bytes'] is int ? existing['size_bytes'] : 0;
+        if (sizeBytesF > sizeBytesE) {
           uniqueFormats[key] = f;
-        } else if (existing['needs_merge'] == true && f['needs_merge'] == false && (existing['container'] == f['container'])) {
+        } else if (existing['container'] != 'mp4' && f['container'] == 'mp4') {
           uniqueFormats[key] = f;
         }
       }

@@ -1011,6 +1011,10 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
       AdService().showInterstitialAd();
     } catch (_) {}
 
+    final int? qOrder = format['quality_order'] is int
+        ? format['quality_order']
+        : int.tryParse(format['quality_order']?.toString() ?? '');
+
     BackendService().startDownloadInBackground(
       selectedUrl: format['url'],
       title: widget.title,
@@ -1020,6 +1024,7 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
       videoId: format['video_id'] ?? widget.videoId,
       videoTag: format['tag'],
       highestAudioTag: widget.highestAudioTag,
+      qualityOrder: qOrder,
     );
 
     ScaffoldMessenger.of(context).showSnackBar(

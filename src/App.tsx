@@ -86,7 +86,7 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.5.3
+                  v1.5.4
                 </span>
               </h1>
               <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي إلى GitHub</p>
@@ -212,10 +212,34 @@ export default function App() {
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في هذا التحديث (v1.5.3)</h2>
+            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في هذا التحديث (v1.5.4)</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="p-5 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 space-y-3">
+              <div className="flex items-center gap-3 text-emerald-400">
+                <div className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
+                  <Sparkles className="w-5 h-5 text-emerald-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">ترقية الجودة الفائقة (4K و 2K و 1080p FHD)</h3>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                تفعيل محرك FFmpeg Lanczos Super-Resolution لرفع الدقة وتحسين التباين والحدة البصرية لكافة المقاطع مع صوت استوديو 320k وترميز استوديو نقي CRF 16.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-2xl border border-purple-500/40 bg-purple-950/20 space-y-3">
+              <div className="flex items-center gap-3 text-purple-400">
+                <div className="p-2 rounded-lg bg-purple-500/20 border border-purple-500/30">
+                  <ShieldCheck className="w-5 h-5 text-purple-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">إعلانات تجارية حقيقية حية (Live Commercial Ads)</h3>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                إلغاء وضع الاختبار (Test Mode) تماماً، والتخلص من شاشة Unity Ads الاختبارية المؤقتة، واستبدالها بإعلانات فيديو حقيقية كاملة من المعلنين الرسميين.
+              </p>
+            </div>
+
             <div className="p-5 rounded-2xl border border-cyan-500/40 bg-cyan-950/20 space-y-3">
               <div className="flex items-center gap-3 text-cyan-400">
                 <div className="p-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30">
@@ -224,19 +248,7 @@ export default function App() {
                 <h3 className="text-sm font-semibold text-white">حل تنزيل الروابط بصوت وصورة 100%</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                إنهاء مشكلة تشغيل الصوت فقط عند التنزيل من الروابط، عبر تطبيع كودك الفيديو فوراً إلى H.264 (AVC) القياسي مع ترميز AAC وyuv420p لمنع الشاشة السوداء نهائياً على كافة المشغلات.
-              </p>
-            </div>
-
-            <div className="p-5 rounded-2xl border border-purple-500/40 bg-purple-950/20 space-y-3">
-              <div className="flex items-center gap-3 text-purple-400">
-                <div className="p-2 rounded-lg bg-purple-500/20 border border-purple-500/30">
-                  <Sparkles className="w-5 h-5 text-purple-400" />
-                </div>
-                <h3 className="text-sm font-semibold text-white">استعادة الإعلانات البينية وضمان ظهورها</h3>
-              </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                إلغاء التجاوز السريع واعتماد خطة مؤكدة لعرض الإعلان البيني فور اكتمال تحميله، مع تدوير المعرفات وتثبيت معرف الإعلان الجاهز لتجنب أي تضارب.
+                إنهاء مشكلة تشغيل الصوت فقط عند التنزيل من الروابط، عبر تطبيع كودك الفيديو فوراً إلى H.264 (AVC) القياسي مع ترميز AAC وyuv420p لمنع الشاشة السوداء نهائياً.
               </p>
             </div>
 
