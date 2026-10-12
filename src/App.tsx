@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 38159459542,
+    id: 38274763070,
     status: 'in_progress',
     conclusion: null,
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38159459542',
-    head_sha: '892081c',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38274763070',
+    head_sha: '982dd3d',
     head_commit: {
-      id: '892081c',
-      message: 'fix(v1.5.3): guarantee video+audio playback from links, enforce interstitial ads, show banner immediately, and remove annoying youtube search bar'
+      id: '982dd3d',
+      message: 'feat(v1.5.4): switch Unity Ads to live commercial ads and add 4K/2K/1080p FFmpeg Lanczos upscaling engine'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -86,7 +86,7 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.5.4
+                  v1.5.5
                 </span>
               </h1>
               <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي إلى GitHub</p>

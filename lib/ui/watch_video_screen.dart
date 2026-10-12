@@ -402,12 +402,13 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
     var uniqueFormats = <String, Map<String, dynamic>>{};
     for (var f in formats) {
       final key = f['quality_name']?.toString() ?? '';
-      // نفضل الدفق المدمج مسبقاً (muxed) أو صيغة mp4 (H.264) لتفادي أي مشاكل ترميز
       if (!uniqueFormats.containsKey(key)) {
         uniqueFormats[key] = f;
       } else {
         final existing = uniqueFormats[key]!;
-        if (existing['needs_merge'] == true && f['needs_merge'] == false) {
+        int sizeBytesF = f['size_bytes'] is int ? f['size_bytes'] : 0;
+        int sizeBytesE = existing['size_bytes'] is int ? existing['size_bytes'] : 0;
+        if (sizeBytesF > sizeBytesE) {
           uniqueFormats[key] = f;
         } else if (existing['container'] != 'mp4' && f['container'] == 'mp4') {
           uniqueFormats[key] = f;

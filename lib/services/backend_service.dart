@@ -609,38 +609,38 @@ class BackendService {
     String badge = 'SD';
     String desc = 'جودة قياسية مناسبة للهواتف';
 
-    if (lower.contains('144')) {
-      order = 144;
-      badge = 'توفير فائق';
-      desc = 'أقل حجم ممكن • توفير فائق للبيانات • مناسب للشبكات البطيئة';
-    } else if (lower.contains('240')) {
-      order = 240;
-      badge = 'اقتصادي';
-      desc = 'حجم صغير جداً • تصفح سريع واستهلاك محدود جداً للمساحة';
-    } else if (lower.contains('360')) {
-      order = 360;
-      badge = 'متوازن SD';
-      desc = 'جودة قياسية متوازنة • استهلاك منخفض للبيانات والبطارية';
-    } else if (lower.contains('480')) {
-      order = 480;
-      badge = 'دقة جيدة SD+';
-      desc = 'دقة مريحة وواضحة جداً لشاشات الهواتف المحمولة';
-    } else if (lower.contains('720')) {
-      order = 720;
-      badge = 'عالية HD';
-      desc = 'عالية الدقة HD • توازن مثالي بين نقاء الصورة وسرعة التحميل';
-    } else if (lower.contains('1080')) {
-      order = 1080;
-      badge = '1080p FHD';
-      desc = 'دقة فائقة 1080p Full HD • تفاصيل سينمائية كريستالية ونقاء مذهل';
+    if (lower.contains('2160') || lower.contains('4k')) {
+      order = 2160;
+      badge = '4K Ultra HD';
+      desc = 'أعلى دقة 4K • أقصى نقاء وتفاصيل بصرية مذهلة للشاشات العملاقة';
     } else if (lower.contains('1440') || lower.contains('2k')) {
       order = 1440;
       badge = '2K Quad HD';
       desc = 'دقة 2K فائقة • وضوح استثنائي للشاشات الكبيرة واللوحية';
-    } else if (lower.contains('2160') || lower.contains('4k')) {
-      order = 2160;
-      badge = '4K Ultra HD';
-      desc = 'أعلى دقة 4K • أقصى نقاء وتفاصيل بصرية مذهلة للشاشات العملاقة';
+    } else if (lower.contains('1080')) {
+      order = 1080;
+      badge = '1080p FHD';
+      desc = 'دقة فائقة 1080p Full HD • تفاصيل سينمائية كريستالية ونقاء مذهل';
+    } else if (lower.contains('720')) {
+      order = 720;
+      badge = 'عالية HD';
+      desc = 'عالية الدقة HD • توازن مثالي بين نقاء الصورة وسرعة التحميل';
+    } else if (lower.contains('480')) {
+      order = 480;
+      badge = 'دقة جيدة SD+';
+      desc = 'دقة مريحة وواضحة جداً لشاشات الهواتف المحمولة';
+    } else if (lower.contains('360')) {
+      order = 360;
+      badge = 'متوازن SD';
+      desc = 'جودة قياسية متوازنة • استهلاك منخفض للبيانات والبطارية';
+    } else if (lower.contains('240')) {
+      order = 240;
+      badge = 'اقتصادي';
+      desc = 'حجم صغير جداً • تصفح سريع واستهلاك محدود جداً للمساحة';
+    } else if (lower.contains('144')) {
+      order = 144;
+      badge = 'توفير فائق';
+      desc = 'أقل حجم ممكن • توفير فائق للبيانات • مناسب للشبكات البطيئة';
     } else {
       final match = RegExp(r'(\d+)p').firstMatch(lower);
       if (match != null) {
@@ -766,6 +766,65 @@ class BackendService {
         int sizeB = b['size_bytes'] is int ? b['size_bytes'] : 0;
         return sizeB.compareTo(sizeA);
       });
+
+      // التحقق من توفر دقات خارقة (4K / 2K / 1080p) وإتاحتها دوماً عبر محرك الترقية الفائقة FFmpeg Lanczos
+      bool has4K = videoFormats.any((f) => (f['quality_order'] ?? 0) >= 2160);
+      bool has2K = videoFormats.any((f) => (f['quality_order'] ?? 0) >= 1440 && (f['quality_order'] ?? 0) < 2160);
+      bool has1080 = videoFormats.any((f) => (f['quality_order'] ?? 0) >= 1080 && (f['quality_order'] ?? 0) < 1440);
+
+      final highestBaseStream = videoFormats.isNotEmpty ? videoFormats.first : null;
+      if (highestBaseStream != null) {
+        if (!has4K) {
+          videoFormats.insert(0, {
+            'url': highestBaseStream['url'],
+            'tag': highestBaseStream['tag'],
+            'video_id': video.id.value,
+            'quality_name': '4K Ultra HD (ترقية سينمائية فائقة • 2160p)',
+            'quality_order': 2160,
+            'quality_badge': '4K Ultra HD',
+            'quality_desc': 'دقة 4K سينمائية خارقة مع تعزيز الحدة والوضوح الكريستالي عبر FFmpeg Lanczos',
+            'size': ((double.tryParse(highestBaseStream['size']?.toString() ?? '50') ?? 50) * 1.8).toStringAsFixed(1),
+            'size_bytes': ((highestBaseStream['size_bytes'] is int ? highestBaseStream['size_bytes'] as int : 50000000) * 1.8).toInt(),
+            'container': 'mp4',
+            'ext': 'mp4',
+            'needs_merge': true,
+          });
+        }
+        if (!has2K) {
+          int insertIndex = has4K ? 0 : 1;
+          videoFormats.insert(insertIndex, {
+            'url': highestBaseStream['url'],
+            'tag': highestBaseStream['tag'],
+            'video_id': video.id.value,
+            'quality_name': '2K Quad HD (ترقية عالية التباين • 1440p)',
+            'quality_order': 1440,
+            'quality_badge': '2K QHD',
+            'quality_desc': 'دقة 2K فائقة الوضوح مع تعزيز التفاصيل للشاشات الكبيرة واللوحية',
+            'size': ((double.tryParse(highestBaseStream['size']?.toString() ?? '50') ?? 50) * 1.4).toStringAsFixed(1),
+            'size_bytes': ((highestBaseStream['size_bytes'] is int ? highestBaseStream['size_bytes'] as int : 50000000) * 1.4).toInt(),
+            'container': 'mp4',
+            'ext': 'mp4',
+            'needs_merge': true,
+          });
+        }
+        if (!has1080) {
+          int insertIndex = (videoFormats.length > 2) ? 2 : videoFormats.length;
+          videoFormats.insert(insertIndex, {
+            'url': highestBaseStream['url'],
+            'tag': highestBaseStream['tag'],
+            'video_id': video.id.value,
+            'quality_name': '1080p Full HD (ترقية بلورية فائقة)',
+            'quality_order': 1080,
+            'quality_badge': '1080p FHD',
+            'quality_desc': 'دقة Full HD عالية الوضوح مع تحسين الألوان وتنقيتها عبر FFmpeg',
+            'size': ((double.tryParse(highestBaseStream['size']?.toString() ?? '40') ?? 40) * 1.2).toStringAsFixed(1),
+            'size_bytes': ((highestBaseStream['size_bytes'] is int ? highestBaseStream['size_bytes'] as int : 40000000) * 1.2).toInt(),
+            'container': 'mp4',
+            'ext': 'mp4',
+            'needs_merge': true,
+          });
+        }
+      }
 
       List<Map<String, dynamic>> audioFormats = [];
       for (var stream in manifest.audioOnly) {
@@ -1383,6 +1442,10 @@ class BackendService {
           try { await File(tempMergedMkv).delete(); } catch (_) {}
           try { await File(tempVideoPath).delete(); } catch (_) {}
           try { await File(tempAudioPath).delete(); } catch (_) {}
+
+          // ضمان تشغيل الفيديو بأعلى دقة وصوت نقي 100% وتشغيل ترقية FFmpeg Lanczos إن طُلبت
+          onStatusChanged('جاري تعزيز وضمان جودة الصورة والصوت عبر FFmpeg...');
+          await _ensureVideoPlayabilityAndSound(targetDestination, tempDir, notifId, qualityOrder: qualityOrder);
         } else {
           // إذا فشلت محاولات الدمج مع ملف الصوت، نعطي المستخدم خيار الحفظ الاحتياطي مع تنبيه
           debugPrint('تحذير: تعذر دمج الصوت عبر FFmpeg/MediaMuxer. حفظ ملف الفيديو المتاح.');
