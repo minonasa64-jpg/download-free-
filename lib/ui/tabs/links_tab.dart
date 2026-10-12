@@ -847,6 +847,8 @@ class _LinksTabState extends State<LinksTab> {
                               ? _selectedFormat!['quality_order']
                               : (int.tryParse(_selectedFormat!['quality_order']?.toString() ?? '') ?? 1080);
 
+                          final bool isUpscaled = _selectedFormat!['is_upscaled'] == true;
+
                           _backend.startDownloadInBackground(
                             selectedUrl: _selectedFormat!['url'],
                             title: title,
@@ -857,6 +859,7 @@ class _LinksTabState extends State<LinksTab> {
                             videoTag: _selectedFormat!['tag'],
                             highestAudioTag: _mediaData?['highestAudioTag'],
                             qualityOrder: qOrder,
+                            isUpscaled: isUpscaled,
                           );
 
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -1014,23 +1017,26 @@ class _LinksTabState extends State<LinksTab> {
     if (formats.isEmpty) return [];
     var uniqueFormats = <String, Map<String, dynamic>>{};
     for (var f in formats) {
-      final key = f['quality_name']?.toString() ?? '';
+      final key = '${f['quality_order']}_${f['quality_name']}';
       if (!uniqueFormats.containsKey(key)) {
         uniqueFormats[key] = f;
       } else {
         final existing = uniqueFormats[key]!;
-        int sizeBytesF = f['size_bytes'] is int ? f['size_bytes'] : 0;
-        int sizeBytesE = existing['size_bytes'] is int ? existing['size_bytes'] : 0;
-        if (sizeBytesF > sizeBytesE) {
+        // نفضل الدفقات المنفصلة needs_merge لأنها تتمتع بمعدل بت أعلى من الدفقات المدمجة
+        if (f['needs_merge'] == true && existing['needs_merge'] != true) {
           uniqueFormats[key] = f;
-        } else if (existing['container'] != 'mp4' && f['container'] == 'mp4') {
-          uniqueFormats[key] = f;
+        } else {
+          int sizeBytesF = f['size_bytes'] is int ? f['size_bytes'] : 0;
+          int sizeBytesE = existing['size_bytes'] is int ? existing['size_bytes'] : 0;
+          if (sizeBytesF > sizeBytesE) {
+            uniqueFormats[key] = f;
+          }
         }
       }
     }
     var sortedList = uniqueFormats.values.toList();
 
-    // ترتيب القائمة تنازلياً من أعلى جودة (1080p Full HD أو أعلى) إلى أدنى جودة
+    // ترتيب القائمة تنازلياً من أعلى جودة (4K / 2K / 1080p FHD أو أعلى) إلى أدنى جودة
     sortedList.sort((a, b) {
       int orderA = a['quality_order'] is int 
           ? a['quality_order'] 
@@ -1042,9 +1048,9 @@ class _LinksTabState extends State<LinksTab> {
       if (orderA != 0 && orderB != 0 && orderA != orderB) {
         return orderB.compareTo(orderA); // أعلى جودة أولاً
       }
-      double sizeA = double.tryParse(a['size'].toString()) ?? 0.0;
-      double sizeB = double.tryParse(b['size'].toString()) ?? 0.0;
-      return sizeB.compareTo(sizeA); // الأكبر حجماً أولاً
+      int sizeBytesA = a['size_bytes'] is int ? a['size_bytes'] : 0;
+      int sizeBytesB = b['size_bytes'] is int ? b['size_bytes'] : 0;
+      return sizeBytesB.compareTo(sizeBytesA); // الأكبر حجماً وأعلى بت ريت أولاً
     });
     return sortedList;
   }

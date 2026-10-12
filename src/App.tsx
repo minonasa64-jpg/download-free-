@@ -86,7 +86,7 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.5.5
+                  v1.5.6
                 </span>
               </h1>
               <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي إلى GitHub</p>
@@ -212,7 +212,7 @@ export default function App() {
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في هذا التحديث (v1.5.4)</h2>
+            <h2 className="text-base font-bold text-white">الميزات والتحسينات المدمجة في هذا التحديث (v1.5.6)</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -221,10 +221,10 @@ export default function App() {
                 <div className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
                   <Sparkles className="w-5 h-5 text-emerald-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">ترقية الجودة الفائقة (4K و 2K و 1080p FHD)</h3>
+                <h3 className="text-sm font-semibold text-white">دقة سينمائية خارقة 1080p FHD و 2K و 4K</h3>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                تفعيل محرك FFmpeg Lanczos Super-Resolution لرفع الدقة وتحسين التباين والحدة البصرية لكافة المقاطع مع صوت استوديو 320k وترميز استوديو نقي CRF 16.
+                ترقية محرك الدمج الصوتي والبصري بالكامل لمنع أي ضغط مشوش، وتفعيل ترميز CRF 17 فائق الوضوح (Visually Lossless) مع النسخ المباشر للدفق النقي للأجهزة المتوافقة.
               </p>
             </div>
 

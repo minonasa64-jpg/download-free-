@@ -134,40 +134,74 @@ class UniversalExtractorService {
         final double wmSizeMb = wmSizeBytes > 0 ? (wmSizeBytes / (1024 * 1024)) : sizeMb;
 
         final List<Map<String, dynamic>> videoFormats = [];
+        final String effectiveMainUrl = hdPlayUrl.isNotEmpty ? hdPlayUrl : playUrl;
 
-        // 1. جودة فائقة 1080p Full HD بدون علامة مائية
+        // 1. خيار ترقية سينمائية 4K فائقة
+        if (effectiveMainUrl.isNotEmpty) {
+          videoFormats.add({
+            'url': effectiveMainUrl,
+            'quality_name': 'خارقة الدقة 4K Ultra HD (2160p • ترقية بصرية فائقة)',
+            'quality_order': 2160,
+            'quality_badge': '4K Ultra HD',
+            'quality_desc': 'ترقية بصرية فائقة 4K بدون علامة مائية مع تعزيز التفاصيل',
+            'size': (hdSizeMb * 1.5).toStringAsFixed(1),
+            'size_bytes': (hdSizeBytes * 1.5).toInt(),
+            'ext': 'mp4',
+            'needs_merge': false,
+            'is_upscaled': true,
+            'platform': 'tiktok',
+          });
+
+          videoFormats.add({
+            'url': effectiveMainUrl,
+            'quality_name': 'فائقة الدقة 2K Quad HD (1440p • شاشات كبيرة)',
+            'quality_order': 1440,
+            'quality_badge': '2K QHD',
+            'quality_desc': 'دقة 2K عالية التباين للشاشات الكبيرة بدون علامة مائية',
+            'size': (hdSizeMb * 1.2).toStringAsFixed(1),
+            'size_bytes': (hdSizeBytes * 1.2).toInt(),
+            'ext': 'mp4',
+            'needs_merge': false,
+            'is_upscaled': true,
+            'platform': 'tiktok',
+          });
+        }
+
+        // 2. جودة فائقة 1080p Full HD بدون علامة مائية (أصلية من المصدر)
         if (hdPlayUrl.isNotEmpty) {
           videoFormats.add({
             'url': hdPlayUrl,
             'quality_name': 'عالي الدقة 1080p Full HD (بدون علامة مائية)',
             'quality_order': 1080,
-            'quality_badge': '1080p FHD',
-            'quality_desc': 'أقصى جودة فائقة 1080p Full HD وبدون أي علامة مائية',
+            'quality_badge': '1080p FHD (أصلية)',
+            'quality_desc': 'أقصى جودة أصلية فائقة 1080p Full HD وبدون أي علامة مائية',
             'size': hdSizeMb.toStringAsFixed(1),
             'size_bytes': hdSizeBytes,
             'ext': 'mp4',
             'needs_merge': false,
+            'is_upscaled': false,
             'platform': 'tiktok',
           });
         }
 
-        // 2. جودة عالية 720p HD بدون علامة مائية
+        // 3. جودة عالية 720p HD بدون علامة مائية
         if (playUrl.isNotEmpty && playUrl != hdPlayUrl) {
           videoFormats.add({
             'url': playUrl,
             'quality_name': 'عالي الدقة 720p HD (بدون علامة مائية)',
             'quality_order': 720,
-            'quality_badge': '720p HD',
+            'quality_badge': '720p HD (أصلية)',
             'quality_desc': 'تنزيل سريع بجودة ممتازة خالية من العلامة المائية',
             'size': sizeMb.toStringAsFixed(1),
             'size_bytes': sizeBytes,
             'ext': 'mp4',
             'needs_merge': false,
+            'is_upscaled': false,
             'platform': 'tiktok',
           });
         }
 
-        // 3. جودة الفيديو مع العلامة المائية الأصلية (Watermark)
+        // 4. جودة الفيديو مع العلامة المائية الأصلية (Watermark)
         if (wmPlayUrl.isNotEmpty) {
           videoFormats.add({
             'url': wmPlayUrl,
@@ -179,6 +213,7 @@ class UniversalExtractorService {
             'size_bytes': wmSizeBytes,
             'ext': 'mp4',
             'needs_merge': false,
+            'is_upscaled': false,
             'platform': 'tiktok',
           });
         }
@@ -1130,6 +1165,7 @@ class UniversalExtractorService {
         'size_bytes': 0,
         'ext': 'mp4',
         'needs_merge': false,
+        'is_upscaled': true,
         'platform': platform,
       },
       {
@@ -1142,30 +1178,33 @@ class UniversalExtractorService {
         'size_bytes': 0,
         'ext': 'mp4',
         'needs_merge': false,
+        'is_upscaled': true,
         'platform': platform,
       },
       {
         'url': effectiveHd,
         'quality_name': 'عالي الدقة 1080p Full HD (أقصى دقة أصلية بمعدل بت عالي)',
         'quality_order': 1080,
-        'quality_badge': '1080p FHD',
+        'quality_badge': '1080p FHD (أصلية)',
         'quality_desc': 'أقصى دقة وجودة بصرية فائقة 1080p من المصدر الأصلي بدون ضغط وبأعلى تفاصيل',
         'size': 'أقصى جودة FHD',
         'size_bytes': 0,
         'ext': 'mp4',
         'needs_merge': false,
+        'is_upscaled': false,
         'platform': platform,
       },
       {
-        'url': effectiveSd,
-        'quality_name': 'عالي الدقة 720p HD (تنزيل سريع متوازن)',
+        'url': effectiveHd.isNotEmpty ? effectiveHd : effectiveSd,
+        'quality_name': 'عالي الدقة 720p HD (دقة نقية عالية)',
         'quality_order': 720,
-        'quality_badge': '720p HD',
-        'quality_desc': 'تنزيل سريع بحجم اقتصادي متوازن ومثالي للمشاهدة السريعة',
+        'quality_badge': '720p HD (أصلية)',
+        'quality_desc': 'تنزيل سريع بجودة HD نقية ومعدل إطارات سلس ومثالي للمشاهدة',
         'size': 'سريع HD',
         'size_bytes': 0,
         'ext': 'mp4',
         'needs_merge': false,
+        'is_upscaled': false,
         'platform': platform,
       },
       {
@@ -1178,6 +1217,7 @@ class UniversalExtractorService {
         'size_bytes': 0,
         'ext': 'mp4',
         'needs_merge': false,
+        'is_upscaled': false,
         'platform': platform,
       },
     ];
