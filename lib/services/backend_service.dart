@@ -1177,10 +1177,19 @@ class BackendService {
             streamTag: videoTag,
           );
 
-          // ترقية دقة الفيديو فقط إذا طُلبت ترقية صريحة لحفظ الجودة الأصلية 100% بدون أي مساس
-          if (ext != 'mp3' && isUpscaled && qualityOrder != null && qualityOrder >= 1080 && await File(finalOutputPath).exists()) {
-            onStatusChanged('جاري ترقية دقة الفيديو عبر محرك FFmpeg Lanczos...');
-            await _ensureVideoPlayabilityAndSound(finalOutputPath, tempDir, notifId, qualityOrder: qualityOrder, forceUpscale: true);
+          // ترقية ورفع جودة الفيديو الضعيف وتوضيح التفاصيل عبر محرك FFmpeg Lanczos
+          final bool shouldEnhanceDirect = isUpscaled || (qualityOrder != null && qualityOrder >= 1080);
+          if (ext != 'mp3' && shouldEnhanceDirect && await File(finalOutputPath).exists()) {
+            onStatusChanged('جاري رفع جودة وتوضيح الفيديو عبر FFmpeg Lanczos...');
+            task.status = 'جاري رفع جودة الفيديو وتوضيح التفاصيل...';
+            activeDownloads.value = List.from(activeDownloads.value);
+            await _ensureVideoPlayabilityAndSound(
+              finalOutputPath,
+              tempDir,
+              notifId,
+              qualityOrder: qualityOrder ?? 1080,
+              forceUpscale: true,
+            );
           }
         }
       } else {
@@ -1453,10 +1462,19 @@ class BackendService {
           try { await File(tempVideoPath).delete(); } catch (_) {}
           try { await File(tempAudioPath).delete(); } catch (_) {}
 
-          // ترقية دقة الصورة فقط إذا طُلبت صراحة لحفظ جودة الدفق الأصلي 100% بدون أي مساس
-          if (isUpscaled && qualityOrder != null && qualityOrder >= 1080) {
-            onStatusChanged('جاري ترقية دقة الفيديو عبر محرك FFmpeg Lanczos...');
-            await _ensureVideoPlayabilityAndSound(targetDestination, tempDir, notifId, qualityOrder: qualityOrder, forceUpscale: true);
+          // ترقية ورفع جودة الفيديو بعد الدمج لرفع الدقة المنخفضة أو ترقية 4K/2K/1080p
+          final bool shouldEnhanceMerged = isUpscaled || (qualityOrder != null && qualityOrder >= 1080);
+          if (shouldEnhanceMerged) {
+            onStatusChanged('جاري رفع جودة وتوضيح الفيديو عبر FFmpeg Lanczos...');
+            task.status = 'جاري رفع جودة الفيديو وتوضيح التفاصيل...';
+            activeDownloads.value = List.from(activeDownloads.value);
+            await _ensureVideoPlayabilityAndSound(
+              targetDestination,
+              tempDir,
+              notifId,
+              qualityOrder: qualityOrder ?? 1080,
+              forceUpscale: true,
+            );
           }
         } else {
           // إذا فشلت محاولات الدمج مع ملف الصوت، نعطي المستخدم خيار الحفظ الاحتياطي مع تنبيه
@@ -1480,7 +1498,14 @@ class BackendService {
               streamTag: videoTag,
             );
           }
-          await _ensureVideoPlayabilityAndSound(targetDestination, tempDir, notifId, qualityOrder: qualityOrder);
+          final bool shouldEnhanceFallback = isUpscaled || (qualityOrder != null && qualityOrder >= 1080);
+          await _ensureVideoPlayabilityAndSound(
+            targetDestination,
+            tempDir,
+            notifId,
+            qualityOrder: qualityOrder ?? 1080,
+            forceUpscale: shouldEnhanceFallback,
+          );
         }
       }
 
@@ -1541,7 +1566,7 @@ class BackendService {
     }
   }
 
-  /// ضمان توافق وترقية جودة الفيديو والصوت عبر FFmpeg Lanczos Super-Resolution عند طلبها
+  /// ضمان توافق وترقية جودة الفيديو والصوت عبر محرك FFmpeg Lanczos Super-Resolution والتوضيح الفائق
   Future<void> _ensureVideoPlayabilityAndSound(
     String filePath,
     Directory tempDir,
@@ -1555,62 +1580,118 @@ class BackendService {
       final int originalSize = await file.length();
       if (originalSize < 1024) return;
 
-      // إذا لم يُطلب ترقية الدقة صراحة، لا نقوم بأي إعادة ترميز للحفاظ على النقاء الأصلي 100%
-      if (!forceUpscale && (qualityOrder == null || qualityOrder <= 1080)) {
+      // ترقية ورفع جودة الفيديو عند طلب ترقية صريحة أو عند اختيار جودة عالية (1080p / 2K / 4K)
+      final bool shouldEnhance = forceUpscale || (qualityOrder != null && qualityOrder >= 1080);
+      if (!shouldEnhance) {
         return;
       }
 
-      final tempOut = '${tempDir.path}/norm_${notifId}.mp4';
+      final tempOut = '${tempDir.path}/enhanced_${notifId}.mp4';
       try { if (await File(tempOut).exists()) await File(tempOut).delete(); } catch (_) {}
 
-      bool normalized = false;
+      // تحديد الدقة المستهدفة ومعدل البت المناسب
+      int targetDimension = 1080;
+      int targetBitrateMb = 8;
+      if (qualityOrder != null) {
+        if (qualityOrder >= 2160) {
+          targetDimension = 2160;
+          targetBitrateMb = 16;
+        } else if (qualityOrder >= 1440) {
+          targetDimension = 1440;
+          targetBitrateMb = 12;
+        } else if (qualityOrder >= 1080) {
+          targetDimension = 1080;
+          targetBitrateMb = 8;
+        } else if (qualityOrder >= 720) {
+          targetDimension = 720;
+          targetBitrateMb = 5;
+        }
+      }
 
-      // ترقية الدقة عبر Lanczos Super-Resolution بجودة استوديو CRF 17 فقط عند طلب الترقية
-      if (qualityOrder != null && qualityOrder >= 1080) {
+      // فلتر ذكي يكتشف تلقائياً توجيه الفيديو (أفقي 16:9، راسي Reels/Shorts/TikTok 9:16، أو مربع)
+      // ويطبق خوارزمية Lanczos لرفع الأبعاد بدون تشويه، مع قناع الحدة والتوضيح (Unsharp Mask)
+      // وتحسين التباين وتشبع الألوان لإزالة البهتان وضبابية الفيديوهات الضعيفة
+      final String filterChain =
+          "scale='if(gte(iw,ih),-2,max(iw,$targetDimension))':'if(gte(iw,ih),max(ih,$targetDimension),-2)':flags=lanczos,"
+          "unsharp=5:5:1.0:5:5:0.5,"
+          "eq=contrast=1.04:brightness=0.01:saturation=1.06";
+
+      debugPrint("FFmpeg AI-Enhance: بدء رفع جودة الفيديو وتوضيحه (${qualityOrder ?? targetDimension}p)...");
+
+      bool enhanced = false;
+
+      // محاولة 1: ترقية فائقة بدقة استوديو H.264 High Profile ومعدل بت عالي مع صوت AAC نقي 256k
+      try {
+        final sessionEnhance = await FFmpegKit.executeWithArguments([
+          '-y',
+          '-i', filePath,
+          '-vf', filterChain,
+          '-c:v', 'libx264',
+          '-preset', 'fast',
+          '-profile:v', 'high',
+          '-level', '4.2',
+          '-pix_fmt', 'yuv420p',
+          '-crf', '18',
+          '-b:v', '${targetBitrateMb}M',
+          '-maxrate', '${targetBitrateMb + 4}M',
+          '-bufsize', '${targetBitrateMb * 2}M',
+          '-c:a', 'aac',
+          '-b:a', '256k',
+          '-movflags', '+faststart',
+          tempOut,
+        ]);
+        final codeEnhance = await sessionEnhance.getReturnCode();
+        final nFile = File(tempOut);
+        if (ReturnCode.isSuccess(codeEnhance) && await nFile.exists() && (await nFile.length()) > (originalSize * 0.3)) {
+          enhanced = true;
+          debugPrint("تم رفع جودة الفيديو بنجاح عبر محرك FFmpeg Lanczos! الحجم: ${await nFile.length()} بايت");
+        } else {
+          final logs = await sessionEnhance.getAllLogsAsString();
+          debugPrint("تنبيه المحاولة 1 لرفع الجودة: $logs");
+        }
+      } catch (e1) {
+        debugPrint("خطأ في محاولة رفع الجودة الأولى: $e1");
+      }
+
+      // محاولة 2: محاولة متوازنة سريعة للأجهزة ذات الموارد المحدودة
+      if (!enhanced) {
         try {
-          String scaleFilter = 'scale=-2:1080:flags=lanczos';
-
-          if (qualityOrder >= 2160) {
-            scaleFilter = 'scale=-2:1440:flags=lanczos'; // ترقية فائقة 2K متوازنة للهواتف الذكية بدون تجميد
-          } else if (qualityOrder >= 1440) {
-            scaleFilter = 'scale=-2:1440:flags=lanczos';
-          }
-
-          debugPrint("FFmpeg: بدء ترقية جودة الفيديو عبر Lanczos ($qualityOrder p)...");
-          final sessionEnhance = await FFmpegKit.executeWithArguments([
+          final String fallbackChain =
+              "scale='if(gte(iw,ih),-2,max(iw,1080))':'if(gte(iw,ih),max(ih,1080),-2)':flags=lanczos,unsharp=5:5:0.8:5:5:0.4";
+          final sessionFallback = await FFmpegKit.executeWithArguments([
             '-y',
             '-i', filePath,
-            '-vf', scaleFilter,
+            '-vf', fallbackChain,
             '-c:v', 'libx264',
-            '-preset', 'fast',
-            '-profile:v', 'high',
-            '-level', '4.2',
+            '-preset', 'veryfast',
             '-pix_fmt', 'yuv420p',
-            '-crf', '17',
+            '-crf', '20',
             '-c:a', 'copy',
             '-movflags', '+faststart',
             tempOut,
           ]);
-          final codeEnhance = await sessionEnhance.getReturnCode();
+          final codeFallback = await sessionFallback.getReturnCode();
           final nFile = File(tempOut);
-          if (ReturnCode.isSuccess(codeEnhance) && await nFile.exists() && (await nFile.length()) > (originalSize * 0.4)) {
-            normalized = true;
-            debugPrint("تمت ترقية جودة الفيديو بنجاح عبر FFmpeg Lanczos ($qualityOrder p)!");
+          if (ReturnCode.isSuccess(codeFallback) && await nFile.exists() && (await nFile.length()) > (originalSize * 0.3)) {
+            enhanced = true;
+            debugPrint("تمت الترقية بنجاح عبر المحاولة البديلة!");
           }
-        } catch (e) {
-          debugPrint('تنبيه أثناء ترقية دقة الفيديو عبر FFmpeg: $e');
+        } catch (e2) {
+          debugPrint("خطأ في محاولة الترقية البديلة: $e2");
         }
       }
 
-      if (normalized && await File(tempOut).exists()) {
+      if (enhanced && await File(tempOut).exists()) {
         try {
           await File(tempOut).copy(filePath);
           await File(tempOut).delete();
-          debugPrint('تم استبدال الملف بالنسخة المرقاة بنجاح: $filePath');
-        } catch (_) {}
+          debugPrint('تم اعتماد النسخة عالية الجودة بنجاح: $filePath');
+        } catch (copyErr) {
+          debugPrint('خطأ في استبدال الملف بالنسخة المحسنة: $copyErr');
+        }
       }
     } catch (e) {
-      debugPrint('تنبيه أثناء ترقية/تطبيع الفيديو: $e');
+      debugPrint('تنبيه أثناء ترقية/توضيح الفيديو: $e');
     }
   }
 

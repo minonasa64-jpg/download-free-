@@ -167,19 +167,19 @@ class UniversalExtractorService {
           });
         }
 
-        // 2. جودة فائقة 1080p Full HD بدون علامة مائية (أصلية من المصدر)
+        // 2. جودة فائقة 1080p Full HD بدون علامة مائية (أصلية من المصدر مع ترقية الدقة)
         if (hdPlayUrl.isNotEmpty) {
           videoFormats.add({
             'url': hdPlayUrl,
-            'quality_name': 'عالي الدقة 1080p Full HD (بدون علامة مائية)',
+            'quality_name': 'عالي الدقة 1080p Full HD (ترقية فائقة وتوضيح)',
             'quality_order': 1080,
-            'quality_badge': '1080p FHD (أصلية)',
-            'quality_desc': 'أقصى جودة أصلية فائقة 1080p Full HD وبدون أي علامة مائية',
+            'quality_badge': '1080p FHD (ترقية فائقة)',
+            'quality_desc': 'رفع جودة وتوضيح الفيديو إلى 1080p Full HD بدون علامة مائية',
             'size': hdSizeMb.toStringAsFixed(1),
             'size_bytes': hdSizeBytes,
             'ext': 'mp4',
             'needs_merge': false,
-            'is_upscaled': false,
+            'is_upscaled': true,
             'platform': 'tiktok',
           });
         }
@@ -1183,28 +1183,28 @@ class UniversalExtractorService {
       },
       {
         'url': effectiveHd,
-        'quality_name': 'عالي الدقة 1080p Full HD (أقصى دقة أصلية بمعدل بت عالي)',
+        'quality_name': 'عالي الدقة 1080p Full HD (ترقية بصرية فائقة • 1080p)',
         'quality_order': 1080,
-        'quality_badge': '1080p FHD (أصلية)',
-        'quality_desc': 'أقصى دقة وجودة بصرية فائقة 1080p من المصدر الأصلي بدون ضغط وبأعلى تفاصيل',
+        'quality_badge': '1080p FHD (ترقية فائقة)',
+        'quality_desc': 'رفع جودة الفيديو الضعيف إلى 1080p Full HD مع تعزيز الحدة وتوضيح التفاصيل',
         'size': 'أقصى جودة FHD',
         'size_bytes': 0,
         'ext': 'mp4',
         'needs_merge': false,
-        'is_upscaled': false,
+        'is_upscaled': true,
         'platform': platform,
       },
       {
         'url': effectiveHd.isNotEmpty ? effectiveHd : effectiveSd,
-        'quality_name': 'عالي الدقة 720p HD (دقة نقية عالية)',
+        'quality_name': 'عالي الدقة 720p HD (دقة نقية عالية • توضيح التفاصيل)',
         'quality_order': 720,
-        'quality_badge': '720p HD (أصلية)',
-        'quality_desc': 'تنزيل سريع بجودة HD نقية ومعدل إطارات سلس ومثالي للمشاهدة',
+        'quality_badge': '720p HD (محسنة)',
+        'quality_desc': 'تنزيل بجودة HD نقية مع تعزيز الوضوح والتفاصيل ومعدل إطارات سلس',
         'size': 'سريع HD',
         'size_bytes': 0,
         'ext': 'mp4',
         'needs_merge': false,
-        'is_upscaled': false,
+        'is_upscaled': true,
         'platform': platform,
       },
       {
