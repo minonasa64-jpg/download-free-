@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 38411636010,
-    status: 'in_progress',
-    conclusion: null,
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38411636010',
-    head_sha: '71bd295',
+    id: 38412241894,
+    status: 'completed',
+    conclusion: 'success',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38412241894',
+    head_sha: '655bee5',
     head_commit: {
-      id: '71bd295',
-      message: 'fix: resolve constant evaluation error on dynamic AppColors in Google login and settings screens'
+      id: '655bee5',
+      message: 'feat(v1.6.0): Google Sign-In authentication + Lossless 1080p/2K/4K downloads'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
