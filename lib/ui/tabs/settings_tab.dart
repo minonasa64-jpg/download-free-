@@ -11,6 +11,8 @@ import '../web_share_screen.dart';
 import '../sheets/theme_station_sheet.dart';
 import '../sheets/data_usage_sheet.dart';
 import '../../services/telegram_analytics_service.dart';
+import '../../services/auth_service.dart';
+import '../google_login_screen.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -320,6 +322,133 @@ class _SettingsTabState extends State<SettingsTab> {
                 color: textColor,
               ),
             ),
+          ),
+          // قسم الحساب وتسجيل الدخول بحساب Google
+          ValueListenableBuilder<GoogleAuthUser?>(
+            valueListenable: AuthService().currentUser,
+            builder: (context, user, _) {
+              final isLoggedIn = user != null;
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isLoggedIn
+                              ? [
+                                  AppColors.cyan.withOpacity(0.18),
+                                  Colors.white.withOpacity(0.04),
+                                ]
+                              : [
+                                  Colors.white.withOpacity(0.08),
+                                  AppColors.cyan.withOpacity(0.05),
+                                ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: isLoggedIn ? AppColors.cyan.withOpacity(0.4) : Colors.white.withOpacity(0.1),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        leading: Container(
+                          width: 44,
+                          height: 44,
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isLoggedIn ? AppColors.cyan : Colors.white24,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            backgroundColor: Colors.white,
+                            backgroundImage: (isLoggedIn && user.photoUrl != null)
+                                ? NetworkImage(user.photoUrl!)
+                                : null,
+                            child: (!isLoggedIn || user.photoUrl == null)
+                                ? Image.network(
+                                    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png',
+                                    width: 24,
+                                    height: 24,
+                                    errorBuilder: (_, __, ___) => const Icon(Icons.account_circle, color: AppColors.cyan, size: 28),
+                                  )
+                                : null,
+                          ),
+                        ),
+                        title: Text(
+                          isLoggedIn ? user.displayName : 'تسجيل الدخول بحساب Google',
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        subtitle: Text(
+                          isLoggedIn ? user.email : 'لمزامنة إعداداتك ومميزات النسخة الكاملة',
+                          style: TextStyle(
+                            color: isLoggedIn ? AppColors.cyan : subtitleColor,
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: isLoggedIn
+                                ? Colors.green.withOpacity(0.2)
+                                : AppColors.cyan.withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isLoggedIn ? Colors.greenAccent : AppColors.cyan,
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                isLoggedIn ? 'نشط ✅' : 'دخول',
+                                style: TextStyle(
+                                  color: isLoggedIn ? Colors.greenAccent : AppColors.cyan,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                isLoggedIn ? Icons.check_circle_outline_rounded : Icons.arrow_forward_ios_rounded,
+                                color: isLoggedIn ? Colors.greenAccent : AppColors.cyan,
+                                size: 12,
+                              ),
+                            ],
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => GoogleLoginScreen(
+                                onLoginSuccess: () {
+                                  Navigator.pop(context);
+                                  setState(() {});
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 10),
 

@@ -1628,21 +1628,25 @@ class BackendService {
         // تجاهل
       }
 
+      final String resolvedSavedPath = (await File(targetDestination).exists()) 
+          ? targetDestination 
+          : finalOutputPath;
+
       // إرسال إشعار فوري إلى بوت تيليجرام بنجاح التحميل
       try {
         int? finalFileSize;
-        final f = File(finalOutputPath);
+        final f = File(resolvedSavedPath);
         if (await f.exists()) {
           finalFileSize = await f.length();
         }
         TelegramAnalyticsService().reportDownloadCompleted(
           title: cleanTitle,
-          format: ext,
+          format: resolvedSavedPath.split('.').last,
           sizeBytes: finalFileSize,
         );
       } catch (_) {}
 
-      return finalOutputPath;
+      return resolvedSavedPath;
     } catch (e) {
       task.isFailed = true;
       task.status = 'تعذر التحميل: $e';
@@ -1700,10 +1704,8 @@ class BackendService {
       // فلتر ذكي يكتشف تلقائياً توجيه الفيديو (أفقي 16:9، راسي Reels/Shorts/TikTok 9:16، أو مربع)
       // ويطبق خوارزمية Lanczos لرفع الأبعاد بدون تشويه، مع قناع الحدة والتوضيح (Unsharp Mask)
       // وتحسين التباين وتشبع الألوان لإزالة البهتان وضبابية الفيديوهات الضعيفة
-      final String filterChain =
-          "scale='if(gte(iw,ih),-2,max(iw,$targetDimension))':'if(gte(iw,ih),max(ih,$targetDimension),-2)':flags=lanczos,"
-          "unsharp=5:5:1.0:5:5:0.5,"
-          "eq=contrast=1.04:brightness=0.01:saturation=1.06";
+      final String scaleFilter = "scale=w='if(gte(iw,ih),-2,max(iw,$targetDimension))':h='if(gte(iw,ih),max(ih,$targetDimension),-2)':flags=lanczos";
+      final String filterChain = "$scaleFilter,unsharp=5:5:1.0:5:5:0.5,eq=contrast=1.04:brightness=0.01:saturation=1.06";
 
       debugPrint("FFmpeg AI-Enhance: بدء رفع جودة الفيديو وتوضيحه (${qualityOrder ?? targetDimension}p)...");
 
@@ -1745,8 +1747,7 @@ class BackendService {
       // محاولة 2: محاولة متوازنة سريعة للأجهزة ذات الموارد المحدودة
       if (!enhanced) {
         try {
-          final String fallbackChain =
-              "scale='if(gte(iw,ih),-2,max(iw,1080))':'if(gte(iw,ih),max(ih,1080),-2)':flags=lanczos,unsharp=5:5:0.8:5:5:0.4";
+          const String fallbackChain = "scale=w='if(gte(iw,ih),-2,max(iw,1080))':h='if(gte(iw,ih),max(ih,1080),-2)':flags=lanczos,unsharp=5:5:0.8:5:5:0.4";
           final sessionFallback = await FFmpegKit.executeWithArguments([
             '-y',
             '-i', filePath,

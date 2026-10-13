@@ -5,6 +5,7 @@ import 'core/theme_service.dart';
 import 'services/backend_service.dart';
 import 'services/ad_service.dart';
 import 'services/telegram_analytics_service.dart';
+import 'services/auth_service.dart';
 import 'ui/main_navigation.dart';
 import 'ui/splash_screen.dart';
 
@@ -38,6 +39,13 @@ void main() async {
     );
   } catch (e) {
     debugPrint('Telegram Analytics Error: $e');
+  }
+
+  // تهيئة خدمة تسجيل الدخول والمصادقة
+  try {
+    await AuthService().init();
+  } catch (e) {
+    debugPrint('Auth Init Error: $e');
   }
 
   // انطلاق التطبيق بغض النظر عن أي أخطاء في الخلفية
