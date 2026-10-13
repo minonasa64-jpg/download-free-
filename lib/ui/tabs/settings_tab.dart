@@ -378,7 +378,7 @@ class _SettingsTabState extends State<SettingsTab> {
                                     'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png',
                                     width: 24,
                                     height: 24,
-                                    errorBuilder: (_, __, ___) => const Icon(Icons.account_circle, color: AppColors.cyan, size: 28),
+                                    errorBuilder: (_, __, ___) => Icon(Icons.account_circle, color: AppColors.cyan, size: 28),
                                   )
                                 : null,
                           ),

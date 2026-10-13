@@ -201,7 +201,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with SingleTicker
                   backgroundColor: AppColors.surface,
                   backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
                   child: user.photoUrl == null
-                      ? const Icon(Icons.person, size: 40, color: AppColors.cyan)
+                      ? Icon(Icons.person, size: 40, color: AppColors.cyan)
                       : null,
                 ),
               ),
@@ -355,7 +355,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with SingleTicker
                   keyboardType: TextInputType.emailAddress,
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.email_outlined, color: AppColors.cyan, size: 18),
+                    prefixIcon: Icon(Icons.email_outlined, color: AppColors.cyan, size: 18),
                     labelText: 'البريد الإلكتروني لحساب Google',
                     labelStyle: TextStyle(color: AppColors.textMuted, fontSize: 12),
                     hintText: 'example@gmail.com',
@@ -369,7 +369,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with SingleTicker
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.cyan),
+                      borderSide: BorderSide(color: AppColors.cyan),
                     ),
                   ),
                 ),
@@ -378,7 +378,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with SingleTicker
                   controller: _customNameController,
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.badge_outlined, color: AppColors.cyan, size: 18),
+                    prefixIcon: Icon(Icons.badge_outlined, color: AppColors.cyan, size: 18),
                     labelText: 'الاسم المعروض (اختياري)',
                     labelStyle: TextStyle(color: AppColors.textMuted, fontSize: 12),
                     hintText: 'اسم المستخدم',
@@ -392,7 +392,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with SingleTicker
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.cyan),
+                      borderSide: BorderSide(color: AppColors.cyan),
                     ),
                   ),
                 ),
