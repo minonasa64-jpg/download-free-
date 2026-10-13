@@ -431,17 +431,64 @@ class _SettingsTabState extends State<SettingsTab> {
                           ),
                         ),
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => GoogleLoginScreen(
-                                onLoginSuccess: () {
-                                  Navigator.pop(context);
-                                  setState(() {});
-                                },
+                          if (isLoggedIn) {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: isDark ? const Color(0xFF1E2230) : Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                title: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      backgroundImage: user?.photoUrl != null ? NetworkImage(user!.photoUrl!) : null,
+                                      child: user?.photoUrl == null ? const Icon(Icons.person) : null,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(user?.displayName ?? '', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
+                                          Text(user?.email ?? '', style: TextStyle(fontSize: 11, color: subtitleColor)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                content: const Text('هل ترغب في تسجيل الخروج من هذا الحساب؟'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text('إلغاء'),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                                    onPressed: () async {
+                                      Navigator.pop(ctx);
+                                      await AuthService().signOut();
+                                      setState(() {});
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('تم تسجيل الخروج بنجاح 👋')),
+                                      );
+                                    },
+                                    child: const Text('تسجيل الخروج', style: TextStyle(color: Colors.white)),
+                                  ),
+                                ],
                               ),
-                            ),
-                          );
+                            );
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => GoogleLoginScreen(
+                                  onLoginSuccess: () {
+                                    Navigator.pop(context);
+                                    setState(() {});
+                                  },
+                                ),
+                              ),
+                            );
+                          }
                         },
                       ),
                     ),

@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
+import 'google_login_screen.dart';
 import 'main_navigation.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -98,9 +100,19 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     Timer(const Duration(milliseconds: 2800), () {
       if (!mounted) return;
 
+      final bool isLoggedIn = AuthService().isLoggedIn.value;
+
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => const MainNavigation(),
+          pageBuilder: (context, animation, secondaryAnimation) => isLoggedIn
+              ? const MainNavigation()
+              : GoogleLoginScreen(
+                  onLoginSuccess: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const MainNavigation()),
+                    );
+                  },
+                ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
               opacity: animation,
