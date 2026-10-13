@@ -1196,6 +1196,7 @@ class BackendService {
     }
 
     try {
+      String targetDestination = finalOutputPath;
       if (!needsMerge) {
         final statusMsg = ext == 'mp3' ? 'جاري تحميل الصوت...' : 'جاري تحميل الفيديو...';
         onStatusChanged(statusMsg);
@@ -1533,7 +1534,6 @@ class BackendService {
         }
 
         // إذا كان الملف المدمج الناتج MKV، نعدل مسار الإخراج النهائي ليكون .mkv متطابقاً مع الحاوية
-        String targetDestination = finalOutputPath;
         if (mergeSucceeded && successfulMergedPath.endsWith('.mkv') && !targetDestination.toLowerCase().endsWith('.mkv')) {
           targetDestination = '${targetDestination.substring(0, targetDestination.lastIndexOf('.'))}.mkv';
         }
