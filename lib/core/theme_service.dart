@@ -150,7 +150,6 @@ class ThemeService {
           primary: cfg.primary,
           secondary: cfg.secondary,
           surface: cfg.surface,
-          surfaceContainerHighest: cfg.surfaceLight,
           onPrimary: Colors.white,
           onSurface: const Color(0xFF0F172A),
         ),
