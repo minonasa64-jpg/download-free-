@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 38595088046,
-    status: 'completed',
-    conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38595088046',
-    head_sha: 'ad7ea12',
+    id: 38599936629,
+    status: 'in_progress',
+    conclusion: null,
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38599936629',
+    head_sha: 'af8589c',
     head_commit: {
-      id: 'ad7ea12',
-      message: 'release: v1.6.1 - official neumorphic login with mandatory initial gate and real auth'
+      id: 'af8589c',
+      message: 'feat(v1.6.2): pure white default theme with contrasting electric blue buttons & official Google OAuth WebView'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
