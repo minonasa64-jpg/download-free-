@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 38599936629,
+    id: 38600682283,
     status: 'in_progress',
     conclusion: null,
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38599936629',
-    head_sha: 'af8589c',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38600682283',
+    head_sha: '9c19e5f',
     head_commit: {
-      id: 'af8589c',
-      message: 'feat(v1.6.2): pure white default theme with contrasting electric blue buttons & official Google OAuth WebView'
+      id: '9c19e5f',
+      message: 'release: v1.6.2 - pure white primary theme & official Google OAuth account picker'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
