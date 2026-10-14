@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 38600682283,
-    status: 'completed',
-    conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38600682283',
-    head_sha: '9c19e5f',
+    id: 38627678700,
+    status: 'in_progress',
+    conclusion: null,
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38627678700',
+    head_sha: '346e074',
     head_commit: {
-      id: '9c19e5f',
-      message: 'release: v1.6.2 - pure white primary theme & official Google OAuth account picker'
+      id: '346e074',
+      message: 'fix(v1.6.3): permanent keystore & v1/v2/v3 signing + modern web-style Google One-Tap login'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -87,7 +87,7 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.6.2
+                  v1.6.3
                 </span>
               </h1>
               <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي إلى GitHub</p>
