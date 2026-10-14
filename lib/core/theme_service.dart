@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum AppThemePreset {
-  cyberCyan,      // السايبر الأزرق الكلاسيكي (الافتراضي)
-  amoledPitch,    // الأسود الفاحم الموفر للبطارية والشاشات
-  emeraldGreen,   // الأخضر الزمردي الراقي
-  sunsetAmber,    // الذهبي والعنبر الفاخر
-  neonViolet,     // البنفسجي الساحر النيون
-  lightFrost,     // الأبيض الثلجي المضيء
+  pureWhite,      // الأبيض النقي المشرق (الافتراضي الرئيسي للتطبيق)
+  cyberCyan,      // السايبر الأزرق الداكن
+  amoledPitch,    // الأسود الفاحم الموفر للبطارية
+  emeraldGreen,   // الأخضر الزمردي
+  sunsetAmber,    // الذهبي والعنبر
+  neonViolet,     // البنفسجي الساحر
 }
 
 class ThemeConfig {
@@ -32,7 +32,7 @@ class ThemeConfig {
     required this.background,
     required this.surface,
     required this.surfaceLight,
-    this.isDark = true,
+    this.isDark = false,
   });
 }
 
@@ -42,11 +42,24 @@ class ThemeService {
   ThemeService._internal();
 
   static const List<ThemeConfig> themes = [
+    // 1. الثيم الأبيض النقي المشرق (الافتراضي الأول للتطبيق بأزرار متباينة ساطعة)
+    ThemeConfig(
+      id: 'pure_white',
+      nameAr: 'أبيض نقي مشرق (الافتراضي المعتمد)',
+      nameEn: 'Pure White (Default)',
+      nameFr: 'Blanc Pur (Défaut)',
+      primary: Color(0xFF0066FF), // أزرق ملكي كهربائي متباين بقوة مع الخلفية البيضاء
+      secondary: Color(0xFF00C6FF), // سيان متوهج مكمل
+      background: Color(0xFFFFFFFF), // أبيض نقي رئيسي للواجهة
+      surface: Color(0xFFF8FAFC), // مساحات البطاقات الناصعة
+      surfaceLight: Color(0xFFEDF2F7), // مساحات الحقول والأزرار الخفيفة
+      isDark: false,
+    ),
     ThemeConfig(
       id: 'cyber_cyan',
-      nameAr: 'سايبر سايان (الافتراضي)',
-      nameEn: 'Cyber Cyan (Default)',
-      nameFr: 'Cyber Cyan (Défaut)',
+      nameAr: 'سايبر سايان (الوضع المظلم)',
+      nameEn: 'Cyber Cyan (Dark)',
+      nameFr: 'Cyber Cyan (Sombre)',
       primary: Color(0xFF00D9FF),
       secondary: Color(0xFFB000FF),
       background: Color(0xFF050509),
@@ -102,25 +115,14 @@ class ThemeService {
       surfaceLight: Color(0xFF26163C),
       isDark: true,
     ),
-    ThemeConfig(
-      id: 'light_frost',
-      nameAr: 'أبيض ثلجي مشرق (Frost Light)',
-      nameEn: 'Frost White (Light Mode)',
-      nameFr: 'Blanc Givré (Clair)',
-      primary: Color(0xFF0284C7),
-      secondary: Color(0xFF7C3AED),
-      background: Color(0xFFF8FAFC),
-      surface: Color(0xFFFFFFFF),
-      surfaceLight: Color(0xFFF1F5F9),
-      isDark: false,
-    ),
   ];
 
   final ValueNotifier<ThemeConfig> currentTheme = ValueNotifier<ThemeConfig>(themes[0]);
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedThemeId = prefs.getString('theme_preset_id') ?? 'cyber_cyan';
+    // تعيين الأبيض النقي تلقائياً كالخيار المعتمد
+    final savedThemeId = prefs.getString('theme_preset_id') ?? 'pure_white';
     final found = themes.firstWhere(
       (t) => t.id == savedThemeId,
       orElse: () => themes[0],
@@ -137,19 +139,32 @@ class ThemeService {
   ThemeData getThemeData() {
     final cfg = currentTheme.value;
     if (!cfg.isDark) {
-      return ThemeData.light().copyWith(
+      return ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.light,
         scaffoldBackgroundColor: cfg.background,
         primaryColor: cfg.primary,
+        cardColor: cfg.surface,
+        dividerColor: const Color(0xFFE2E8F0),
         colorScheme: ColorScheme.light(
           primary: cfg.primary,
           secondary: cfg.secondary,
           surface: cfg.surface,
+          surfaceContainerHighest: cfg.surfaceLight,
+          onPrimary: Colors.white,
+          onSurface: const Color(0xFF0F172A),
+        ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: cfg.background,
+          foregroundColor: const Color(0xFF0F172A),
+          elevation: 0,
         ),
       );
     } else {
       return ThemeData.dark().copyWith(
         scaffoldBackgroundColor: cfg.background,
         primaryColor: cfg.primary,
+        cardColor: cfg.surface,
         colorScheme: ColorScheme.dark(
           primary: cfg.primary,
           secondary: cfg.secondary,

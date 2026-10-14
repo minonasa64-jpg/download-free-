@@ -31,6 +31,7 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       extendBody: true,
       body: ValueListenableBuilder<String>(
         valueListenable: _backend.langNotifier,
@@ -57,6 +58,7 @@ class _MainNavigationState extends State<MainNavigation> {
           ValueListenableBuilder<String>(
             valueListenable: _backend.langNotifier,
             builder: (context, lang, child) {
+              final isDark = ThemeService().currentTheme.value.isDark;
               return Container(
                 margin: const EdgeInsets.only(left: 12, right: 12, bottom: 18),
                 child: ClipRRect(
@@ -66,9 +68,21 @@ class _MainNavigationState extends State<MainNavigation> {
                     child: Container(
                       height: 68,
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceLight.withOpacity(0.55),
+                        color: isDark
+                            ? AppColors.surfaceLight.withOpacity(0.55)
+                            : Colors.white.withOpacity(0.95),
                         borderRadius: BorderRadius.circular(25),
-                        border: Border.all(color: Colors.white.withOpacity(0.06)),
+                        border: Border.all(
+                          color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,

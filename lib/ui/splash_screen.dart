@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../core/theme_service.dart';
 import 'google_login_screen.dart';
 import 'main_navigation.dart';
 
@@ -136,8 +137,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
+    final isDark = ThemeService().currentTheme.value.isDark;
     return Scaffold(
-      backgroundColor: const Color(0xFF050509),
+      backgroundColor: isDark ? const Color(0xFF050509) : Colors.white,
       body: Stack(
         children: [
           Center(
@@ -267,10 +269,10 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                           ),
                         ),
                         const SizedBox(height: 7),
-                        const Text(
+                        Text(
                           'Download Videos',
                           style: TextStyle(
-                            color: Colors.white70,
+                            color: isDark ? Colors.white70 : const Color(0xFF475569),
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 2,

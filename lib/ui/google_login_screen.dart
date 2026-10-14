@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import 'google_oauth_webview_screen.dart';
 
 class GoogleLoginScreen extends StatefulWidget {
   final VoidCallback? onLoginSuccess;
@@ -132,123 +133,37 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
     }
   }
 
-  // تسجيل الدخول الحقيقي عبر Google
+  // تسجيل الدخول الحقيقي عبر Google الرسمي مع اختيار الحسابات
   Future<void> _handleGoogleSignIn() async {
-    // إتاحة نافذة لتأكيد الحساب أو استخدام الحساب المباشر
-    final googleEmailController = TextEditingController();
-    final googleNameController = TextEditingController();
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: neoBg,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Row(
-            children: [
-              Image.network(
-                'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png',
-                width: 24,
-                height: 24,
-                errorBuilder: (_, __, ___) => const Icon(Icons.g_mobiledata_rounded, color: primaryBlue),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'تسجيل الدخول بـ Google',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textDark),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'سيتم تسجيل دخولك ومزامنة بياناتك مع حساب Google الخاص بك:',
-                style: TextStyle(fontSize: 12, color: textMuted),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: googleEmailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  labelText: 'بريدك في Google (اختياري)',
-                  hintText: 'example@gmail.com',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.email_outlined),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: googleNameController,
-                decoration: InputDecoration(
-                  labelText: 'اسمك في الحساب (اختياري)',
-                  hintText: 'اسم المستخدم',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.person_outline),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء', style: TextStyle(color: textMuted)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryBlue,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('تأكيد الدخول', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (result != true) return;
-
     setState(() {
-      _isLoading = true;
       _statusMessage = null;
       _isError = false;
     });
 
-    try {
-      final inputEmail = googleEmailController.text.trim();
-      final inputName = googleNameController.text.trim();
+    // فتح شاشة تسجيل الدخول الرسمية لـ Google مع اختيار الحسابات
+    final GoogleAuthUser? loggedInUser = await Navigator.push<GoogleAuthUser>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const GoogleOAuthWebViewScreen(),
+        fullscreenDialog: true,
+      ),
+    );
 
-      await _auth.signInWithGoogle(
-        email: inputEmail.isNotEmpty ? inputEmail : null,
-        displayName: inputName.isNotEmpty ? inputName : null,
-        rememberMe: _rememberMe,
-      );
-
+    if (loggedInUser != null) {
       if (mounted) {
         setState(() {
-          _isLoading = false;
           _statusMessage = 'تم تسجيل الدخول بنجاح بحساب Google 🎉';
           _isError = false;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('مرحباً بك ${_auth.currentUser.value?.displayName}! تم تسجيل الدخول بنجاح.'),
+            content: Text('مرحباً بك ${loggedInUser.displayName}! تم ربط حسابك الرسمي للاشتراك بنجاح.'),
             backgroundColor: Colors.green,
           ),
         );
 
         Future.delayed(const Duration(milliseconds: 500), _proceedToApp);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _statusMessage = 'فشل تسجيل الدخول: $e';
-          _isError = true;
-        });
       }
     }
   }
