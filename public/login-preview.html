@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login & Sign Up Form UI | CodeByGaurav</title>
+    <title>تسجيل الدخول - Boykta Pro</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap');
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Tajawal', sans-serif;
         }
 
         body {
@@ -20,516 +20,355 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            background: #ebf0f5;
-            padding: 20px;
-            overflow-x: hidden;
-        }
-
-        /* Floating Neumorphic Spheres in background */
-        .bg-sphere {
-            position: fixed;
-            border-radius: 50%;
-            background: #ebf0f5;
-            box-shadow: 14px 14px 28px #caced1, -14px -14px 28px #ffffff;
-            z-index: -1;
-            animation: floatAnim 5s ease-in-out infinite alternate;
-        }
-        .sp1 { width: 170px; height: 170px; top: 8%; left: 8%; }
-        .sp2 { width: 130px; height: 130px; bottom: 8%; right: 8%; animation-delay: 2s; }
-        .sp3 { width: 60px; height: 60px; top: 25%; right: 22%; animation-delay: 1s; }
-
-        @keyframes floatAnim {
-            0% { transform: translateY(0); }
-            100% { transform: translateY(-16px); }
-        }
-
-        .auth-wrapper {
-            width: 390px;
-            max-width: 100%;
-            perspective: 1500px;
+            background: #ffffff;
+            padding: 24px 16px;
+            color: #0f172a;
         }
 
         .auth-card {
-            position: relative;
             width: 100%;
-            min-height: 620px;
-            transform-style: preserve-3d;
-            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-        }
-
-        .auth-card.flipped {
-            transform: rotateY(180deg);
-        }
-
-        .form-panel {
-            position: absolute;
-            inset: 0;
+            max-width: 440px;
+            background: #ffffff;
+            border-radius: 24px;
             padding: 32px 28px;
-            border-radius: 38px;
-            background: #ebf0f5;
-            box-shadow: 16px 16px 32px #caced1, -16px -16px 32px #ffffff;
-            backface-visibility: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .signup-panel {
-            transform: rotateY(180deg);
-        }
-
-        /* Logo Area */
-        .logo-box {
-            width: 74px;
-            height: 74px;
-            border-radius: 50%;
-            background: #ebf0f5;
-            box-shadow: 8px 8px 16px #caced1, -8px -8px 16px #ffffff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-
-        .logo-box .inner-badge {
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            background: #ebf0f5;
-            box-shadow: inset 2px 2px 5px #caced1, inset -2px -2px 5px #ffffff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 22px;
-        }
-
-        .logo-lock { color: #f59e0b; }
-        .logo-user { color: #0066cc; }
-
-        h1 {
-            color: #2d3748;
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 3px;
-            text-align: center;
-        }
-
-        .subtitle {
-            color: #718096;
-            font-size: 13px;
-            margin-bottom: 22px;
-            text-align: center;
-        }
-
-        form {
-            width: 100%;
-        }
-
-        .field-group {
-            margin-bottom: 15px;
-            width: 100%;
-        }
-
-        .field-group label {
-            display: block;
-            color: #2d3748;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 6px;
-            margin-left: 4px;
-        }
-
-        .input-inset {
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08), 0 0 0 1px #e2e8f0;
             position: relative;
-            width: 100%;
-            height: 48px;
-            border-radius: 16px;
-            background: #ebf0f5;
-            box-shadow: inset 3px 3px 6px #caced1, inset -3px -3px 6px #ffffff;
-            display: flex;
-            align-items: center;
-            padding: 0 14px;
-            border: 1px solid transparent;
-            transition: all 0.25s ease;
         }
 
-        .input-inset:focus-within {
-            border-color: #00aaff;
-            box-shadow: inset 2px 2px 5px #caced1, inset -2px -2px 5px #ffffff, 0 0 10px rgba(0, 170, 255, 0.25);
+        .brand-header {
+            text-align: center;
+            margin-bottom: 28px;
         }
 
-        .input-inset i.prefix-icon {
-            color: #718096;
-            font-size: 15px;
-            margin-right: 10px;
-        }
-
-        .input-inset input {
-            flex: 1;
-            height: 100%;
-            border: none;
-            outline: none;
-            background: transparent;
-            color: #2d3748;
-            font-size: 13.5px;
-            font-weight: 500;
-        }
-
-        .input-inset input::placeholder {
-            color: #a0aec0;
-            font-size: 13px;
-        }
-
-        .pass-toggle {
-            background: none;
-            border: none;
-            color: #718096;
-            cursor: pointer;
-            font-size: 15px;
-            padding: 4px;
-        }
-
-        .pass-toggle:hover {
-            color: #0066cc;
-        }
-
-        /* Options Row */
-        .options-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 4px 2px 18px;
-            font-size: 12.5px;
-        }
-
-        .remember-wrap {
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            color: #718096;
-            cursor: pointer;
-        }
-
-        .remember-wrap input[type="checkbox"] {
-            accent-color: #0066cc;
-            width: 16px;
-            height: 16px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .forgot-link {
-            color: #0066cc;
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        .forgot-link:hover {
-            text-decoration: underline;
-        }
-
-        /* Neumorphic Buttons */
-        .btn-neo {
-            width: 100%;
-            height: 50px;
-            border: none;
-            border-radius: 16px;
-            background: #ebf0f5;
-            color: #0066cc;
-            font-size: 14.5px;
-            font-weight: 700;
-            letter-spacing: 1.2px;
-            cursor: pointer;
-            box-shadow: 6px 6px 14px #caced1, -6px -6px 14px #ffffff;
-            transition: all 0.2s ease;
-        }
-
-        .btn-neo:hover {
-            transform: translateY(-2px);
-            box-shadow: 8px 8px 18px #caced1, -8px -8px 18px #ffffff;
-            color: #0052a3;
-        }
-
-        .btn-neo:active {
-            transform: translateY(1px);
-            box-shadow: inset 3px 3px 6px #caced1, inset -3px -3px 6px #ffffff;
-        }
-
-        /* Switch row */
-        .switch-row {
+        .brand-icon {
+            width: 62px;
+            height: 62px;
+            margin: 0 auto 14px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #2563eb, #38bdf8);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            margin: 18px 0;
-            font-size: 12.5px;
-            color: #718096;
-        }
-
-        .btn-switch-circle {
-            width: 38px;
-            height: 38px;
-            border: none;
-            border-radius: 50%;
-            background: #ebf0f5;
-            color: #0066cc;
-            font-size: 16px;
-            cursor: pointer;
-            box-shadow: 4px 4px 8px #caced1, -4px -4px 8px #ffffff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: all 0.25s ease;
-        }
-
-        .btn-switch-circle:hover {
-            transform: scale(1.08) rotate(90deg);
-            background: #0066cc;
-            color: #fff;
-            box-shadow: 0 4px 12px rgba(0, 102, 204, 0.35);
-        }
-
-        /* Social Icons Row */
-        .social-row {
-            display: flex;
-            justify-content: center;
-            gap: 16px;
-            margin-top: 4px;
-        }
-
-        .btn-social {
-            width: 44px;
-            height: 44px;
-            border: none;
-            border-radius: 50%;
-            background: #ebf0f5;
-            cursor: pointer;
-            box-shadow: 5px 5px 10px #caced1, -5px -5px 10px #ffffff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: 700;
-            font-size: 16px;
-            transition: all 0.2s ease;
-        }
-
-        .btn-social:hover {
-            transform: translateY(-2px);
-            box-shadow: 7px 7px 14px #caced1, -7px -7px 14px #ffffff;
-        }
-
-        .btn-social.google { color: #ea4335; }
-        .btn-social.facebook { color: #1877f2; }
-        .btn-social.linkedin { color: #0a66c2; }
-
-        /* Toast */
-        .toast {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%) translateY(-100px);
-            background: #10b981;
             color: white;
-            padding: 12px 24px;
-            border-radius: 14px;
-            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
-            font-size: 13.5px;
-            font-weight: 600;
-            transition: transform 0.4s ease;
-            z-index: 1000;
+            font-size: 28px;
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
         }
-        .toast.show { transform: translateX(-50%) translateY(0); }
+
+        .brand-title {
+            font-size: 22px;
+            font-weight: 900;
+            color: #0f172a;
+            margin-bottom: 4px;
+        }
+
+        .brand-subtitle {
+            font-size: 13px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        /* Google Web Button */
+        .google-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 13px 18px;
+            background: #ffffff;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+        }
+        .google-btn:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        }
+        .google-badge {
+            background: #eff6ff;
+            color: #2563eb;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+
+        /* Divider */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 22px 0;
+            color: #94a3b8;
+            font-size: 12px;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e2e8f0;
+        }
+
+        /* Segmented Tabs */
+        .tabs {
+            display: flex;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 9px 0;
+            text-align: center;
+            border: none;
+            background: transparent;
+            font-size: 13px;
+            font-weight: 700;
+            color: #64748b;
+            cursor: pointer;
+            border-radius: 9px;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: #ffffff;
+            color: #2563eb;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        /* Inputs */
+        .input-group {
+            margin-bottom: 14px;
+        }
+        .input-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+        .input-wrapper {
+            display: flex;
+            align-items: center;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 0 12px;
+            transition: border-color 0.2s;
+        }
+        .input-wrapper:focus-within {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        .input-wrapper i {
+            color: #94a3b8;
+            font-size: 15px;
+            margin-left: 10px;
+        }
+        .input-wrapper input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 12px 0;
+            font-size: 13px;
+            color: #0f172a;
+            outline: none;
+        }
+
+        /* Primary Submit */
+        .primary-btn {
+            width: 100%;
+            padding: 14px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 14px;
+        }
+        .primary-btn:hover {
+            background: #1d4ed8;
+        }
+
+        /* Modal Google One Tap */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: flex-end;
+            padding: 16px;
+        }
+        .modal-box {
+            width: 100%;
+            max-width: 440px;
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 24px;
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .account-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: all 0.2s;
+        }
+        .account-item:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+        .avatar-circle {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #2563eb;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+        }
     </style>
 </head>
-
 <body>
-    <div class="bg-sphere sp1"></div>
-    <div class="bg-sphere sp2"></div>
-    <div class="bg-sphere sp3"></div>
 
-    <div id="toast" class="toast">
-        <i class="fa-solid fa-circle-check"></i>
-        <span id="toastMsg">تم تسجيل الدخول بنجاح!</span>
+    <div class="auth-card">
+        <div class="brand-header">
+            <div class="brand-icon">
+                <i class="fa-solid fa-cloud-arrow-down"></i>
+            </div>
+            <h1 class="brand-title">Boykta Pro</h1>
+            <p class="brand-subtitle">سجّل دخولك لحفظ اشتراكك وسجل التنزيلات السحابية</p>
+        </div>
+
+        <!-- Google One Tap Button -->
+        <button class="google-btn" id="openGoogleModal">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png" width="22" height="22" alt="Google">
+            <span>المتابعة باستخدام Google</span>
+            <span class="google-badge">فوري وسهل</span>
+        </button>
+
+        <div class="divider">أو بالبريد الإلكتروني</div>
+
+        <div class="tabs">
+            <button class="tab-btn active" id="tabLogin">تسجيل الدخول</button>
+            <button class="tab-btn" id="tabSignup">حساب جديد</button>
+        </div>
+
+        <form id="authForm" onsubmit="event.preventDefault(); alert('تم تسجيل الدخول بنجاح!');">
+            <div class="input-group" id="nameGroup" style="display: none;">
+                <label class="input-label">الاسم الكامل</label>
+                <div class="input-wrapper">
+                    <i class="fa-regular fa-user"></i>
+                    <input type="text" placeholder="مثلاً: نافع وضاح">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">البريد الإلكتروني</label>
+                <div class="input-wrapper">
+                    <i class="fa-regular fa-envelope"></i>
+                    <input type="email" placeholder="name@example.com" required>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">كلمة المرور</label>
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="password" placeholder="••••••••" required>
+                </div>
+            </div>
+
+            <button type="submit" class="primary-btn" id="submitBtn">تسجيل الدخول</button>
+        </form>
+
+        <div style="text-align: center; margin-top: 18px;">
+            <a href="#" style="color: #64748b; font-size: 13px; text-decoration: none;" onclick="alert('تم المتابعة كزائر');">المتابعة كزائر مؤقتاً وتخطي التسجيل &larr;</a>
+        </div>
     </div>
 
-    <div class="auth-wrapper">
-        <div class="auth-card" id="authCard">
-
-            <!-- 1. LOGIN PANEL (Welcome) -->
-            <div class="form-panel login-panel">
-                <div class="logo-box">
-                    <div class="inner-badge">
-                        <i class="fa-solid fa-lock logo-lock"></i>
-                    </div>
+    <!-- Google One-Tap Account Chooser Modal -->
+    <div class="modal-overlay" id="googleModal">
+        <div class="modal-box">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png" width="22" height="22" alt="Google">
+                    <h3 style="font-size: 15px; font-weight: 700;">تسجيل الدخول باستخدام Google</h3>
                 </div>
+                <i class="fa-solid fa-xmark" style="cursor: pointer; color: #94a3b8;" id="closeGoogleModal"></i>
+            </div>
+            <p style="font-size: 12px; color: #64748b; margin-bottom: 14px;">اختر حسابك لحفظ اشتراكك وسجل التحميلات في Boykta Pro:</p>
 
-                <h1>Welcome</h1>
-                <p class="subtitle">Login to continue your journey</p>
-
-                <form id="loginForm" onsubmit="handleLoginSubmit(event)">
-                    <!-- Email -->
-                    <div class="field-group">
-                        <label>Email Address</label>
-                        <div class="input-inset">
-                            <i class="fa-regular fa-envelope prefix-icon"></i>
-                            <input type="email" placeholder="gaurav@gmail.com" required>
-                        </div>
-                    </div>
-
-                    <!-- Password -->
-                    <div class="field-group">
-                        <label>Password</label>
-                        <div class="input-inset">
-                            <i class="fa-solid fa-lock prefix-icon"></i>
-                            <input type="password" id="loginPass" placeholder="••••••" required>
-                            <button type="button" class="pass-toggle" onclick="togglePass('loginPass', this)">
-                                <i class="fa-regular fa-eye"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="options-row">
-                        <label class="remember-wrap">
-                            <input type="checkbox" checked>
-                            <span>Remember me</span>
-                        </label>
-                        <a href="#" class="forgot-link" onclick="showToast('تم إرسال رابط استعادة كلمة المرور'); return false;">Forgot Password?</a>
-                    </div>
-
-                    <button type="submit" class="btn-neo">LOGIN</button>
-                </form>
-
-                <div class="switch-row">
-                    <span>Don't have an account?</span>
-                    <button type="button" class="btn-switch-circle" onclick="flipCard()">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
+            <div class="account-item" onclick="alert('تم تسجيل الدخول بنجاح بحساب nafea ouadah! تم ربط الاشتراك.'); document.getElementById('googleModal').style.display='none';">
+                <div class="avatar-circle">N</div>
+                <div style="flex: 1;">
+                    <div style="font-weight: 700; font-size: 14px;">nafea ouadah</div>
+                    <div style="font-size: 12px; color: #64748b;">nafeawoudah24@gmail.com</div>
                 </div>
-
-                <!-- Social Icons G, f, in -->
-                <div class="social-row">
-                    <button class="btn-social google" title="Google Sign-In" onclick="showToast('تم تسجيل الدخول بحساب Google!')">
-                        <i class="fa-brands fa-google"></i>
-                    </button>
-                    <button class="btn-social facebook" title="Facebook" onclick="showToast('تم تسجيل الدخول بحساب Facebook!')">
-                        <i class="fa-brands fa-facebook-f"></i>
-                    </button>
-                    <button class="btn-social linkedin" title="LinkedIn" onclick="showToast('تم تسجيل الدخول بحساب LinkedIn!')">
-                        <i class="fa-brands fa-linkedin-in"></i>
-                    </button>
-                </div>
+                <i class="fa-solid fa-chevron-left" style="color: #94a3b8; font-size: 12px;"></i>
             </div>
 
-            <!-- 2. SIGNUP PANEL (Create Account) -->
-            <div class="form-panel signup-panel">
-                <div class="logo-box">
-                    <div class="inner-badge">
-                        <i class="fa-solid fa-user logo-user"></i>
-                    </div>
+            <div class="account-item" onclick="prompt('أدخل بريدك في Gmail:'); alert('تم الربط!'); document.getElementById('googleModal').style.display='none';">
+                <div class="avatar-circle" style="background: #e2e8f0; color: #2563eb;"><i class="fa-solid fa-plus"></i></div>
+                <div style="flex: 1;">
+                    <div style="font-weight: 700; font-size: 14px;">استخدام حساب Google آخر</div>
+                    <div style="font-size: 12px; color: #64748b;">أدخل أي بريد Gmail ترغب في ربطه بالاشتراك</div>
                 </div>
-
-                <h1>Create Account</h1>
-                <p class="subtitle">Sign up to get started</p>
-
-                <form id="signupForm" onsubmit="handleSignupSubmit(event)">
-                    <!-- Full Name -->
-                    <div class="field-group">
-                        <label>Full Name</label>
-                        <div class="input-inset">
-                            <i class="fa-regular fa-user prefix-icon"></i>
-                            <input type="text" placeholder="Enter your name" required>
-                        </div>
-                    </div>
-
-                    <!-- Email -->
-                    <div class="field-group">
-                        <label>Email Address</label>
-                        <div class="input-inset">
-                            <i class="fa-regular fa-envelope prefix-icon"></i>
-                            <input type="email" placeholder="gaurav@gmail.com" required>
-                        </div>
-                    </div>
-
-                    <!-- Password -->
-                    <div class="field-group">
-                        <label>Password</label>
-                        <div class="input-inset">
-                            <i class="fa-solid fa-lock prefix-icon"></i>
-                            <input type="password" id="signupPass" placeholder="••••••" required>
-                            <button type="button" class="pass-toggle" onclick="togglePass('signupPass', this)">
-                                <i class="fa-regular fa-eye"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Confirm Password -->
-                    <div class="field-group">
-                        <label>Confirm Password</label>
-                        <div class="input-inset">
-                            <i class="fa-solid fa-lock prefix-icon"></i>
-                            <input type="password" id="confirmPass" placeholder="••••••" required>
-                            <button type="button" class="pass-toggle" onclick="togglePass('confirmPass', this)">
-                                <i class="fa-regular fa-eye"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="options-row">
-                        <label class="remember-wrap">
-                            <input type="checkbox" checked required>
-                            <span>I agree to the <b style="color: #0066cc;">Terms & Conditions</b></span>
-                        </label>
-                    </div>
-
-                    <button type="submit" class="btn-neo">SIGN UP</button>
-                </form>
-
-                <div class="switch-row">
-                    <span>Already have an account?</span>
-                    <button type="button" class="btn-switch-circle" onclick="flipCard()">
-                        <i class="fa-solid fa-arrow-right"></i>
-                    </button>
-                </div>
+                <i class="fa-solid fa-chevron-left" style="color: #94a3b8; font-size: 12px;"></i>
             </div>
-
         </div>
     </div>
 
     <script>
-        function flipCard() {
-            document.getElementById("authCard").classList.toggle("flipped");
-        }
+        const modal = document.getElementById('googleModal');
+        document.getElementById('openGoogleModal').addEventListener('click', () => modal.style.display = 'flex');
+        document.getElementById('closeGoogleModal').addEventListener('click', () => modal.style.display = 'none');
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
 
-        function togglePass(id, btn) {
-            const input = document.getElementById(id);
-            const icon = btn.querySelector("i");
-            if (input.type === "password") {
-                input.type = "text";
-                icon.classList.remove("fa-eye");
-                icon.classList.add("fa-eye-slash");
-            } else {
-                input.type = "password";
-                icon.classList.remove("fa-eye-slash");
-                icon.classList.add("fa-eye");
-            }
-        }
+        const tabLogin = document.getElementById('tabLogin');
+        const tabSignup = document.getElementById('tabSignup');
+        const nameGroup = document.getElementById('nameGroup');
+        const submitBtn = document.getElementById('submitBtn');
 
-        function showToast(msg) {
-            const toast = document.getElementById("toast");
-            document.getElementById("toastMsg").textContent = msg;
-            toast.classList.add("show");
-            setTimeout(() => toast.classList.remove("show"), 3000);
-        }
+        tabLogin.addEventListener('click', () => {
+            tabLogin.classList.add('active');
+            tabSignup.classList.remove('active');
+            nameGroup.style.display = 'none';
+            submitBtn.textContent = 'تسجيل الدخول';
+        });
 
-        function handleLoginSubmit(e) {
-            e.preventDefault();
-            showToast("✓ تم تسجيل الدخول بنجاح!");
-        }
-
-        function handleSignupSubmit(e) {
-            e.preventDefault();
-            showToast("✓ تم إنشاء الحساب وتسجيل الدخول بنجاح!");
-        }
+        tabSignup.addEventListener('click', () => {
+            tabSignup.classList.add('active');
+            tabLogin.classList.remove('active');
+            nameGroup.style.display = 'block';
+            submitBtn.textContent = 'إنشاء الحساب مجاناً';
+        });
     </script>
 </body>
 </html>

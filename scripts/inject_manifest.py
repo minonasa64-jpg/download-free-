@@ -41,13 +41,8 @@ for p in perms:
         e.set('{http://schemas.android.com/apk/res/android}name', p)
         root.insert(0, e)
 
-# Inject modern targetSdkVersion 34 to avoid Google Play Protect warning
-uses_sdk = root.find('uses-sdk')
-if uses_sdk is None:
-    uses_sdk = ET.Element('uses-sdk')
-    root.insert(0, uses_sdk)
-uses_sdk.set('{http://schemas.android.com/apk/res/android}minSdkVersion', '24')
-uses_sdk.set('{http://schemas.android.com/apk/res/android}targetSdkVersion', '34')
+# Note: Gradle handles minSdkVersion and targetSdkVersion via defaultConfig in build.gradle
+# to prevent manifest merger conflicts that cause 'package appears to be invalid'
     
 app = root.find('application')
 if app is not None:

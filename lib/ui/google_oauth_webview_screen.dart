@@ -54,8 +54,8 @@ class _GoogleOAuthWebViewScreenState extends State<GoogleOAuthWebViewScreen> {
           },
         ),
       )
-      // فتح صفحة تسجيل الدخول الرسمية لـ Google مع اختيار الحسابات
-      ..loadRequest(Uri.parse('https://accounts.google.com/ServiceLogin?service=mail&continue=https://myaccount.google.com/'));
+      // فتح صفحة تسجيل الدخول الرسمية لـ Google النظيفة بدون إعادة توجيه لـ myaccount
+      ..loadRequest(Uri.parse('https://accounts.google.com/signin/v2/identifier?flowName=GlifWebSignIn'));
   }
 
   Future<void> _autoDetectAndComplete(String url) async {

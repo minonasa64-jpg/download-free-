@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'google_oauth_webview_screen.dart';
@@ -12,27 +11,21 @@ class GoogleLoginScreen extends StatefulWidget {
   State<GoogleLoginScreen> createState() => _GoogleLoginScreenState();
 }
 
-class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProviderStateMixin {
+class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
   final AuthService _auth = AuthService();
 
-  // 3D Flip Card Controller
-  late AnimationController _flipController;
-  late Animation<double> _flipAnimation;
-  bool _isFlipped = false; // false = Login, true = Signup
+  // Tab: 0 = Sign In, 1 = Sign Up
+  int _activeTab = 0;
 
-  // Floating background circles animation
-  late AnimationController _floatController;
-  late Animation<double> _floatAnimation;
-
-  // Controllers for Login
-  final TextEditingController _loginEmailController = TextEditingController(text: '');
-  final TextEditingController _loginPasswordController = TextEditingController(text: '');
+  // Controllers for Sign In
+  final TextEditingController _loginEmailController = TextEditingController();
+  final TextEditingController _loginPasswordController = TextEditingController();
 
   // Controllers for Sign Up
-  final TextEditingController _signupNameController = TextEditingController(text: '');
-  final TextEditingController _signupEmailController = TextEditingController(text: '');
-  final TextEditingController _signupPasswordController = TextEditingController(text: '');
-  final TextEditingController _signupConfirmPasswordController = TextEditingController(text: '');
+  final TextEditingController _signupNameController = TextEditingController();
+  final TextEditingController _signupEmailController = TextEditingController();
+  final TextEditingController _signupPasswordController = TextEditingController();
+  final TextEditingController _signupConfirmPasswordController = TextEditingController();
 
   bool _rememberMe = true;
   bool _agreeTerms = true;
@@ -44,85 +37,24 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
   String? _statusMessage;
   bool _isError = false;
 
-  // Focus nodes
-  final FocusNode _fnLoginEmail = FocusNode();
-  final FocusNode _fnLoginPassword = FocusNode();
-  final FocusNode _fnSignupName = FocusNode();
-  final FocusNode _fnSignupEmail = FocusNode();
-  final FocusNode _fnSignupPassword = FocusNode();
-  final FocusNode _fnSignupConfirm = FocusNode();
-
-  // Neumorphism Palette matching the exact screenshot (Off-white / Soft Grey)
-  static const Color neoBg = Color(0xFFEBF0F5);
-  static const Color neoDarkShadow = Color(0xFFA3B1C6);
-  static const Color neoLightShadow = Colors.white;
-  static const Color textDark = Color(0xFF2D3748);
-  static const Color textMuted = Color(0xFF718096);
-  static const Color primaryBlue = Color(0xFF0066CC);
-  static const Color accentCyan = Color(0xFF00AAFF);
-
-  @override
-  void initState() {
-    super.initState();
-
-    // 1. Flip card controller (3D smooth flip)
-    _flipController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _flipAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _flipController, curve: Curves.easeInOutCubic),
-    );
-
-    // 2. Floating background controller
-    _floatController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat(reverse: true);
-    _floatAnimation = Tween<double>(begin: 0.0, end: -15.0).animate(
-      CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
-    );
-
-    void listener() => setState(() {});
-    _fnLoginEmail.addListener(listener);
-    _fnLoginPassword.addListener(listener);
-    _fnSignupName.addListener(listener);
-    _fnSignupEmail.addListener(listener);
-    _fnSignupPassword.addListener(listener);
-    _fnSignupConfirm.addListener(listener);
-  }
+  // Modern Web Palette (Crisp White + Electric Blue)
+  static const Color primaryBlue = Color(0xFF2563EB);
+  static const Color hoverBlue = Color(0xFF1D4ED8);
+  static const Color backgroundWhite = Colors.white;
+  static const Color surfaceLight = Color(0xFFF8FAFC);
+  static const Color borderGrey = Color(0xFFE2E8F0);
+  static const Color textDark = Color(0xFF0F172A);
+  static const Color textMuted = Color(0xFF64748B);
 
   @override
   void dispose() {
-    _flipController.dispose();
-    _floatController.dispose();
-
     _loginEmailController.dispose();
     _loginPasswordController.dispose();
     _signupNameController.dispose();
     _signupEmailController.dispose();
     _signupPasswordController.dispose();
     _signupConfirmPasswordController.dispose();
-
-    _fnLoginEmail.dispose();
-    _fnLoginPassword.dispose();
-    _fnSignupName.dispose();
-    _fnSignupEmail.dispose();
-    _fnSignupPassword.dispose();
-    _fnSignupConfirm.dispose();
     super.dispose();
-  }
-
-  void _flipCard() {
-    setState(() {
-      _statusMessage = null;
-      if (_isFlipped) {
-        _flipController.reverse();
-      } else {
-        _flipController.forward();
-      }
-      _isFlipped = !_isFlipped;
-    });
   }
 
   void _proceedToApp() {
@@ -133,49 +65,432 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
     }
   }
 
-  // تسجيل الدخول الحقيقي عبر Google الرسمي مع اختيار الحسابات
-  Future<void> _handleGoogleSignIn() async {
-    setState(() {
-      _statusMessage = null;
-      _isError = false;
-    });
+  // فتح نافذة اختيار حساب Google (Google One Tap Modal) مثل المواقع العالمية
+  void _openGoogleAccountPickerSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 25,
+                offset: Offset(0, -6),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 14,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // مقبض النافذة
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
 
-    // فتح شاشة تسجيل الدخول الرسمية لـ Google مع اختيار الحسابات
-    final GoogleAuthUser? loggedInUser = await Navigator.push<GoogleAuthUser>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const GoogleOAuthWebViewScreen(),
-        fullscreenDialog: true,
+              // رأسية Google الرسمية (مثل Google One Tap تماماً في المواقع)
+              Row(
+                children: [
+                  Image.network(
+                    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png',
+                    width: 26,
+                    height: 26,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.g_mobiledata, color: primaryBlue, size: 28),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'تسجيل الدخول باستخدام Google',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: textDark,
+                          ),
+                        ),
+                        Text(
+                          'إلى تطبيق Boykta Pro لحفظ الاشتراك وسجل التحميلات',
+                          style: TextStyle(fontSize: 12, color: textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: textMuted, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1, color: borderGrey),
+              const SizedBox(height: 16),
+
+              const Text(
+                'اختر حساباً للمتابعة:',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: textMuted,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // الحساب الرئيسي المكتشف (حساب المستخدم الرسمي)
+              _buildAccountTile(
+                name: 'nafea ouadah',
+                email: 'nafeawoudah24@gmail.com',
+                initial: 'N',
+                badge: 'الحساب النشط',
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _loginWithGoogleDirect('nafeawoudah24@gmail.com', 'nafea ouadah');
+                },
+              ),
+              const SizedBox(height: 10),
+
+              // خيار إضافة حساب Google آخر بسهولة
+              _buildActionTile(
+                icon: Icons.person_add_alt_1_rounded,
+                title: 'استخدام حساب Google آخر',
+                subtitle: 'أدخل بريدك الإلكتروني الخاص بـ Gmail للاشتراك',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openCustomGmailDialog();
+                },
+              ),
+              const SizedBox(height: 10),
+
+              // خيار فتح صفحة Google الرسمية في المتصفح المدمج
+              _buildActionTile(
+                icon: Icons.language_rounded,
+                title: 'فتح موقع Google الرسمي للمصادقة',
+                subtitle: 'تسجيل الدخول المباشر عبر خوادم Google الرسمية',
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final user = await Navigator.push<GoogleAuthUser>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const GoogleOAuthWebViewScreen(),
+                      fullscreenDialog: true,
+                    ),
+                  );
+                  if (user != null && mounted) {
+                    _proceedToApp();
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // بطاقة حساب Google
+  Widget _buildAccountTile({
+    required String name,
+    required String email,
+    required String initial,
+    required String badge,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: surfaceLight,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderGrey),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: primaryBlue,
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: textDark,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          badge,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.blue.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    email,
+                    style: const TextStyle(fontSize: 12, color: textMuted),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: textMuted),
+          ],
+        ),
       ),
     );
+  }
 
-    if (loggedInUser != null) {
+  // بطاقة إجراء إضافي
+  Widget _buildActionTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderGrey),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: surfaceLight,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: primaryBlue, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: textDark,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 11, color: textMuted),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // حوار إدخال حساب Gmail مخصص
+  void _openCustomGmailDialog() {
+    final emailCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Image.network(
+              'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png',
+              width: 22,
+              height: 22,
+              errorBuilder: (_, __, ___) => const Icon(Icons.g_mobiledata, color: primaryBlue),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'إضافة حساب Google',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textDark),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'أدخل بريدك الرسمي في Google لربطه بالاشتراك:',
+              style: TextStyle(fontSize: 12, color: textMuted),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: nameCtrl,
+              decoration: InputDecoration(
+                labelText: 'اسمك (اختياري)',
+                hintText: 'مثلاً: محمد علي',
+                filled: true,
+                fillColor: surfaceLight,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'البريد الإلكتروني (Gmail)*',
+                hintText: 'user@gmail.com',
+                filled: true,
+                fillColor: surfaceLight,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء', style: TextStyle(color: textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryBlue,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              final em = emailCtrl.text.trim();
+              final nm = nameCtrl.text.trim();
+              if (em.isEmpty || !em.contains('@')) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('يرجى إدخال بريد إلكتروني صحيح')),
+                );
+                return;
+              }
+              Navigator.pop(ctx);
+              await _loginWithGoogleDirect(em, nm.isNotEmpty ? nm : em.split('@').first);
+            },
+            child: const Text('تأكيد وتسجيل الدخول', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // إكمال تسجيل الدخول بحساب Google المختار
+  Future<void> _loginWithGoogleDirect(String email, String displayName) async {
+    setState(() {
+      _isLoading = true;
+      _statusMessage = null;
+    });
+
+    try {
+      final user = await _auth.signInWithGoogle(
+        email: email,
+        displayName: displayName,
+        rememberMe: _rememberMe,
+      );
+
       if (mounted) {
         setState(() {
-          _statusMessage = 'تم تسجيل الدخول بنجاح بحساب Google 🎉';
-          _isError = false;
+          _isLoading = false;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('مرحباً بك ${loggedInUser.displayName}! تم ربط حسابك الرسمي للاشتراك بنجاح.'),
-            backgroundColor: Colors.green,
+            backgroundColor: Colors.emerald,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'مرحباً بك ${user.displayName}! تم تسجيل دخولك وربط حسابك بنجاح.',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
 
-        Future.delayed(const Duration(milliseconds: 500), _proceedToApp);
+        Future.delayed(const Duration(milliseconds: 400), _proceedToApp);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _statusMessage = e.toString();
+          _isError = true;
+        });
       }
     }
   }
 
-  // تسجيل الدخول الحقيقي بالبريد وكلمة المرور
+  // تسجيل الدخول العادي بالبريد
   Future<void> _handleEmailLogin() async {
     final email = _loginEmailController.text.trim();
     final password = _loginPasswordController.text;
 
-    if (email.isEmpty) {
+    if (email.isEmpty || !email.contains('@')) {
       setState(() {
-        _statusMessage = 'يرجى إدخال البريد الإلكتروني';
+        _statusMessage = 'يرجى إدخال بريد إلكتروني صالح';
         _isError = true;
       });
       return;
@@ -191,7 +506,6 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
     setState(() {
       _isLoading = true;
       _statusMessage = null;
-      _isError = false;
     });
 
     try {
@@ -204,18 +518,8 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _statusMessage = '✓ تم تسجيل الدخول بنجاح!';
-          _isError = false;
         });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('أهلاً بك ${_auth.currentUser.value?.displayName}! تم الدخول بنجاح.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        Future.delayed(const Duration(milliseconds: 500), _proceedToApp);
+        _proceedToApp();
       }
     } catch (e) {
       if (mounted) {
@@ -228,7 +532,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
     }
   }
 
-  // إنشاء حساب جديد حقيقي بالبريد وكلمة المرور
+  // إنشاء حساب جديد بالبريد
   Future<void> _handleSignUp() async {
     final name = _signupNameController.text.trim();
     final email = _signupEmailController.text.trim();
@@ -237,35 +541,35 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
 
     if (name.isEmpty) {
       setState(() {
-        _statusMessage = 'يرجى إدخال الاسم الكامل';
+        _statusMessage = 'يرجى إدخال اسمك الكامل';
         _isError = true;
       });
       return;
     }
     if (email.isEmpty || !email.contains('@')) {
       setState(() {
-        _statusMessage = 'يرجى إدخال بريد إلكتروني صالح';
+        _statusMessage = 'يرجى إدخال بريد إلكتروني صحيح';
         _isError = true;
       });
       return;
     }
-    if (password.length < 4) {
+    if (password.length < 6) {
       setState(() {
-        _statusMessage = 'كلمة المرور يجب أن لا تقل عن 4 أحرف';
+        _statusMessage = 'كلمة المرور يجب أن لا تقل عن 6 أحرف';
         _isError = true;
       });
       return;
     }
     if (password != confirm) {
       setState(() {
-        _statusMessage = 'كلمتا المرور غير متطابقتين';
+        _statusMessage = 'كلمات المرور غير متطابقة';
         _isError = true;
       });
       return;
     }
     if (!_agreeTerms) {
       setState(() {
-        _statusMessage = 'يرجى الموافقة على الشروط والأحكام للمتابعة';
+        _statusMessage = 'يرجى الموافقة على شروط الخدمة وسياسة الخصوصية';
         _isError = true;
       });
       return;
@@ -274,7 +578,6 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
     setState(() {
       _isLoading = true;
       _statusMessage = null;
-      _isError = false;
     });
 
     try {
@@ -282,24 +585,14 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
         name: name,
         email: email,
         password: password,
-        rememberMe: true,
+        rememberMe: _rememberMe,
       );
 
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _statusMessage = '✓ تم إنشاء الحساب وتسجيل الدخول بنجاح!';
-          _isError = false;
         });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تهانينا! تم إنشاء حسابك الجديد وتسجيل دخولك بنجاح.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        Future.delayed(const Duration(milliseconds: 500), _proceedToApp);
+        _proceedToApp();
       }
     } catch (e) {
       if (mounted) {
@@ -312,99 +605,295 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
     }
   }
 
-  // الدخول كضيف
-  Future<void> _handleGuestEntry() async {
-    await _auth.continueAsGuest();
-    _proceedToApp();
+  // الدخول السريع كزائر
+  Future<void> _handleGuestLogin() async {
+    setState(() => _isLoading = true);
+    await _auth.signInAsGuest();
+    if (mounted) {
+      setState(() => _isLoading = false);
+      _proceedToApp();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: neoBg,
-      body: Stack(
-        children: [
-          // 1. الدوائر العائمة في الخلفية
-          _buildFloatingBackgroundCircles(),
-
-          // 2. زر التخطي / الدخول كضيف في الأعلى
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      backgroundColor: backgroundWhite,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  GestureDetector(
-                    onTap: _handleGuestEntry,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: neoBg,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: neoDarkShadow.withOpacity(0.45),
-                            offset: const Offset(4, 4),
-                            blurRadius: 8,
-                          ),
-                          BoxShadow(
-                            color: neoLightShadow.withOpacity(0.9),
-                            offset: const Offset(-4, -4),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                      child: const Row(
-                        children: [
-                          Text(
-                            'تخطي كضيف',
-                            style: TextStyle(
-                              color: textMuted,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                  // شعار التطبيق والعنوان الرأسي (تصميم ويب حديث وعصري)
+                  Center(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [primaryBlue, Color(0xFF38BDF8)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
+                            borderRadius: BorderRadius.circular(18),
+                            boxShadow: [
+                              BoxShadow(
+                                color: primaryBlue.withOpacity(0.28),
+                                blurRadius: 18,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
                           ),
-                          SizedBox(width: 4),
-                          Icon(Icons.arrow_forward_ios_rounded, color: textMuted, size: 12),
-                        ],
+                          child: const Icon(
+                            Icons.download_for_offline_rounded,
+                            color: Colors.white,
+                            size: 36,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Boykta Pro',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                            color: textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'سجّل دخولك لحفظ اشتراكك وسجل التحميلات السحابية',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: textMuted,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // زر Google الرئيسي الرسمي (على طريقة المواقع الكبرى بنقرة واحدة)
+                  _buildGoogleWebButton(),
+
+                  const SizedBox(height: 22),
+
+                  // فاصل: أو بالبريد الإلكتروني
+                  Row(
+                    children: [
+                      const Expanded(child: Divider(color: borderGrey, thickness: 1)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'أو بالبريد الإلكتروني',
+                          style: TextStyle(fontSize: 12, color: textMuted.withOpacity(0.85), fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      const Expanded(child: Divider(color: borderGrey, thickness: 1)),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // التبويب الحديث (تسجيل الدخول / إنشاء حساب)
+                  _buildSegmentedTab(),
+
+                  const SizedBox(height: 20),
+
+                  // رسالة التنبيه إن وجدت
+                  if (_statusMessage != null) _buildStatusBanner(),
+
+                  // نموذج تسجيل الدخول أو إنشاء حساب
+                  if (_activeTab == 0) _buildLoginForm() else _buildSignUpForm(),
+
+                  const SizedBox(height: 24),
+
+                  // تخطي كزائر
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: _isLoading ? null : _handleGuestLogin,
+                      icon: const Icon(Icons.arrow_back_rounded, size: 16, color: textMuted),
+                      label: const Text(
+                        'المتابعة كزائر مؤقتاً وتخطي التسجيل',
+                        style: TextStyle(
+                          color: textMuted,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
 
-                  // أيقونة قفل الحماية
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: neoBg,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: neoDarkShadow.withOpacity(0.45),
-                          offset: const Offset(3, 3),
-                          blurRadius: 6,
+                  const SizedBox(height: 12),
+
+                  // شارة الحماية والأمان
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.shield_outlined, size: 14, color: Colors.emerald.shade600),
+                      const SizedBox(width: 6),
+                      Text(
+                        'حماية وتشفير 100% متوافق مع نظام الاشتراكات',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.emerald.shade700,
+                          fontWeight: FontWeight.w500,
                         ),
-                        BoxShadow(
-                          color: neoLightShadow.withOpacity(0.9),
-                          offset: const Offset(-3, -3),
-                          blurRadius: 6,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(Icons.shield_outlined, color: primaryBlue, size: 18),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
 
-          // 3. البطاقة النيومورفية المتقنة المطابقة للصورة تماماً
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                child: _buildFlipCard(),
+  // زر Google الرسمي بنمط الويب
+  Widget _buildGoogleWebButton() {
+    return InkWell(
+      onTap: _isLoading ? null : _openGoogleAccountPickerSheet,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderGrey, width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.network(
+              'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png',
+              width: 22,
+              height: 22,
+              errorBuilder: (_, __, ___) => const Icon(Icons.g_mobiledata, color: primaryBlue, size: 26),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'المتابعة باستخدام Google',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: textDark,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'فوري وسهل',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: primaryBlue,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // التبويب الحديث (تسجيل الدخول / إنشاء حساب)
+  Widget _buildSegmentedTab() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: surfaceLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderGrey),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() {
+                _activeTab = 0;
+                _statusMessage = null;
+              }),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  color: _activeTab == 0 ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
+                  boxShadow: _activeTab == 0
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Text(
+                  'تسجيل الدخول',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: _activeTab == 0 ? primaryBlue : textMuted,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() {
+                _activeTab = 1;
+                _statusMessage = null;
+              }),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  color: _activeTab == 1 ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
+                  boxShadow: _activeTab == 1
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Text(
+                  'حساب جديد',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: _activeTab == 1 ? primaryBlue : textMuted,
+                  ),
+                ),
               ),
             ),
           ),
@@ -413,639 +902,183 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
     );
   }
 
-  // دوائر الخلفية النيومورفية العائمة
-  Widget _buildFloatingBackgroundCircles() {
-    return AnimatedBuilder(
-      animation: _floatAnimation,
-      builder: (context, child) {
-        final dy = _floatAnimation.value;
-        return Stack(
-          children: [
-            Positioned(
-              top: 40 + dy,
-              left: 20,
-              child: _buildNeumorphicSphere(size: 160),
-            ),
-            Positioned(
-              bottom: 80 - dy,
-              right: 15,
-              child: _buildNeumorphicSphere(size: 120),
-            ),
-            Positioned(
-              top: 180 + (dy * 0.6),
-              right: 35,
-              child: _buildNeumorphicSphere(size: 50),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildNeumorphicSphere({required double size}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: neoBg,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: neoDarkShadow.withOpacity(0.45),
-            offset: const Offset(12, 12),
-            blurRadius: 24,
-          ),
-          BoxShadow(
-            color: neoLightShadow.withOpacity(0.9),
-            offset: const Offset(-12, -12),
-            blurRadius: 24,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // بطاقة 3D Flip Card
-  Widget _buildFlipCard() {
-    return AnimatedBuilder(
-      animation: _flipAnimation,
-      builder: (context, child) {
-        final angle = _flipAnimation.value * math.pi;
-        final isUnderHalf = _flipAnimation.value <= 0.5;
-
-        return Transform(
-          transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.001)
-            ..rotateY(angle),
-          alignment: Alignment.center,
-          child: isUnderHalf
-              ? _buildCardShell(child: _buildLoginCardContent())
-              : Transform(
-                  transform: Matrix4.identity()..rotateY(math.pi),
-                  alignment: Alignment.center,
-                  child: _buildCardShell(child: _buildSignUpCardContent()),
-                ),
-        );
-      },
-    );
-  }
-
-  // إطار البطاقة النيومورفية (Card Shell)
-  Widget _buildCardShell({required Widget child}) {
-    return Container(
-      width: 380,
-      constraints: const BoxConstraints(maxWidth: 380),
-      padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 32),
-      decoration: BoxDecoration(
-        color: neoBg,
-        borderRadius: BorderRadius.circular(38),
-        boxShadow: [
-          BoxShadow(
-            color: neoDarkShadow.withOpacity(0.65),
-            offset: const Offset(16, 16),
-            blurRadius: 32,
-          ),
-          BoxShadow(
-            color: neoLightShadow.withOpacity(0.95),
-            offset: const Offset(-16, -16),
-            blurRadius: 32,
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-
-  // -------------------------------------------------------------
-  // وجه تسجيل الدخول (WELCOME CARD) - مطابق بدقة للصورة المرفقة
-  // -------------------------------------------------------------
-  Widget _buildLoginCardContent() {
+  // نموذج تسجيل الدخول
+  Widget _buildLoginForm() {
     return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 1. الشعار الدائري مع القفل الذهبي / البنفسجي
-        _buildLogoWithLock(),
-        const SizedBox(height: 12),
-
-        // 2. العناوين
-        const Text(
-          'Welcome',
-          style: TextStyle(
-            fontSize: 25,
-            fontWeight: FontWeight.bold,
-            color: textDark,
-            letterSpacing: 0.2,
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Login to continue your journey',
-          style: TextStyle(
-            fontSize: 13,
-            color: textMuted,
-          ),
-        ),
-        const SizedBox(height: 22),
-
-        // تنبيه الحالة عند وجود خطأ
-        if (_statusMessage != null) _buildStatusBanner(),
-
-        // 3. حقل البريد الإلكتروني مع أيقونة الرسالة والتجويف النيومورفي
-        _buildNeumorphicInputField(
-          label: 'Email Address',
-          hint: 'gaurav@gmail.com',
+        _buildTextField(
           controller: _loginEmailController,
-          focusNode: _fnLoginEmail,
-          prefixIcon: Icons.mail_outline_rounded,
+          label: 'البريد الإلكتروني',
+          hint: 'name@example.com',
+          icon: Icons.alternate_email_rounded,
           keyboardType: TextInputType.emailAddress,
         ),
-        const SizedBox(height: 16),
-
-        // 4. حقل كلمة المرور مع أيقونة القفل وزر العين
-        _buildNeumorphicInputField(
-          label: 'Password',
-          hint: '••••••',
+        const SizedBox(height: 14),
+        _buildTextField(
           controller: _loginPasswordController,
-          focusNode: _fnLoginPassword,
-          prefixIcon: Icons.lock_outline_rounded,
+          label: 'كلمة المرور',
+          hint: '••••••••',
+          icon: Icons.lock_outline_rounded,
           isPassword: true,
           isObscured: _loginObscure,
           onToggleObscure: () => setState(() => _loginObscure = !_loginObscure),
         ),
-        const SizedBox(height: 8),
-
-        // 5. شريط الخيارات: Remember me & Forgot Password?
+        const SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            GestureDetector(
-              onTap: () => setState(() => _rememberMe = !_rememberMe),
-              child: Row(
-                children: [
-                  Container(
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: _rememberMe ? primaryBlue : neoBg,
-                      borderRadius: BorderRadius.circular(5),
-                      border: Border.all(
-                        color: _rememberMe ? primaryBlue : neoDarkShadow,
-                        width: 1.2,
-                      ),
-                    ),
-                    child: _rememberMe
-                        ? const Icon(Icons.check, size: 13, color: Colors.white)
-                        : null,
+            Row(
+              children: [
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: Checkbox(
+                    value: _rememberMe,
+                    activeColor: primaryBlue,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    onChanged: (v) => setState(() => _rememberMe = v ?? true),
                   ),
-                  const SizedBox(width: 7),
-                  const Text(
-                    'Remember me',
-                    style: TextStyle(color: textMuted, fontSize: 13),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 6),
+                const Text('تذكرني دائماً', style: TextStyle(fontSize: 12, color: textDark)),
+              ],
             ),
-            GestureDetector(
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    backgroundColor: neoBg,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    title: const Text('استعادة كلمة المرور', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textDark)),
-                    content: const Text('أدخل بريدك الإلكتروني وسيتم إرسال رابط إعادة التعيين فوراً.'),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً', style: TextStyle(color: primaryBlue))),
-                    ],
-                  ),
+            TextButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('يمكنك تسجيل الدخول مباشرة عبر Google لتجاوز كلمة المرور.')),
                 );
               },
-              child: const Text(
-                'Forgot Password?',
-                style: TextStyle(
-                  color: primaryBlue,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: const Text('نسيت كلمة المرور؟', style: TextStyle(fontSize: 12, color: primaryBlue, fontWeight: FontWeight.w600)),
             ),
           ],
         ),
-        const SizedBox(height: 22),
-
-        // 6. الزر النيومورفي البارز (LOGIN)
-        _buildNeumorphicRaisedButton(
-          text: 'LOGIN',
+        const SizedBox(height: 16),
+        _buildPrimaryButton(
+          text: 'تسجيل الدخول',
           onTap: _handleEmailLogin,
-        ),
-        const SizedBox(height: 20),
-
-        // 7. سطر التبديل لإنشاء الحساب
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              "Don't have an account?",
-              style: TextStyle(color: textMuted, fontSize: 13),
-            ),
-            const SizedBox(width: 10),
-            _buildCircularNeumorphicButton(
-              icon: Icons.add,
-              iconColor: primaryBlue,
-              size: 38,
-              onTap: _flipCard,
-            ),
-          ],
-        ),
-        const SizedBox(height: 22),
-
-        // 8. أزرار الدخول عبر وسائل التواصل الاجتماعي (G / f / in)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // زر Google الرسمي الحقيقي
-            _buildSocialCircleButton(
-              child: Image.network(
-                'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png',
-                width: 20,
-                height: 20,
-                errorBuilder: (_, __, ___) => const Text('G', style: TextStyle(fontWeight: FontWeight.bold, color: primaryBlue, fontSize: 16)),
-              ),
-              onTap: _handleGoogleSignIn,
-            ),
-            const SizedBox(width: 16),
-            // Facebook
-            _buildSocialCircleButton(
-              child: const Text(
-                'f',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1877F2), fontSize: 18),
-              ),
-              onTap: () {
-                _auth.signInWithGoogle(email: 'user.facebook@boykta.app', displayName: 'Facebook User');
-                _proceedToApp();
-              },
-            ),
-            const SizedBox(width: 16),
-            // LinkedIn
-            _buildSocialCircleButton(
-              child: const Text(
-                'in',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0A66C2), fontSize: 16),
-              ),
-              onTap: () {
-                _auth.signInWithGoogle(email: 'user.linkedin@boykta.app', displayName: 'LinkedIn User');
-                _proceedToApp();
-              },
-            ),
-          ],
         ),
       ],
     );
   }
 
-  // -------------------------------------------------------------
-  // وجه إنشاء الحساب (CREATE ACCOUNT) - مطابق بدقة للصورة المرفقة
-  // -------------------------------------------------------------
-  Widget _buildSignUpCardContent() {
+  // نموذج إنشاء الحساب
+  Widget _buildSignUpForm() {
     return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 1. الشعار الدائري النيومورفي مع أيقونة الشخص
-        _buildLogoWithPerson(),
-        const SizedBox(height: 12),
-
-        // 2. العناوين
-        const Text(
-          'Create Account',
-          style: TextStyle(
-            fontSize: 25,
-            fontWeight: FontWeight.bold,
-            color: textDark,
-            letterSpacing: 0.2,
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Sign up to get started',
-          style: TextStyle(
-            fontSize: 13,
-            color: textMuted,
-          ),
-        ),
-        const SizedBox(height: 18),
-
-        if (_statusMessage != null) _buildStatusBanner(),
-
-        // 3. الحقول الأربعة المجوفة:
-        // Full Name
-        _buildNeumorphicInputField(
-          label: 'Full Name',
-          hint: 'Enter your name',
+        _buildTextField(
           controller: _signupNameController,
-          focusNode: _fnSignupName,
-          prefixIcon: Icons.person_outline_rounded,
-          keyboardType: TextInputType.name,
+          label: 'الاسم الكامل',
+          hint: 'مثلاً: نافع وضاح',
+          icon: Icons.person_outline_rounded,
         ),
-        const SizedBox(height: 13),
-
-        // Email Address
-        _buildNeumorphicInputField(
-          label: 'Email Address',
-          hint: 'gaurav@gmail.com',
+        const SizedBox(height: 14),
+        _buildTextField(
           controller: _signupEmailController,
-          focusNode: _fnSignupEmail,
-          prefixIcon: Icons.mail_outline_rounded,
+          label: 'البريد الإلكتروني',
+          hint: 'name@example.com',
+          icon: Icons.alternate_email_rounded,
           keyboardType: TextInputType.emailAddress,
         ),
-        const SizedBox(height: 13),
-
-        // Password
-        _buildNeumorphicInputField(
-          label: 'Password',
-          hint: '••••••',
+        const SizedBox(height: 14),
+        _buildTextField(
           controller: _signupPasswordController,
-          focusNode: _fnSignupPassword,
-          prefixIcon: Icons.lock_outline_rounded,
+          label: 'كلمة المرور (6 أحرف فأكثر)',
+          hint: '••••••••',
+          icon: Icons.lock_outline_rounded,
           isPassword: true,
           isObscured: _signupObscure,
           onToggleObscure: () => setState(() => _signupObscure = !_signupObscure),
         ),
-        const SizedBox(height: 13),
-
-        // Confirm Password
-        _buildNeumorphicInputField(
-          label: 'Confirm Password',
-          hint: '••••••',
+        const SizedBox(height: 14),
+        _buildTextField(
           controller: _signupConfirmPasswordController,
-          focusNode: _fnSignupConfirm,
-          prefixIcon: Icons.lock_outline_rounded,
+          label: 'تأكيد كلمة المرور',
+          hint: '••••••••',
+          icon: Icons.lock_outline_rounded,
           isPassword: true,
           isObscured: _confirmObscure,
           onToggleObscure: () => setState(() => _confirmObscure = !_confirmObscure),
         ),
-        const SizedBox(height: 8),
-
-        // 4. خيار الموافقة على الشروط
-        GestureDetector(
-          onTap: () => setState(() => _agreeTerms = !_agreeTerms),
-          child: Row(
-            children: [
-              Container(
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: _agreeTerms ? primaryBlue : neoBg,
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(
-                    color: _agreeTerms ? primaryBlue : neoDarkShadow,
-                    width: 1.2,
-                  ),
-                ),
-                child: _agreeTerms
-                    ? const Icon(Icons.check, size: 13, color: Colors.white)
-                    : null,
-              ),
-              const SizedBox(width: 7),
-              const Expanded(
-                child: Text.rich(
-                  TextSpan(
-                    text: 'I agree to the ',
-                    style: TextStyle(color: textMuted, fontSize: 12),
-                    children: [
-                      TextSpan(
-                        text: 'Terms & Conditions',
-                        style: TextStyle(color: primaryBlue, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-
-        // 5. زر SIGN UP النيومورفي
-        _buildNeumorphicRaisedButton(
-          text: 'SIGN UP',
-          onTap: _handleSignUp,
-        ),
-        const SizedBox(height: 18),
-
-        // 6. زر الرجوع لتسجيل الدخول مع السهم النيومورفي
+        const SizedBox(height: 10),
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              'Already have an account?',
-              style: TextStyle(color: textMuted, fontSize: 13),
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: Checkbox(
+                value: _agreeTerms,
+                activeColor: primaryBlue,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                onChanged: (v) => setState(() => _agreeTerms = v ?? true),
+              ),
             ),
-            const SizedBox(width: 10),
-            _buildCircularNeumorphicButton(
-              icon: Icons.arrow_forward_rounded,
-              iconColor: primaryBlue,
-              size: 38,
-              onTap: _flipCard,
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'أوافق على شروط الخدمة وسياسة الخصوصية للاشتراك',
+                style: TextStyle(fontSize: 11, color: textDark),
+              ),
             ),
           ],
+        ),
+        const SizedBox(height: 16),
+        _buildPrimaryButton(
+          text: 'إنشاء الحساب مجاناً',
+          onTap: _handleSignUp,
         ),
       ],
     );
   }
 
-  // -------------------------------------------------------------
-  // المكونات البصرية النيومورفية المخصصة (WIDGETS)
-  // -------------------------------------------------------------
-
-  // شعار القفل الذهبي والبنفسجي النيومورفي العلوي
-  Widget _buildLogoWithLock() {
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        color: neoBg,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: neoDarkShadow.withOpacity(0.6),
-            offset: const Offset(8, 8),
-            blurRadius: 16,
-          ),
-          BoxShadow(
-            color: neoLightShadow.withOpacity(0.95),
-            offset: const Offset(-8, -8),
-            blurRadius: 16,
-          ),
-        ],
-      ),
-      child: Center(
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: neoBg,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: neoDarkShadow.withOpacity(0.3),
-                offset: const Offset(2, 2),
-                blurRadius: 4,
-              ),
-              BoxShadow(
-                color: neoLightShadow.withOpacity(0.8),
-                offset: const Offset(-2, -2),
-                blurRadius: 4,
-              ),
-            ],
-          ),
-          child: const Center(
-            child: Icon(
-              Icons.lock_rounded,
-              size: 24,
-              color: Color(0xFFF59E0B), // أصفر ذهبي مطابق للصورة
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // شعار الشخص الأزرق لصفحة Create Account
-  Widget _buildLogoWithPerson() {
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        color: neoBg,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: neoDarkShadow.withOpacity(0.6),
-            offset: const Offset(8, 8),
-            blurRadius: 16,
-          ),
-          BoxShadow(
-            color: neoLightShadow.withOpacity(0.95),
-            offset: const Offset(-8, -8),
-            blurRadius: 16,
-          ),
-        ],
-      ),
-      child: Center(
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: neoBg,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: neoDarkShadow.withOpacity(0.3),
-                offset: const Offset(2, 2),
-                blurRadius: 4,
-              ),
-              BoxShadow(
-                color: neoLightShadow.withOpacity(0.8),
-                offset: const Offset(-2, -2),
-                blurRadius: 4,
-              ),
-            ],
-          ),
-          child: const Center(
-            child: Icon(
-              Icons.person_rounded,
-              size: 26,
-              color: primaryBlue,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // حقل الإدخال المجوف النيومورفي مع العنوان بالأعلى والأيقونات المطابقة للصورة
-  Widget _buildNeumorphicInputField({
+  // حقل إدخال بتصميم ويب عصري
+  Widget _buildTextField({
+    required TextEditingController controller,
     required String label,
     required String hint,
-    required TextEditingController controller,
-    required FocusNode focusNode,
-    required IconData prefixIcon,
+    required IconData icon,
     bool isPassword = false,
     bool isObscured = false,
     VoidCallback? onToggleObscure,
     TextInputType keyboardType = TextInputType.text,
   }) {
-    final bool isFocused = focusNode.hasFocus;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // عنوان الحقل بالأعلى كما في الصورة تماماً
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 6),
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: textDark,
-            ),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: textDark,
           ),
         ),
-
-        // الحاوية المجوفة النيومورفية (Inset Pill Container)
+        const SizedBox(height: 6),
         Container(
-          height: 48,
           decoration: BoxDecoration(
-            color: neoBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isFocused ? accentCyan.withOpacity(0.8) : neoDarkShadow.withOpacity(0.35),
-              width: isFocused ? 1.4 : 1.0,
-            ),
-            boxShadow: [
-              // محاكاة الظل الداخلي (Inset look)
-              BoxShadow(
-                color: isFocused
-                    ? accentCyan.withOpacity(0.2)
-                    : neoDarkShadow.withOpacity(0.45),
-                offset: const Offset(2.5, 2.5),
-                blurRadius: 4,
-              ),
-              BoxShadow(
-                color: neoLightShadow.withOpacity(0.85),
-                offset: const Offset(-2.5, -2.5),
-                blurRadius: 4,
-              ),
-            ],
+            color: surfaceLight,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderGrey),
           ),
           child: Row(
             children: [
-              const SizedBox(width: 14),
-              Icon(prefixIcon, color: isFocused ? primaryBlue : textMuted, size: 19),
-              const SizedBox(width: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Icon(icon, color: textMuted, size: 19),
+              ),
               Expanded(
                 child: TextField(
                   controller: controller,
-                  focusNode: focusNode,
-                  obscureText: isPassword ? isObscured : false,
+                  obscureText: isPassword && isObscured,
                   keyboardType: keyboardType,
-                  style: const TextStyle(
-                    color: textDark,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: const TextStyle(fontSize: 14, color: textDark),
                   decoration: InputDecoration(
                     hintText: hint,
-                    hintStyle: TextStyle(
-                      color: textMuted.withOpacity(0.65),
-                      fontSize: 13,
-                    ),
+                    hintStyle: TextStyle(fontSize: 13, color: textMuted.withOpacity(0.6)),
                     border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 13),
                   ),
                 ),
               ),
@@ -1053,14 +1086,11 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
                 IconButton(
                   icon: Icon(
                     isObscured ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                    color: isFocused ? primaryBlue : textMuted,
-                    size: 18,
+                    color: textMuted,
+                    size: 19,
                   ),
                   onPressed: onToggleObscure,
-                  splashRadius: 18,
-                )
-              else
-                const SizedBox(width: 14),
+                ),
             ],
           ),
         ),
@@ -1068,145 +1098,61 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
     );
   }
 
-  // الزر النيومورفي البارز (LOGIN / SIGN UP)
-  Widget _buildNeumorphicRaisedButton({
+  // الزر الرئيسي
+  Widget _buildPrimaryButton({
     required String text,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: _isLoading ? null : onTap,
-      child: Container(
-        width: double.infinity,
-        height: 50,
-        decoration: BoxDecoration(
-          color: neoBg,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: neoDarkShadow.withOpacity(0.6),
-              offset: const Offset(6, 6),
-              blurRadius: 14,
-            ),
-            BoxShadow(
-              color: neoLightShadow.withOpacity(0.95),
-              offset: const Offset(-6, -6),
-              blurRadius: 14,
-            ),
-          ],
-        ),
-        child: Center(
-          child: _isLoading
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(color: primaryBlue, strokeWidth: 2.2),
-                )
-              : Text(
-                  text,
-                  style: const TextStyle(
-                    color: primaryBlue,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-        ),
+    return ElevatedButton(
+      onPressed: _isLoading ? null : onTap,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: primaryBlue,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        elevation: 0,
       ),
+      child: _isLoading
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            )
+          : Text(
+              text,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.2,
+              ),
+            ),
     );
   }
 
-  // الزر النيومورفي الدائري الصغير (+ أو السهم)
-  Widget _buildCircularNeumorphicButton({
-    required IconData icon,
-    required Color iconColor,
-    required double size,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: neoBg,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: neoDarkShadow.withOpacity(0.55),
-              offset: const Offset(4, 4),
-              blurRadius: 8,
-            ),
-            BoxShadow(
-              color: neoLightShadow.withOpacity(0.95),
-              offset: const Offset(-4, -4),
-              blurRadius: 8,
-            ),
-          ],
-        ),
-        child: Center(
-          child: Icon(icon, color: iconColor, size: 20),
-        ),
-      ),
-    );
-  }
-
-  // أزرار السوشيال النيومورفية الدائرية (G / f / in)
-  Widget _buildSocialCircleButton({
-    required Widget child,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: _isLoading ? null : onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: neoBg,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: neoDarkShadow.withOpacity(0.55),
-              offset: const Offset(5, 5),
-              blurRadius: 10,
-            ),
-            BoxShadow(
-              color: neoLightShadow.withOpacity(0.95),
-              offset: const Offset(-5, -5),
-              blurRadius: 10,
-            ),
-          ],
-        ),
-        child: Center(child: child),
-      ),
-    );
-  }
-
-  // بطاقة عرض التنبيهات والأخطاء
+  // رسالة الحالة والأخطاء
   Widget _buildStatusBanner() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: _isError ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _isError ? Colors.red.withOpacity(0.3) : Colors.green.withOpacity(0.3),
-        ),
+        color: _isError ? Colors.red.shade50 : Colors.green.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _isError ? Colors.red.shade200 : Colors.green.shade200),
       ),
       child: Row(
         children: [
           Icon(
-            _isError ? Icons.error_outline_rounded : Icons.check_circle_rounded,
-            color: _isError ? Colors.redAccent : Colors.green,
-            size: 16,
+            _isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+            size: 18,
+            color: _isError ? Colors.red.shade700 : Colors.green.shade700,
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               _statusMessage!,
               style: TextStyle(
-                color: _isError ? Colors.redAccent : Colors.green.shade800,
                 fontSize: 12,
+                color: _isError ? Colors.red.shade800 : Colors.green.shade800,
                 fontWeight: FontWeight.w600,
               ),
             ),
