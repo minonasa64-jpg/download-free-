@@ -869,7 +869,10 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> with TickerProvid
 
               // التجويف الداخلي للنيومورفيزم
               Positioned.fill(
-                margin: const EdgeInsets.all(2),
+                top: 2,
+                bottom: 2,
+                left: 2,
+                right: 2,
                 child: Container(
                   decoration: BoxDecoration(
                     color: neoBg,
@@ -1583,7 +1586,9 @@ class _GoogleAuthBottomSheetState extends State<_GoogleAuthBottomSheet> {
   Widget _buildGoogleFooter() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      border: const Border(top: BorderSide(color: Color(0xFF242526))),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFF242526))),
+      ),
       child: const Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
