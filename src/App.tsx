@@ -17,6 +17,7 @@ import {
   Bot,
   Send
 } from 'lucide-react';
+import FirebaseAuthPanel from './components/FirebaseAuthPanel';
 
 interface WorkflowRun {
   id: number;
@@ -119,6 +120,9 @@ export default function App() {
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+        {/* Real Google Sign-In with Firebase Authentication */}
+        <FirebaseAuthPanel />
+
         {/* Live Build Status Card */}
         <section className="rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-900/90 to-slate-950 p-6 shadow-xl relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500"></div>

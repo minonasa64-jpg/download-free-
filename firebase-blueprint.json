@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile stored in Firestore",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Unique Firebase user identifier"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User Google email address"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User full display name"
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Profile picture URL from Google"
+        },
+        "authProvider": {
+          "type": "string",
+          "description": "Authentication provider, e.g. google.com"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of user registration"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of latest profile update"
+        }
+      },
+      "required": ["uid", "email"]
+    },
+    "userDownload": {
+      "title": "UserDownload",
+      "description": "User download item in personal downloads subcollection",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Download record ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "User UID who owns this download"
+        },
+        "title": {
+          "type": "string",
+          "description": "Video or audio title"
+        },
+        "url": {
+          "type": "string",
+          "description": "Source URL of download"
+        },
+        "format": {
+          "type": "string",
+          "description": "Downloaded format: mp4, mp3, etc."
+        },
+        "quality": {
+          "type": "string",
+          "description": "Resolution or bitrate"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "downloading", "failed"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of download creation"
+        }
+      },
+      "required": ["id", "userId", "title", "url"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "userProfile",
+      "description": "Private user profile documents, accessible and mutable only by the owner"
+    },
+    "/users/{userId}/downloads/{downloadId}": {
+      "schema": "userDownload",
+      "description": "Private user downloads subcollection, strictly isolated to the owner"
+    }
+  }
+}
