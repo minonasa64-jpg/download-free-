@@ -452,7 +452,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: Colors.emerald,
+            backgroundColor: const Color(0xFF10B981),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             content: Row(
@@ -608,7 +608,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
   // الدخول السريع كزائر
   Future<void> _handleGuestLogin() async {
     setState(() => _isLoading = true);
-    await _auth.signInAsGuest();
+    await _auth.continueAsGuest();
     if (mounted) {
       setState(() => _isLoading = false);
       _proceedToApp();
@@ -739,13 +739,13 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.shield_outlined, size: 14, color: Colors.emerald.shade600),
+                      Icon(Icons.shield_outlined, size: 14, color: const Color(0xFF059669)),
                       const SizedBox(width: 6),
-                      Text(
+                      const Text(
                         'حماية وتشفير 100% متوافق مع نظام الاشتراكات',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.emerald.shade700,
+                          color: Color(0xFF047857),
                           fontWeight: FontWeight.w500,
                         ),
                       ),

@@ -32,14 +32,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 38627678700,
+    id: 38628125148,
     status: 'in_progress',
     conclusion: null,
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38627678700',
-    head_sha: '346e074',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38628125148',
+    head_sha: '6ce62ae',
     head_commit: {
-      id: '346e074',
-      message: 'fix(v1.6.3): permanent keystore & v1/v2/v3 signing + modern web-style Google One-Tap login'
+      id: '6ce62ae',
+      message: 'fix(v1.6.3): permanent keystore & pkcs12 signing + modern web-style Google One-Tap login'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
