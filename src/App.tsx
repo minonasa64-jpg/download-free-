@@ -33,14 +33,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 38768955109,
+    id: 39026401783,
     status: 'completed',
     conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38768955109',
-    head_sha: '7c08692',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39026401783',
+    head_sha: '2565dd4',
     head_commit: {
-      id: '7c08692',
-      message: 'release: v1.6.4 with exact Neumorphic 3D Flip Card & Google Account Chooser'
+      id: '2565dd4',
+      message: 'release: v1.6.5 with Firebase Auth Google Sign-In & permanent keystore'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
