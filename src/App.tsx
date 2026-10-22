@@ -34,8 +34,8 @@ interface WorkflowRun {
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
     id: 39742501697,
-    status: 'in_progress',
-    conclusion: null,
+    status: 'completed',
+    conclusion: 'success',
     html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39742501697',
     head_sha: 'ca6ff36',
     head_commit: {
