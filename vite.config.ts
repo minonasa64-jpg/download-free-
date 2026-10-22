@@ -40,13 +40,13 @@ function apiPlugin(): Plugin {
         res.end(JSON.stringify({
           success: true,
           latestRun: {
-            id: 39747787358,
-            status: 'completed',
-            conclusion: 'success',
-            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39747787358',
+            id: 39796861689,
+            status: 'in_progress',
+            conclusion: null,
+            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39796861689',
             head_commit: {
-              id: 'b613000',
-              message: 'release: v1.6.7 with Ultra-HQ video master & Universal Cobalt extractor'
+              id: '295aeab',
+              message: 'release: v1.6.8 with multi-library ultra-HQ video engine & in-app resolution selector'
             }
           },
           runs: []

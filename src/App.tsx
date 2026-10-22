@@ -33,13 +33,13 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 39750000000,
+    id: 39796861689,
     status: 'in_progress',
     conclusion: null,
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions',
-    head_sha: 'v1.6.8',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39796861689',
+    head_sha: '295aeab',
     head_commit: {
-      id: 'v1.6.8',
+      id: '295aeab',
       message: 'release: v1.6.8 with multi-library ultra-HQ video engine & in-app resolution selector'
     }
   });
