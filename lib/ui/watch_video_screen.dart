@@ -517,7 +517,75 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
         ),
         backgroundColor: _isBackgroundAudioEnabled ? AppColors.cyan : AppColors.surface,
         duration: const Duration(seconds: 2),
-      ),
+  void _showQualitySelector() {
+    if (_candidateStreams.isEmpty) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.high_quality_rounded, color: AppColors.cyan, size: 22),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'جودة البث المباشر (Video Quality)',
+                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ...List.generate(_candidateStreams.length, (idx) {
+                  final s = _candidateStreams[idx];
+                  final isCurrent = idx == _currentCandidateIndex;
+                  final q = s['quality']?.toString() ?? 'عالية HD';
+                  final size = s['size']?.toString() ?? '';
+                  return ListTile(
+                    leading: Icon(
+                      isCurrent ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                      color: isCurrent ? AppColors.cyan : Colors.white54,
+                    ),
+                    title: Text(
+                      q,
+                      style: TextStyle(
+                        color: isCurrent ? AppColors.cyan : Colors.white,
+                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                    subtitle: size.isNotEmpty
+                        ? Text('$size MB • بث مباشر فائق السرعة', style: const TextStyle(color: Colors.white38, fontSize: 11))
+                        : null,
+                    trailing: isCurrent
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.cyan.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppColors.cyan.withOpacity(0.4)),
+                            ),
+                            child: Text('نشط الآن ⚡', style: TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold)),
+                          )
+                        : null,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      if (!isCurrent) {
+                        _initDirectStreamPlayer(_currentVideo, startIndex: idx);
+                      }
+                    },
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -665,6 +733,33 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          if (_candidateStreams.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              child: InkWell(
+                onTap: _showQualitySelector,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.cyan.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.cyan.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.high_quality_rounded, color: AppColors.cyan, size: 15),
+                      const SizedBox(width: 4),
+                      Text(
+                        _candidateStreams[_currentCandidateIndex]['quality']?.toString() ?? 'HD',
+                        style: TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           IconButton(
             icon: Icon(
               _isBackgroundAudioEnabled ? Icons.headset_rounded : Icons.headset_off_rounded,

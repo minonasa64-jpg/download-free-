@@ -62,6 +62,12 @@ class UniversalExtractorService {
     debugPrint('بدء استخراج الرابط عبر المحرك الشامل ($platform): $url');
 
     switch (platform) {
+      case 'youtube':
+        final piped = await _extractPipedUniversal(url);
+        if (piped != null) return piped;
+        final cobalt = await _extractCobaltUniversal(url);
+        if (cobalt != null) return cobalt;
+        return await _extractGenericWebOrFallbacks(url);
       case 'tiktok':
         return await _extractTikTok(url);
       case 'instagram':
@@ -1051,9 +1057,121 @@ class UniversalExtractorService {
       } catch (_) {
         // تجربة الخادم التالي
       }
+  /// محرك Piped السحابي عالي الدقة (4K / 1080p 60fps Unthrottled Engine)
+  Future<Map<String, dynamic>?> _extractPipedUniversal(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return null;
+    String videoId = '';
+    if (uri.host.contains('youtu.be')) {
+      videoId = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
+    } else if (uri.host.contains('youtube.com')) {
+      videoId = uri.queryParameters['v'] ?? '';
+      if (videoId.isEmpty && uri.pathSegments.contains('shorts')) {
+        final idx = uri.pathSegments.indexOf('shorts');
+        if (idx + 1 < uri.pathSegments.length) videoId = uri.pathSegments[idx + 1];
+      }
+    }
+    if (videoId.isEmpty) return null;
+
+    final pipedInstances = [
+      'https://pipedapi.kavin.rocks',
+      'https://api.piped.privacydev.net',
+      'https://piped-api.lunar.icu',
+      'https://pipedapi.leptons.xyz',
+    ];
+
+    for (final instance in pipedInstances) {
+      try {
+        final res = await _dio.get(
+          '$instance/streams/$videoId',
+          options: Options(
+            connectTimeout: const Duration(seconds: 4),
+            receiveTimeout: const Duration(seconds: 6),
+            headers: {'Accept': 'application/json'},
+          ),
+        );
+
+        if (res.statusCode == 200 && res.data is Map) {
+          final data = res.data as Map;
+          final title = data['title']?.toString() ?? 'فيديو يوتيوب فائق الدقة';
+          final thumbnail = data['thumbnailUrl']?.toString() ?? '';
+          final rawVideos = List<Map<String, dynamic>>.from(data['videoStreams'] ?? []);
+          final rawAudios = List<Map<String, dynamic>>.from(data['audioStreams'] ?? []);
+
+          if (rawVideos.isNotEmpty) {
+            final List<Map<String, dynamic>> videoFormats = [];
+            for (final v in rawVideos) {
+              final qLabel = v['quality']?.toString() ?? 'HD';
+              final streamUrl = v['url']?.toString() ?? '';
+              if (streamUrl.isEmpty) continue;
+              final isVideoOnly = v['videoOnly'] == true;
+              final int bitrate = (v['bitrate'] as num?)?.toInt() ?? 0;
+              final String format = (v['format']?.toString() ?? 'MP4').toLowerCase();
+
+              int order = 720;
+              if (qLabel.contains('2160') || qLabel.contains('4K')) order = 2160;
+              else if (qLabel.contains('1440') || qLabel.contains('2K')) order = 1440;
+              else if (qLabel.contains('1080')) order = 1080;
+              else if (qLabel.contains('720')) order = 720;
+              else if (qLabel.contains('480')) order = 480;
+              else if (qLabel.contains('360')) order = 360;
+
+              videoFormats.add({
+                'url': streamUrl,
+                'quality_name': '$qLabel (${format.toUpperCase()} • Piped HQ)',
+                'quality_order': order,
+                'quality_badge': qLabel,
+                'quality_desc': 'بث مباشر عالي النقاء 60fps عبر خوادم Piped فائقة السرعة',
+                'size': '${(bitrate / (8 * 1024 * 1024) * 60).toStringAsFixed(1)} MB/m',
+                'size_bytes': bitrate,
+                'ext': 'mp4',
+                'needs_merge': isVideoOnly,
+                'is_upscaled': false,
+                'platform': 'youtube',
+              });
+            }
+
+            String bestAudioUrl = '';
+            if (rawAudios.isNotEmpty) {
+              rawAudios.sort((a, b) => ((b['bitrate'] as num?) ?? 0).compareTo((a['bitrate'] as num?) ?? 0));
+              bestAudioUrl = rawAudios.first['url']?.toString() ?? '';
+            }
+
+            if (videoFormats.isNotEmpty) {
+              videoFormats.sort((a, b) => (b['quality_order'] as int).compareTo(a['quality_order'] as int));
+              return {
+                'id': videoId,
+                'title': title,
+                'thumbnail': thumbnail,
+                'author': data['uploader']?.toString() ?? 'YouTube',
+                'platform': 'youtube',
+                'highestAudioUrl': bestAudioUrl,
+                'highestAudioTag': null,
+                'video': videoFormats,
+                'audio': [
+                  {
+                    'url': bestAudioUrl,
+                    'quality_name': 'صوت فائق 320 kbps (Piped Master)',
+                    'quality_order': 320,
+                    'quality_badge': 'Studio 320k',
+                    'quality_desc': 'أقصى نقاء واستجابة ترددية لمسار الصوت الأصلي',
+                    'size': 'صوت نقي',
+                    'size_bytes': 0,
+                    'ext': 'mp3',
+                    'needs_merge': false,
+                    'platform': 'youtube',
+                  }
+                ],
+                'subtitles': [],
+              };
+            }
+          }
+        }
+      } catch (_) {}
     }
     return null;
   }
+
 
   // =========================================================================
   // 7. استخراج أي صفحة ويب عامة أو المحرك الاحتياطي الشامل (Generic HTML5 / OpenGraph Scraper)
@@ -1234,11 +1352,24 @@ class UniversalExtractorService {
     final List<Map<String, dynamic>> videoFormats = [
       {
         'url': effectiveHd,
-        'quality_name': 'خارقة الدقة 4K Ultra HD (2160p • ترقية بصرية فائقة)',
+        'quality_name': 'الدقة الأصلية الكاملة (Original Master • جودة المصدر الخام بدون أي ضغط)',
+        'quality_order': 2200,
+        'quality_badge': 'الأصلية 100%',
+        'quality_desc': 'تنزيل مباشر للملف الأصلي من خادم المنصة بكامل معدل البت والحدة دون أي إعادة ضغط',
+        'size': 'الأصلية الخام',
+        'size_bytes': 0,
+        'ext': 'mp4',
+        'needs_merge': false,
+        'is_upscaled': false,
+        'platform': platform,
+      },
+      {
+        'url': effectiveHd,
+        'quality_name': 'خارقة الدقة 4K Ultra HD (2160p • ترقية سينمائية فائقة)',
         'quality_order': 2160,
         'quality_badge': '4K Ultra HD',
-        'quality_desc': 'دقة 4K سينمائية خارقة مع تعزيز الحدة والوضوح الكريستالي عبر FFmpeg Lanczos',
-        'size': 'أعلى دقة 4K',
+        'quality_desc': 'ترقية أبعاد سينمائية 4K مع تعزيز الحدة والألوان عبر محرك Lanczos',
+        'size': 'ترقية 4K',
         'size_bytes': 0,
         'ext': 'mp4',
         'needs_merge': false,
@@ -1251,7 +1382,7 @@ class UniversalExtractorService {
         'quality_order': 1440,
         'quality_badge': '2K QHD',
         'quality_desc': 'دقة 2K عالية التباين والتفاصيل للشاشات الذكية واللوحية',
-        'size': 'فائقة 2K',
+        'size': 'ترقية 2K',
         'size_bytes': 0,
         'ext': 'mp4',
         'needs_merge': false,
@@ -1262,9 +1393,9 @@ class UniversalExtractorService {
         'url': effectiveHd,
         'quality_name': 'عالي الدقة 1080p Full HD (ترقية بصرية فائقة • 1080p)',
         'quality_order': 1080,
-        'quality_badge': '1080p FHD (ترقية فائقة)',
-        'quality_desc': 'رفع جودة الفيديو الضعيف إلى 1080p Full HD مع تعزيز الحدة وتوضيح التفاصيل',
-        'size': 'أقصى جودة FHD',
+        'quality_badge': '1080p FHD (محسنة)',
+        'quality_desc': 'رفع جودة الفيديو مع تعزيز الحدة وتوضيح التفاصيل',
+        'size': 'ترقية FHD',
         'size_bytes': 0,
         'ext': 'mp4',
         'needs_merge': false,
@@ -1273,15 +1404,15 @@ class UniversalExtractorService {
       },
       {
         'url': effectiveHd.isNotEmpty ? effectiveHd : effectiveSd,
-        'quality_name': 'عالي الدقة 720p HD (دقة نقية عالية • توضيح التفاصيل)',
+        'quality_name': 'سريعة 720p HD (متوازنة • تحميل فوري)',
         'quality_order': 720,
-        'quality_badge': '720p HD (محسنة)',
-        'quality_desc': 'تنزيل بجودة HD نقية مع تعزيز الوضوح والتفاصيل ومعدل إطارات سلس',
+        'quality_badge': '720p HD',
+        'quality_desc': 'دقة متوازنة عالية السرعة ومناسبة للمشاهدة على الهواتف',
         'size': 'سريع HD',
         'size_bytes': 0,
         'ext': 'mp4',
         'needs_merge': false,
-        'is_upscaled': true,
+        'is_upscaled': false,
         'platform': platform,
       },
       {

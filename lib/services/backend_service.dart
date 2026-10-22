@@ -1229,7 +1229,8 @@ class BackendService {
               '-i', tempRawAudio,
               '-vn',
               '-c:a', 'libmp3lame',
-              '-b:a', '192k',
+              '-b:a', '320k',
+              '-ar', '48000',
               tempMp3Path,
             ]);
             final returnCode = await session.getReturnCode();
@@ -1267,8 +1268,9 @@ class BackendService {
             streamTag: videoTag,
           );
 
-          // ترقية ورفع جودة الفيديو الضعيف وتوضيح التفاصيل عبر محرك FFmpeg Lanczos
-          final bool shouldEnhanceDirect = isUpscaled || (qualityOrder != null && qualityOrder >= 1080);
+          // ترقية ورفع جودة الفيديو عند طلب ترقية بصرية فائقة (isUpscaled)
+          // أما الدقات الأصلية (Original Source) فتحفظ كما هي مباشرة دون أي مساس أو ضغط
+          final bool shouldEnhanceDirect = isUpscaled;
           if (ext != 'mp3' && shouldEnhanceDirect && await File(finalOutputPath).exists()) {
             onStatusChanged('جاري رفع جودة وتوضيح الفيديو عبر FFmpeg Lanczos...');
             task.status = 'جاري رفع جودة الفيديو وتوضيح التفاصيل...';
@@ -1551,8 +1553,9 @@ class BackendService {
           try { await File(tempVideoPath).delete(); } catch (_) {}
           try { await File(tempAudioPath).delete(); } catch (_) {}
 
-          // ترقية ورفع جودة الفيديو بعد الدمج لرفع الدقة المنخفضة أو ترقية 4K/2K/1080p
-          final bool shouldEnhanceMerged = isUpscaled || (qualityOrder != null && qualityOrder >= 1080);
+          // ترقية ورفع جودة الفيديو بعد الدمج فقط عند طلب ترقية صريحة فائقة (isUpscaled)
+          // أما المقاطع ذات الجودة الأصلية فتحفظ بدون أي إعادة ضغط لضمان أقصى نقاء وأعلى بت ريت أصلي
+          final bool shouldEnhanceMerged = isUpscaled;
           if (shouldEnhanceMerged) {
             onStatusChanged('جاري رفع جودة وتوضيح الفيديو عبر FFmpeg Lanczos...');
             task.status = 'جاري رفع جودة الفيديو وتوضيح التفاصيل...';
@@ -1673,9 +1676,9 @@ class BackendService {
       final int originalSize = await file.length();
       if (originalSize < 1024) return;
 
-      // ترقية ورفع جودة الفيديو عند طلب ترقية صريحة أو عند اختيار جودة عالية (1080p / 2K / 4K)
-      final bool shouldEnhance = forceUpscale || (qualityOrder != null && qualityOrder >= 1080);
-      if (!shouldEnhance) {
+      // ترقية ورفع جودة الفيديو فقط عند طلب ترقية صريحة (forceUpscale)
+      // أما الدقات الأصلية فتحفظ مباشرة بنسبة 100% نقيّة من السيرفر بدون أي ضغط أو فقدان للجودة
+      if (!forceUpscale) {
         return;
       }
 
@@ -1684,50 +1687,44 @@ class BackendService {
 
       // تحديد الدقة المستهدفة ومعدل البت المناسب
       int targetDimension = 1080;
-      int targetBitrateMb = 8;
       if (qualityOrder != null) {
         if (qualityOrder >= 2160) {
           targetDimension = 2160;
-          targetBitrateMb = 16;
         } else if (qualityOrder >= 1440) {
           targetDimension = 1440;
-          targetBitrateMb = 12;
         } else if (qualityOrder >= 1080) {
           targetDimension = 1080;
-          targetBitrateMb = 8;
         } else if (qualityOrder >= 720) {
           targetDimension = 720;
-          targetBitrateMb = 5;
         }
       }
 
       // فلتر ذكي يكتشف تلقائياً توجيه الفيديو (أفقي 16:9، راسي Reels/Shorts/TikTok 9:16، أو مربع)
       // ويطبق خوارزمية Lanczos لرفع الأبعاد بدون تشويه، مع قناع الحدة والتوضيح (Unsharp Mask)
       // وتحسين التباين وتشبع الألوان لإزالة البهتان وضبابية الفيديوهات الضعيفة
-      final String scaleFilter = "scale=w='if(gte(iw,ih),-2,max(iw,$targetDimension))':h='if(gte(iw,ih),max(ih,$targetDimension),-2)':flags=lanczos";
-      final String filterChain = "$scaleFilter,unsharp=5:5:1.0:5:5:0.5,eq=contrast=1.04:brightness=0.01:saturation=1.06";
+      final String scaleFilter = "scale=w='if(gte(iw,ih),-2,max(iw,$targetDimension))':h='if(gte(iw,ih),max(ih,$targetDimension),-2)':flags=lanczos+accurate_rnd";
+      final String filterChain = "$scaleFilter,unsharp=lx=5:ly=5:la=0.85:cx=5:cy=5:ca=0.45,eq=contrast=1.03:saturation=1.05";
 
       debugPrint("FFmpeg AI-Enhance: بدء رفع جودة الفيديو وتوضيحه (${qualityOrder ?? targetDimension}p)...");
 
       bool enhanced = false;
 
-      // محاولة 1: ترقية فائقة بدقة استوديو H.264 High Profile ومعدل بت عالي مع صوت AAC نقي 256k
+      // محاولة 1: ترقية فائقة بدقة استوديو H.264 High Profile ومعدل بت عالي مع صوت AAC استوديو 320k
       try {
         final sessionEnhance = await FFmpegKit.executeWithArguments([
           '-y',
+          '-threads', '4',
           '-i', filePath,
           '-vf', filterChain,
           '-c:v', 'libx264',
-          '-preset', 'fast',
+          '-preset', 'veryfast',
           '-profile:v', 'high',
           '-level', '4.2',
           '-pix_fmt', 'yuv420p',
-          '-crf', '18',
-          '-b:v', '${targetBitrateMb}M',
-          '-maxrate', '${targetBitrateMb + 4}M',
-          '-bufsize', '${targetBitrateMb * 2}M',
+          '-crf', '16',
           '-c:a', 'aac',
-          '-b:a', '256k',
+          '-b:a', '320k',
+          '-ar', '48000',
           '-movflags', '+faststart',
           tempOut,
         ]);
@@ -1747,15 +1744,16 @@ class BackendService {
       // محاولة 2: محاولة متوازنة سريعة للأجهزة ذات الموارد المحدودة
       if (!enhanced) {
         try {
-          const String fallbackChain = "scale=w='if(gte(iw,ih),-2,max(iw,1080))':h='if(gte(iw,ih),max(ih,1080),-2)':flags=lanczos,unsharp=5:5:0.8:5:5:0.4";
+          final String fallbackChain = "scale=w='if(gte(iw,ih),-2,max(iw,$targetDimension))':h='if(gte(iw,ih),max(ih,$targetDimension),-2)':flags=lanczos,unsharp=lx=5:ly=5:la=0.7:cx=5:cy=5:ca=0.35";
           final sessionFallback = await FFmpegKit.executeWithArguments([
             '-y',
+            '-threads', '4',
             '-i', filePath,
             '-vf', fallbackChain,
             '-c:v', 'libx264',
-            '-preset', 'veryfast',
+            '-preset', 'ultrafast',
             '-pix_fmt', 'yuv420p',
-            '-crf', '20',
+            '-crf', '18',
             '-c:a', 'copy',
             '-movflags', '+faststart',
             tempOut,
@@ -1802,24 +1800,22 @@ class BackendService {
       String? primaryHdUrl;
       String? primaryHdQuality;
 
-      // 1. نبحث أولاً في التدفقات المدمجة (صوت وصورة معاً) - نفضل MP4 المتوافق بنسبة 100% مع كافة الأجهزة
+      // 1. نبحث أولاً في التدفقات المدمجة (صوت وصورة معاً) - نفضل دفقات MP4 عالية الدقة
       if (manifest.muxed.isNotEmpty) {
         final muxedList = manifest.muxed.toList();
-        muxedList.sort((a, b) => a.size.totalBytes.compareTo(b.size.totalBytes));
+        // ترتيب تنازلي من أعلى جودة وحجم إلى الأقل لضمان تشغيل الفيديو بأعلى دقة متوفرة تلقائياً
+        muxedList.sort((a, b) => b.size.totalBytes.compareTo(a.size.totalBytes));
 
         final mp4Muxed = muxedList.where((s) => s.container.name.toLowerCase() == 'mp4').toList();
         final candidatePool = mp4Muxed.isNotEmpty ? mp4Muxed : muxedList;
 
-        final fastStream = candidatePool.firstWhere(
-          (s) => s.qualityLabel.contains('480') || s.qualityLabel.contains('360') || s.qualityLabel.contains('720'),
-          orElse: () => candidatePool.first,
-        );
-        final hdStream = candidatePool.last;
+        final topHdStream = candidatePool.first;
+        final fastStream = candidatePool.last;
 
-        primaryUrl = fastStream.url.toString();
-        primaryQuality = fastStream.qualityLabel;
-        primaryHdUrl = hdStream.url.toString();
-        primaryHdQuality = hdStream.qualityLabel;
+        primaryUrl = topHdStream.url.toString();
+        primaryQuality = topHdStream.qualityLabel;
+        primaryHdUrl = topHdStream.url.toString();
+        primaryHdQuality = topHdStream.qualityLabel;
 
         for (final s in candidatePool) {
           allStreamsList.add({
@@ -1835,15 +1831,14 @@ class BackendService {
       // 2. إذا لم تتوفر تدفقات مدمجة، نبحث في تدفقات الفيديو
       if (primaryUrl == null && manifest.video.isNotEmpty) {
         final videoList = manifest.video.toList();
-        videoList.sort((a, b) => a.size.totalBytes.compareTo(b.size.totalBytes));
-        final fastVideo = videoList.firstWhere(
-          (s) => s.qualityLabel.contains('480') || s.qualityLabel.contains('360') || s.qualityLabel.contains('720'),
-          orElse: () => videoList.first,
-        );
-        primaryUrl = fastVideo.url.toString();
-        primaryQuality = fastVideo.qualityLabel;
-        primaryHdUrl = videoList.last.url.toString();
-        primaryHdQuality = videoList.last.qualityLabel;
+        // ترتيب تنازلي من أعلى جودة إلى الأقل
+        videoList.sort((a, b) => b.size.totalBytes.compareTo(a.size.totalBytes));
+        final topVideo = videoList.first;
+
+        primaryUrl = topVideo.url.toString();
+        primaryQuality = topVideo.qualityLabel;
+        primaryHdUrl = topVideo.url.toString();
+        primaryHdQuality = topVideo.qualityLabel;
 
         for (final s in videoList) {
           allStreamsList.add({

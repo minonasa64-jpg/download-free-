@@ -33,14 +33,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 39747787358,
-    status: 'completed',
-    conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39747787358',
-    head_sha: 'b613000',
+    id: 39750000000,
+    status: 'in_progress',
+    conclusion: null,
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions',
+    head_sha: 'v1.6.8',
     head_commit: {
-      id: 'b613000',
-      message: 'release: v1.6.7 with Ultra-HQ video master & Universal Cobalt extractor'
+      id: 'v1.6.8',
+      message: 'release: v1.6.8 with multi-library ultra-HQ video engine & in-app resolution selector'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -88,7 +88,7 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.6.7
+                  v1.6.8
                 </span>
               </h1>
               <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي إلى GitHub</p>
