@@ -1061,7 +1061,7 @@ class _SettingsTabState extends State<SettingsTab> {
                       children: [
                         Icon(Icons.verified_rounded, color: AppColors.cyan, size: 22),
                         const SizedBox(width: 8),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'المحرك يعمل بالخلفية لإنتاج فيديوهات نقية بأعلى دقة متوفرة مع صوت استوديو كريستالي.',
                             style: TextStyle(color: AppColors.cyan, fontSize: 12, height: 1.3),

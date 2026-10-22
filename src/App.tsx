@@ -33,13 +33,13 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 39746494108,
+    id: 39747174517,
     status: 'in_progress',
     conclusion: null,
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39746494108',
-    head_sha: '4f3025c',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39747174517',
+    head_sha: 'a32394f',
     head_commit: {
-      id: '4f3025c',
+      id: 'a32394f',
       message: 'release: v1.6.7 with Ultra-HQ video master & Universal Cobalt extractor'
     }
   });
