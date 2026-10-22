@@ -33,14 +33,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 39742501697,
-    status: 'completed',
-    conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39742501697',
-    head_sha: 'ca6ff36',
+    id: 39746494108,
+    status: 'in_progress',
+    conclusion: null,
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39746494108',
+    head_sha: '4f3025c',
     head_commit: {
-      id: 'ca6ff36',
-      message: 'release: v1.6.6 with clean Local-First Auth & zero external friction'
+      id: '4f3025c',
+      message: 'release: v1.6.7 with Ultra-HQ video master & Universal Cobalt extractor'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);

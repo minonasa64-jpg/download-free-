@@ -749,7 +749,7 @@ class _SettingsTabState extends State<SettingsTab> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.cyan.withOpacity(0.3)),
               ),
-              child: const Text('مفعل ⚡', style: TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold)),
+              child: Text('مفعل ⚡', style: TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold)),
             ),
             onTap: () => _showVideoEnhancerDialog(context),
           ),
@@ -1034,7 +1034,7 @@ class _SettingsTabState extends State<SettingsTab> {
                     color: AppColors.cyan.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.auto_awesome_rounded, color: AppColors.cyan, size: 24),
+                  child: Icon(Icons.auto_awesome_rounded, color: AppColors.cyan, size: 24),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -1058,10 +1058,10 @@ class _SettingsTabState extends State<SettingsTab> {
                       border: Border.all(color: AppColors.cyan.withOpacity(0.25)),
                     ),
                     child: Row(
-                      children: const [
+                      children: [
                         Icon(Icons.verified_rounded, color: AppColors.cyan, size: 22),
-                        SizedBox(width: 8),
-                        Expanded(
+                        const SizedBox(width: 8),
+                        const Expanded(
                           child: Text(
                             'المحرك يعمل بالخلفية لإنتاج فيديوهات نقية بأعلى دقة متوفرة مع صوت استوديو كريستالي.',
                             style: TextStyle(color: AppColors.cyan, fontSize: 12, height: 1.3),
