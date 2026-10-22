@@ -18,6 +18,7 @@ import {
   Send
 } from 'lucide-react';
 import FirebaseAuthPanel from './components/FirebaseAuthPanel';
+import TerminalCommandsCard from './components/TerminalCommandsCard';
 
 interface WorkflowRun {
   id: number;
@@ -88,7 +89,7 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.6.5
+                  v1.6.6
                 </span>
               </h1>
               <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي إلى GitHub</p>
@@ -212,6 +213,9 @@ export default function App() {
             </div>
           </div>
         </section>
+
+        {/* Quick Interactive Terminal Commands Section */}
+        <TerminalCommandsCard />
 
         {/* Live Neumorphic Login & Sign Up UI Showcase */}
         <section className="rounded-2xl border border-cyan-500/30 bg-slate-900/80 p-6 shadow-xl relative overflow-hidden space-y-4">

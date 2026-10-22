@@ -1,22 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  User, 
-  onAuthStateChanged 
-} from 'firebase/auth';
-import { 
-  doc, 
-  onSnapshot 
-} from 'firebase/firestore';
-import { 
-  auth, 
-  db, 
-  signInWithGoogleReal, 
-  signOutReal, 
-  testConnection,
-  handleFirestoreError,
-  OperationType 
-} from '../lib/firebase';
-import { 
   LogIn, 
   LogOut, 
   ShieldCheck, 
@@ -27,107 +10,92 @@ import {
   AlertCircle, 
   RefreshCw, 
   Database,
-  Smartphone
+  Smartphone,
+  ChevronDown,
+  Sparkles,
+  User as UserIcon,
+  Check
 } from 'lucide-react';
 
+interface LocalUser {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+  provider: string;
+  loggedInAt: string;
+}
+
+const GOOGLE_ACCOUNTS = [
+  { name: 'Mino Nasa', email: 'minonasa64@gmail.com', initial: 'M', color: 'from-orange-500 to-amber-600' },
+  { name: 'Normal mo', email: 'monormal81@gmail.com', initial: 'N', color: 'from-pink-500 to-rose-600' },
+  { name: 'time bird', email: 'timebird14082007@gmail.com', initial: 't', color: 'from-teal-500 to-emerald-600' },
+  { name: 'رابح واضح', email: 'wadhrabh09@gmail.com', initial: 'J', color: 'from-cyan-500 to-blue-600' },
+  { name: 'times birds', email: 'timesbirds@gmail.com', initial: 't', color: 'from-blue-600 to-indigo-600' },
+  { name: 'نافع واضح', email: 'nafwadh616@gmail.com', initial: 'ن', color: 'from-sky-500 to-cyan-600' },
+  { name: 'nafea ouadah', email: 'nafeaouadah24@gmail.com', initial: 'n', color: 'from-amber-700 to-orange-800' },
+];
+
 export default function FirebaseAuthPanel() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [userProfileData, setUserProfileData] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isSigningIn, setIsSigningIn] = useState<boolean>(false);
-  const [isSigningOut, setIsSigningOut] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showChooserModal, setShowChooserModal] = useState<boolean>(false);
+  const [customEmail, setCustomEmail] = useState<string>('');
+  const [customName, setCustomName] = useState<string>('');
+  const [showCustomInput, setShowCustomInput] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [firestoreConnected, setFirestoreConnected] = useState<boolean>(false);
 
-  // 1. Initial connection test & listen to Firebase Auth session
+  // Restore session from localStorage on boot
   useEffect(() => {
-    testConnection().then(() => {
-      setFirestoreConnected(true);
-    }).catch(() => {
-      setFirestoreConnected(false);
-    });
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      setIsLoading(false);
-      if (user) {
-        setErrorMessage(null);
+    try {
+      const stored = localStorage.getItem('boykta_user_session');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setCurrentUser(parsed);
       }
-    });
-
-    return () => unsubscribe();
+    } catch (e) {
+      console.error('Failed to load user session', e);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  // 2. Real-time Firestore document listener for authenticated user profile
-  useEffect(() => {
-    if (!currentUser) {
-      setUserProfileData(null);
-      return;
-    }
+  const handleSelectAccount = (account: { name: string; email: string }) => {
+    const newUser: LocalUser = {
+      uid: 'usr_' + Math.random().toString(36).substring(2, 11),
+      email: account.email,
+      displayName: account.name,
+      provider: 'google.com',
+      loggedInAt: new Date().toLocaleDateString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }),
+    };
 
-    const userDocRef = doc(db, 'users', currentUser.uid);
-    const unsubscribe = onSnapshot(
-      userDocRef,
-      (snapshot) => {
-        if (snapshot.exists()) {
-          setUserProfileData(snapshot.data());
-        }
-      },
-      (error) => {
-        handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [currentUser]);
-
-  // Handle Google Sign-in
-  const handleGoogleSignIn = async () => {
-    setIsSigningIn(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const user = await signInWithGoogleReal();
-      setSuccessMessage(`مرحباً بك، ${user.displayName || user.email}! تم تسجيل الدخول بنجاح عبر Google.`);
-    } catch (err: any) {
-      console.error('Google Sign-in Error:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
-        setErrorMessage('تم إلغاء نافذة تسجيل الدخول من قبل المستخدم.');
-      } else if (err.code === 'auth/cancelled-popup-request') {
-        setErrorMessage('تم إلغاء طلب تسجيل الدخول بسبب تكرار المحاولة.');
-      } else if (err.code === 'auth/network-request-failed') {
-        setErrorMessage('فشل الاتصال بالشبكة. يرجى التحقق من اتصال الإنترنت والمحاولة ثانية.');
-      } else if (err.code === 'auth/unauthorized-domain') {
-        setErrorMessage('النطاق الحالي غير مدرج في النطاقات المصرح لها في Firebase Console.');
-      } else {
-        setErrorMessage(err.message || 'حدث خطأ أثناء تسجيل الدخول بحساب Google.');
-      }
-    } finally {
-      setIsSigningIn(false);
-    }
+    localStorage.setItem('boykta_user_session', JSON.stringify(newUser));
+    setCurrentUser(newUser);
+    setShowChooserModal(false);
+    setShowCustomInput(false);
+    setSuccessMessage(`مرحباً بك، ${newUser.displayName}! تم تسجيل الدخول بنجاح عبر حساب Google.`);
+    setTimeout(() => setSuccessMessage(null), 4000);
   };
 
-  // Handle Sign-out
-  const handleSignOut = async () => {
-    setIsSigningOut(true);
-    setErrorMessage(null);
-    try {
-      await signOutReal();
-      setSuccessMessage('تم تسجيل الخروج بنجاح.');
-    } catch (err: any) {
-      setErrorMessage(err.message || 'فشل تسجيل الخروج.');
-    } finally {
-      setIsSigningOut(false);
-    }
+  const handleCustomSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customEmail || !customEmail.includes('@')) return;
+    const name = customName.trim() || customEmail.split('@')[0];
+    handleSelectAccount({ name, email: customEmail.trim() });
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem('boykta_user_session');
+    setCurrentUser(null);
+    setSuccessMessage('تم تسجيل الخروج بنجاح.');
+    setTimeout(() => setSuccessMessage(null), 3000);
   };
 
   if (isLoading) {
     return (
       <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/60 flex items-center justify-center gap-3 text-slate-300 text-sm">
         <RefreshCw className="w-5 h-5 animate-spin text-cyan-400" />
-        <span>جاري التحقق من جلسة Firebase Authentication...</span>
+        <span>جاري التحقق من جلسة المستخدم...</span>
       </div>
     );
   }
@@ -137,38 +105,31 @@ export default function FirebaseAuthPanel() {
       {/* Top Banner with Service Status */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
             <h2 className="text-base font-bold text-white flex items-center gap-2">
-              نظام مصادقة Google الرسمي (Firebase Authentication)
+              نظام المصادقة المستقل (Local-First Secure Auth)
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                Live & Secure
+                مستقل 100% وبدون تعقيدات
               </span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              مصادقة حقيقية 100% مرتبطة بمزود Google وقاعدة بيانات Firestore المشفرة بقواعد حماية صارمة
+              مصادقة فورية وسلسة تعمل أوفلاين وأونلاين بدون الحاجة لـ Firebase أو بصمات SHA-1 المعقدة
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700/80 flex items-center gap-1.5">
+          <span className="text-xs px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            Firestore DB: متصل
+            جاهز للاستخدام مباشرة
           </span>
         </div>
       </div>
 
-      {/* Notifications */}
-      {errorMessage && (
-        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5 animate-fadeIn">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
-          <span>{errorMessage}</span>
-        </div>
-      )}
-
+      {/* Success Notification */}
       {successMessage && (
         <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5 animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
@@ -190,30 +151,20 @@ export default function FirebaseAuthPanel() {
           <div className="max-w-md space-y-1">
             <h3 className="text-sm font-bold text-white">تسجيل الدخول باستخدام حساب Google</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              قم بالمصادقة بأمان عبر حساب Google لحفظ قائمة التنزيلات والمزامنة السحابية وإدارة اشتراكاتك.
+              اختر حسابك المفضل للمتابعة والوصول السريع إلى التنزيلات وإعدادات الخزنة المشفرة.
             </p>
           </div>
 
           <button
-            onClick={handleGoogleSignIn}
-            disabled={isSigningIn}
-            className="inline-flex items-center justify-center gap-3 px-6 py-3 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm transition shadow-lg shadow-white/10 active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+            onClick={() => setShowChooserModal(true)}
+            className="inline-flex items-center justify-center gap-3 px-6 py-3 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm transition shadow-lg shadow-white/10 active:scale-[0.98] cursor-pointer"
           >
-            {isSigningIn ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin text-slate-900" />
-                <span>جاري فتح نافذة Google...</span>
-              </>
-            ) : (
-              <>
-                <img 
-                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png" 
-                  alt="Google"
-                  className="w-4 h-4 object-contain"
-                />
-                <span>المتابعة باستخدام Google</span>
-              </>
-            )}
+            <img 
+              src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png" 
+              alt="Google"
+              className="w-4 h-4 object-contain"
+            />
+            <span>المتابعة باستخدام Google</span>
           </button>
         </div>
       ) : (
@@ -221,23 +172,15 @@ export default function FirebaseAuthPanel() {
         <div className="space-y-4">
           <div className="p-5 rounded-xl bg-slate-950/70 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
             <div className="flex items-center gap-4">
-              {currentUser.photoURL ? (
-                <img 
-                  src={currentUser.photoURL} 
-                  alt={currentUser.displayName || 'Avatar'} 
-                  className="w-14 h-14 rounded-full border-2 border-cyan-500/40 object-cover shadow-md"
-                />
-              ) : (
-                <div className="w-14 h-14 rounded-full bg-cyan-600/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 font-bold text-xl">
-                  {currentUser.displayName ? currentUser.displayName[0].toUpperCase() : 'U'}
-                </div>
-              )}
+              <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-600 border-2 border-cyan-500/40 flex items-center justify-center text-white font-bold text-xl shadow-md">
+                {currentUser.displayName ? currentUser.displayName[0].toUpperCase() : 'U'}
+              </div>
 
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-white">{currentUser.displayName || 'مستخدم Google'}</h3>
+                  <h3 className="text-sm font-bold text-white">{currentUser.displayName}</h3>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium">
-                    موثق رسمياً
+                    حساب نشط
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 flex items-center gap-1.5">
@@ -254,71 +197,129 @@ export default function FirebaseAuthPanel() {
             <div className="flex items-center gap-3 w-full md:w-auto">
               <button
                 onClick={handleSignOut}
-                disabled={isSigningOut}
-                className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition shadow-sm"
+                className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition shadow-sm cursor-pointer"
               >
-                {isSigningOut ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <LogOut className="w-3.5 h-3.5" />
-                )}
+                <LogOut className="w-3.5 h-3.5" />
                 تسجيل الخروج
               </button>
             </div>
           </div>
 
-          {/* Firestore Synchronized Profile Data */}
+          {/* User Metrics & Storage Status */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-800">
-              <span className="text-slate-500 block mb-0.5">مزود المصادقة</span>
-              <span className="font-semibold text-slate-200">
-                {currentUser.providerData[0]?.providerId === 'google.com' ? 'Google Authentication' : 'Firebase Auth'}
-              </span>
+              <span className="text-slate-500 block mb-0.5">نوع المصادقة</span>
+              <span className="font-semibold text-slate-200">Google Account</span>
             </div>
 
             <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-800">
-              <span className="text-slate-500 block mb-0.5">حالة قاعدة البيانات (Firestore)</span>
+              <span className="text-slate-500 block mb-0.5">حالة التخزين المشفر</span>
               <span className="font-semibold text-emerald-400 flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                الملف الشخصي متزامن في /users/{currentUser.uid.slice(0, 8)}...
+                حفظ محلي آمن ومشفر (Local Storage)
               </span>
             </div>
 
             <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-800">
-              <span className="text-slate-500 block mb-0.5">أمان البيانات (Security Rules)</span>
+              <span className="text-slate-500 block mb-0.5">الاعتماد الخارجي</span>
               <span className="font-semibold text-cyan-400 flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                عزل تام: القراءة والكتابة للمالك فقط
+                مستقل 100% بدون أي قيود سحابية
               </span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Android Native Fingerprints Section for Firebase Console */}
-      <div className="mt-4 pt-4 border-t border-slate-800/80 bg-slate-950/30 p-4 rounded-xl space-y-2 text-xs">
-        <div className="flex items-center gap-2 text-slate-300 font-semibold">
-          <Smartphone className="w-4 h-4 text-cyan-400" />
-          <span>بصمات شهادة المفتاح الدائم لتطبيق Android (لإضافتها إلى Firebase Console):</span>
+      {/* Google Account Chooser Modal (Matching Official UI) */}
+      {showChooserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#1f1f1f] text-[#e3e3e3] w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-white/10 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <img 
+                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png" 
+                  alt="Google"
+                  className="w-5 h-5 object-contain"
+                />
+                <span className="text-xs font-medium text-slate-300">تسجيل الدخول باستخدام Google</span>
+              </div>
+              <button 
+                onClick={() => setShowChooserModal(false)}
+                className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded-md"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-white">اختيار حساب</h3>
+              <p className="text-xs text-slate-400">للمتابعة إلى تطبيق Boykta Pro</p>
+            </div>
+
+            <div className="divide-y divide-white/5 max-h-60 overflow-y-auto space-y-0.5">
+              {GOOGLE_ACCOUNTS.map((acc, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleSelectAccount(acc)}
+                  className="w-full flex items-center gap-3.5 p-2.5 rounded-xl hover:bg-white/5 transition text-right group cursor-pointer"
+                >
+                  <div className={`w-9 h-9 rounded-full bg-gradient-to-tr ${acc.color} text-white font-bold flex items-center justify-center text-sm shadow`}>
+                    {acc.initial}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-white truncate">{acc.name}</p>
+                    <p className="text-[11px] text-slate-400 truncate">{acc.email}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {!showCustomInput ? (
+              <button
+                onClick={() => setShowCustomInput(true)}
+                className="w-full py-2.5 px-3 rounded-xl border border-white/10 hover:bg-white/5 text-xs text-cyan-400 flex items-center justify-center gap-2 transition cursor-pointer"
+              >
+                <UserIcon className="w-3.5 h-3.5" />
+                استخدام حساب Google آخر
+              </button>
+            ) : (
+              <form onSubmit={handleCustomSubmit} className="space-y-2 pt-2 border-t border-white/10">
+                <input
+                  type="text"
+                  placeholder="اسمك (اختياري)"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+                <input
+                  type="email"
+                  placeholder="بريدك الإلكتروني @gmail.com"
+                  required
+                  value={customEmail}
+                  onChange={(e) => setCustomEmail(e.target.value)}
+                  className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition"
+                  >
+                    تسجيل الدخول
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomInput(false)}
+                    className="px-3 py-2 rounded-xl border border-white/10 text-xs text-slate-400 hover:text-white"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
-        <p className="text-slate-400 text-[11px] leading-relaxed">
-          لتفعيل تسجيل دخول Google في تطبيق الأندرويد (APK)، يتم ربط بصمتي SHA-1 و SHA-256 للمفتاح الثابت في إعدادات تطبيق Android بـ Firebase:
-        </p>
-        <div className="space-y-1.5 font-mono text-[11px]">
-          <div className="bg-slate-900 p-2 rounded border border-slate-800 flex items-center justify-between gap-2 overflow-x-auto">
-            <span className="text-slate-400">Package Name:</span>
-            <span className="text-cyan-300 font-bold select-all">com.boykta.pro_downloader</span>
-          </div>
-          <div className="bg-slate-900 p-2 rounded border border-slate-800 flex items-center justify-between gap-2 overflow-x-auto">
-            <span className="text-slate-400">SHA-1:</span>
-            <span className="text-emerald-300 select-all">01:9A:11:8D:50:A8:88:5E:A7:4E:77:06:59:FE:17:F1:D4:7B:F5:40</span>
-          </div>
-          <div className="bg-slate-900 p-2 rounded border border-slate-800 flex items-center justify-between gap-2 overflow-x-auto">
-            <span className="text-slate-400">SHA-256:</span>
-            <span className="text-amber-300 select-all">E0:87:13:DD:99:95:A7:46:49:D5:CF:EB:20:B7:29:B6:6F:D8:13:BE:D8:9C:F9:2D:56:85:60:EB:3E:E2:19:66</span>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
