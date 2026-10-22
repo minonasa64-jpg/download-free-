@@ -40,13 +40,13 @@ function apiPlugin(): Plugin {
         res.end(JSON.stringify({
           success: true,
           latestRun: {
-            id: 38159459542,
-            status: 'in_progress',
-            conclusion: null,
-            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/38159459542',
+            id: 39747787358,
+            status: 'completed',
+            conclusion: 'success',
+            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39747787358',
             head_commit: {
-              id: '892081c',
-              message: 'fix(v1.5.3): guarantee video+audio playback from links, enforce interstitial ads, show banner immediately, and remove annoying youtube search bar'
+              id: 'b613000',
+              message: 'release: v1.6.7 with Ultra-HQ video master & Universal Cobalt extractor'
             }
           },
           runs: []
