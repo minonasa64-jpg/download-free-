@@ -18,7 +18,6 @@ import {
   Send
 } from 'lucide-react';
 import FirebaseAuthPanel from './components/FirebaseAuthPanel';
-import TerminalCommandsCard from './components/TerminalCommandsCard';
 
 interface WorkflowRun {
   id: number;
@@ -34,14 +33,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 39026401783,
-    status: 'completed',
-    conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39026401783',
-    head_sha: '2565dd4',
+    id: 39742501697,
+    status: 'in_progress',
+    conclusion: null,
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39742501697',
+    head_sha: 'ca6ff36',
     head_commit: {
-      id: '2565dd4',
-      message: 'release: v1.6.5 with Firebase Auth Google Sign-In & permanent keystore'
+      id: 'ca6ff36',
+      message: 'release: v1.6.6 with clean Local-First Auth & zero external friction'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -213,9 +212,6 @@ export default function App() {
             </div>
           </div>
         </section>
-
-        {/* Quick Interactive Terminal Commands Section */}
-        <TerminalCommandsCard />
 
         {/* Live Neumorphic Login & Sign Up UI Showcase */}
         <section className="rounded-2xl border border-cyan-500/30 bg-slate-900/80 p-6 shadow-xl relative overflow-hidden space-y-4">
