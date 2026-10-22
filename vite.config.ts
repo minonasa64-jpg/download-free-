@@ -40,10 +40,10 @@ function apiPlugin(): Plugin {
         res.end(JSON.stringify({
           success: true,
           latestRun: {
-            id: 39796861689,
+            id: 39796953287,
             status: 'in_progress',
             conclusion: null,
-            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39796861689',
+            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/39796953287',
             head_commit: {
               id: '295aeab',
               message: 'release: v1.6.8 with multi-library ultra-HQ video engine & in-app resolution selector'
