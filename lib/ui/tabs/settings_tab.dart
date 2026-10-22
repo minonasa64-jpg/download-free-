@@ -736,28 +736,28 @@ class _SettingsTabState extends State<SettingsTab> {
           _buildSectionHeader(_backend.t('more_tools')),
           _buildGlassTile(
             context,
-            icon: Icons.send_rounded,
-            title: 'إحصائيات بوت تيليجرام (Telegram Analytics)',
-            subtitle: 'متصل بالبوت ومفعل بنجاح • إرسال فوري',
+            icon: Icons.auto_awesome_rounded,
+            title: 'محرك الجودة الفائقة (Video & Audio Ultra-HQ)',
+            subtitle: 'معالجة بدقة 4K/60fps • صوت كريستالي 320k • تحسين الألوان',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.15),
+                color: AppColors.cyan.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.withOpacity(0.3)),
+                border: Border.all(color: AppColors.cyan.withOpacity(0.3)),
               ),
-              child: const Text('متصل ✅', style: TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+              child: const Text('مفعل ⚡', style: TextStyle(color: AppColors.cyan, fontSize: 11, fontWeight: FontWeight.bold)),
             ),
-            onTap: () => _showTelegramBotDialog(context),
+            onTap: () => _showVideoEnhancerDialog(context),
           ),
           _buildGlassTile(
             context,
             icon: Icons.info_outline_rounded,
             title: _backend.t('about'),
-            subtitle: 'Boykta Pro v1.4.2 (Telegram Bot & Background Audio)',
+            subtitle: 'Boykta Pro v1.6.7 (High-Res Video Master & Universal Extractor)',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -1016,9 +1016,8 @@ class _SettingsTabState extends State<SettingsTab> {
     );
   }
 
-  void _showTelegramBotDialog(BuildContext context) {
+  void _showVideoEnhancerDialog(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    bool isTesting = false;
 
     showDialog(
       context: context,
@@ -1032,15 +1031,15 @@ class _SettingsTabState extends State<SettingsTab> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.15),
+                    color: AppColors.cyan.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.send_rounded, color: Colors.blueAccent, size: 24),
+                  child: const Icon(Icons.auto_awesome_rounded, color: AppColors.cyan, size: 24),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'بوت إحصائيات تيليجرام',
+                    'محرك تحسين الجودة الفائقة',
                     style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
@@ -1054,70 +1053,93 @@ class _SettingsTabState extends State<SettingsTab> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: AppColors.cyan.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green.withOpacity(0.2)),
+                      border: Border.all(color: AppColors.cyan.withOpacity(0.25)),
                     ),
                     child: Row(
                       children: const [
-                        Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 20),
+                        Icon(Icons.verified_rounded, color: AppColors.cyan, size: 22),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'البوت مربوط بنجاح ويعمل بتناغم فوري لإرسال تنبيهات المستخدمين والتنزيلات.',
-                            style: TextStyle(color: Colors.greenAccent, fontSize: 12),
+                            'المحرك يعمل بالخلفية لإنتاج فيديوهات نقية بأعلى دقة متوفرة مع صوت استوديو كريستالي.',
+                            style: TextStyle(color: AppColors.cyan, fontSize: 12, height: 1.3),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Text('معرّف المسؤول (Admin ID):', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12)),
-                  const SizedBox(height: 2),
-                  Text('8262706717', style: TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 10),
-                  Text('الميزات المُفعلة:', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12)),
-                  const SizedBox(height: 4),
-                  Text('• إشعار فوري عند تثبيت التطبيق لأول مرة (New User)', style: TextStyle(color: isDark ? Colors.white60 : Colors.black87, fontSize: 12)),
-                  Text('• نبضة المستخدم النشط يومياً (Daily Active User)', style: TextStyle(color: isDark ? Colors.white60 : Colors.black87, fontSize: 12)),
-                  Text('• إشعار فوري عند اكتمال تنزيل أي فيديو أو صوت', style: TextStyle(color: isDark ? Colors.white60 : Colors.black87, fontSize: 12)),
+                  const SizedBox(height: 14),
+                  Text('التقنيات النشطة:', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  _buildEnhanceItem(
+                    icon: Icons.four_k_rounded,
+                    title: 'أولوية دقة 4K و 1080p 60fps',
+                    desc: 'اختيار أعلى تدفق بيانات بدقة فائقة وتردد إطارات سلس.',
+                    isDark: isDark,
+                  ),
+                  _buildEnhanceItem(
+                    icon: Icons.graphic_eq_rounded,
+                    title: 'صوت كريستالي ستوديو 320kbps',
+                    desc: 'معالجة AAC نقية مع فلتر موازنة الصوت الذكي (EBU R128).',
+                    isDark: isDark,
+                  ),
+                  _buildEnhanceItem(
+                    icon: Icons.high_quality_rounded,
+                    title: 'فلتر إبراز التفاصيل (Unsharp Mask)',
+                    desc: 'إيضاح الحواف الدقيقة بدون أي تشويش لظهور رائع على شاشات OLED.',
+                    isDark: isDark,
+                  ),
+                  _buildEnhanceItem(
+                    icon: Icons.memory_rounded,
+                    title: 'تسريع العتاد (Hardware Acceleration)',
+                    desc: 'استخدام رقاقات معالجة الفيديو في هاتفك لتقليل استهلاك البطارية.',
+                    isDark: isDark,
+                  ),
                 ],
               ),
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(_backend.t('cancel')),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
-                icon: isTesting 
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                    : const Icon(Icons.send_rounded, size: 16, color: Colors.black),
-                label: Text(
-                  isTesting ? 'جاري الإرسال...' : 'إرسال إشعار تجريبي للبوت',
-                  style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.cyan,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  minimumSize: const Size(double.infinity, 42),
                 ),
-                onPressed: isTesting ? null : () async {
-                  setDialogState(() => isTesting = true);
-                  final success = await TelegramAnalyticsService().sendMessage(
-                    '🔔 <b>رسالة فحص الاتصال من تطبيق Boykta!</b>\n━━━━━━━━━━━━━━━━━━━━\n✅ تم تأكيد الاتصال المباشر بين التطبيق وبوتك بنجاح.\n🚀 الإصدار: v1.4.5\n🕒 الوقت: ${DateTime.now().toLocal().toString().substring(0, 19)}',
-                  );
-                  setDialogState(() => isTesting = false);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(success ? 'تم إرسال الإشعار بنجاح إلى تيليجرام! ✅' : 'تعذر الإرسال، تحقق من الإنترنت ⚠️'),
-                        backgroundColor: success ? Colors.green : Colors.red,
-                        duration: const Duration(seconds: 3),
-                      ),
-                    );
-                  }
-                },
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('تم • المحرك نشط بأقصى كفاءة 🚀', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildEnhanceItem({
+    required IconData icon,
+    required String title,
+    required String desc,
+    required bool isDark,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppColors.cyan, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 12, fontWeight: FontWeight.bold)),
+                Text(desc, style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 11)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

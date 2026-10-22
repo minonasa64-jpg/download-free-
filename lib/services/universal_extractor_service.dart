@@ -987,11 +987,88 @@ class UniversalExtractorService {
     return await _extractGenericWebOrFallbacks(url, forcedPlatform: 'dailymotion');
   }
 
+  /// المحرك السحابي العالمي المتقدم (Universal Multi-Platform Extractor)
+  Future<Map<String, dynamic>?> _extractCobaltUniversal(String url) async {
+    final instances = [
+      'https://api.cobalt.tools/api/json',
+      'https://cobalt.api.scav.top/api/json',
+      'https://api.wuk.sh/api/json',
+      'https://cobalt-backend.canine.tools/api/json',
+    ];
+
+    for (final endpoint in instances) {
+      try {
+        final res = await _dio.post(
+          endpoint,
+          data: {
+            'url': url,
+            'videoQuality': 'max',
+            'youtubeVideoCodec': 'h264',
+          },
+          options: Options(
+            connectTimeout: const Duration(seconds: 4),
+            receiveTimeout: const Duration(seconds: 6),
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+          ),
+        );
+
+        if (res.statusCode == 200 && res.data is Map) {
+          final data = res.data as Map;
+          final status = data['status']?.toString();
+          if (status == 'stream' || status == 'redirect') {
+            final streamUrl = data['url']?.toString() ?? '';
+            if (streamUrl.isNotEmpty) {
+              return _buildSimpleMediaResult(
+                id: 'cobalt_${DateTime.now().millisecondsSinceEpoch}',
+                title: data['filename']?.toString().replaceAll('.mp4', '') ?? 'فيديو فائق الجودة من الإنترنت',
+                thumbnail: '',
+                videoUrl: streamUrl,
+                platform: detectPlatform(url),
+                author: Uri.tryParse(url)?.host ?? 'Universal Web',
+              );
+            }
+          } else if (status == 'picker') {
+            final picker = List<dynamic>.from(data['picker'] ?? []);
+            if (picker.isNotEmpty) {
+              final first = picker.first as Map;
+              final streamUrl = first['url']?.toString() ?? '';
+              if (streamUrl.isNotEmpty) {
+                return _buildSimpleMediaResult(
+                  id: 'cobalt_${DateTime.now().millisecondsSinceEpoch}',
+                  title: 'فيديو عالي الجودة (${Uri.tryParse(url)?.host ?? "Web"})',
+                  thumbnail: first['thumb']?.toString() ?? '',
+                  videoUrl: streamUrl,
+                  platform: detectPlatform(url),
+                  author: Uri.tryParse(url)?.host ?? 'Universal Web',
+                );
+              }
+            }
+          }
+        }
+      } catch (_) {
+        // تجربة الخادم التالي
+      }
+    }
+    return null;
+  }
+
   // =========================================================================
   // 7. استخراج أي صفحة ويب عامة أو المحرك الاحتياطي الشامل (Generic HTML5 / OpenGraph Scraper)
   // =========================================================================
   Future<Map<String, dynamic>> _extractGenericWebOrFallbacks(String url, {String? forcedPlatform}) async {
     debugPrint('جاري فحص محتوى صفحة الويب عبر HTML Scraper الشامل: $url');
+
+    // 1. تجربة المحرك السحابي العالمي متعدد المنصات أولاً
+    try {
+      final cobaltResult = await _extractCobaltUniversal(url);
+      if (cobaltResult != null) {
+        return cobaltResult;
+      }
+    } catch (_) {}
+
     try {
       final res = await _dio.get(
         url,

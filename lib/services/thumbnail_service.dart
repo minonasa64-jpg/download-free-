@@ -37,7 +37,23 @@ class ThumbnailService {
       final videoFile = File(videoPath);
       if (!await videoFile.exists()) return null;
 
-      // 1. فحص ما إذا كان هناك ملف غلاف أو صورة مصغرة محفوظة بنفس الاسم
+      // 1. فحص الذاكرة المؤقتة التخزينية (Disk Cache) لسرعة استجابة فائقة
+      try {
+        final cacheDir = await getTemporaryDirectory();
+        final thumbDir = Directory('${cacheDir.path}/boykta_thumbs');
+        if (!await thumbDir.exists()) {
+          await thumbDir.create(recursive: true);
+        }
+        final cacheFile = File('${thumbDir.path}/${videoPath.hashCode.abs()}.jpg');
+        if (await cacheFile.exists()) {
+          final cachedBytes = await cacheFile.readAsBytes();
+          if (cachedBytes.isNotEmpty) {
+            return cachedBytes;
+          }
+        }
+      } catch (_) {}
+
+      // 2. فحص ما إذا كان هناك ملف غلاف أو صورة مصغرة محفوظة بنفس الاسم
       final baseName = videoPath.contains('.') ? videoPath.substring(0, videoPath.lastIndexOf('.')) : videoPath;
       final localThumbJpg = File('$baseName.jpg');
       final localThumbPng = File('$baseName.png');
@@ -51,16 +67,22 @@ class ThumbnailService {
         if (bytes.isNotEmpty) return bytes;
       }
 
-      // 2. استخدام video_thumbnail لاستخراج إطار سريع
+      // 3. استخدام video_thumbnail لاستخراج إطار سريع وعالي الدقة
       final thumbBytes = await VideoThumbnail.thumbnailData(
         video: videoPath,
         imageFormat: ImageFormat.JPEG,
-        maxWidth: 200,
-        quality: 60,
+        maxWidth: 240,
+        quality: 75,
         timeMs: 1500, // إطار بعد ثانية ونصف لضمان عدم التقاط شاشة سوداء
       );
 
       if (thumbBytes != null && thumbBytes.isNotEmpty) {
+        // حفظ في القرص لتسريع الفتح القادم بنسبة 100%
+        try {
+          final cacheDir = await getTemporaryDirectory();
+          final cacheFile = File('${cacheDir.path}/boykta_thumbs/${videoPath.hashCode.abs()}.jpg');
+          await cacheFile.writeAsBytes(thumbBytes, flush: true);
+        } catch (_) {}
         return thumbBytes;
       }
 
