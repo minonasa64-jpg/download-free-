@@ -517,6 +517,10 @@ class _WatchVideoScreenState extends State<WatchVideoScreen> {
         ),
         backgroundColor: _isBackgroundAudioEnabled ? AppColors.cyan : AppColors.surface,
         duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _showQualitySelector() {
     if (_candidateStreams.isEmpty) return;
     showModalBottomSheet(

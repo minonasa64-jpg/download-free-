@@ -1057,6 +1057,10 @@ class UniversalExtractorService {
       } catch (_) {
         // تجربة الخادم التالي
       }
+    }
+    return null;
+  }
+
   /// محرك Piped السحابي عالي الدقة (4K / 1080p 60fps Unthrottled Engine)
   Future<Map<String, dynamic>?> _extractPipedUniversal(String url) async {
     final uri = Uri.tryParse(url);
