@@ -1175,7 +1175,7 @@ class _SettingsTabState extends State<SettingsTab> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('الإصدار 1.4.5', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)),
+            Text('الإصدار 1.7.0 (محرك دمج عتادي 1080p FHD مباشر)', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(
               'تطبيق تنزيل ومشاهدة الوسائط بأعلى جودة مع دعم التوربو المتعدد، دمج الصوت والصورة بدون فقد، الخزنة المشفرة، تشغيل الموسيقى في الخلفية، وإحصائيات تيليجرام المباشرة.',

@@ -1017,13 +1017,19 @@ class _LinksTabState extends State<LinksTab> {
     if (formats.isEmpty) return [];
     var uniqueFormats = <String, Map<String, dynamic>>{};
     for (var f in formats) {
-      final key = '${f['quality_order']}_${f['quality_name']}';
+      final key = '${f['quality_order']}';
       if (!uniqueFormats.containsKey(key)) {
         uniqueFormats[key] = f;
       } else {
         final existing = uniqueFormats[key]!;
-        // نفضل الدفقات المنفصلة needs_merge لأنها تتمتع بمعدل بت أعلى من الدفقات المدمجة
-        if (f['needs_merge'] == true && existing['needs_merge'] != true) {
+        // للدقات حتى 1080p: نفضل دائماً حاوية MP4 المتوافقة 100% مع أندرويد
+        final bool fIsMp4 = (f['container']?.toString().toLowerCase() == 'mp4') || (f['ext'] == 'mp4');
+        final bool exIsMp4 = (existing['container']?.toString().toLowerCase() == 'mp4') || (existing['ext'] == 'mp4');
+        if (fIsMp4 && !exIsMp4) {
+          uniqueFormats[key] = f;
+        } else if (!fIsMp4 && exIsMp4) {
+          // احتفظ بـ MP4
+        } else if (f['needs_merge'] == true && existing['needs_merge'] != true) {
           uniqueFormats[key] = f;
         } else {
           int sizeBytesF = f['size_bytes'] is int ? f['size_bytes'] : 0;
@@ -1048,11 +1054,18 @@ class _LinksTabState extends State<LinksTab> {
       if (orderA != 0 && orderB != 0 && orderA != orderB) {
         return orderB.compareTo(orderA); // أعلى جودة أولاً
       }
+      bool isMp4A = (fIsMp4(a));
+      bool isMp4B = (fIsMp4(b));
+      if (isMp4A != isMp4B) return isMp4A ? -1 : 1;
       int sizeBytesA = a['size_bytes'] is int ? a['size_bytes'] : 0;
       int sizeBytesB = b['size_bytes'] is int ? b['size_bytes'] : 0;
       return sizeBytesB.compareTo(sizeBytesA); // الأكبر حجماً وأعلى بت ريت أولاً
     });
     return sortedList;
+  }
+
+  bool fIsMp4(Map<String, dynamic> m) {
+    return (m['container']?.toString().toLowerCase() == 'mp4') || (m['ext'] == 'mp4');
   }
 
   Widget _buildFormatList(List<Map<String, dynamic>> formats, IconData icon) {

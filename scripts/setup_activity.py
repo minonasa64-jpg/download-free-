@@ -159,10 +159,18 @@ public class MainActivity extends FlutterFragmentActivity {
                 outFile.delete();
             }
 
-            muxer = new MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-
             videoExtractor.selectTrack(videoSourceTrack);
             MediaFormat videoFormat = videoExtractor.getTrackFormat(videoSourceTrack);
+            String videoMime = videoFormat.getString(MediaFormat.KEY_MIME);
+
+            int outputFormat = MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4;
+            if (outputPath.toLowerCase().endsWith(".webm") || (videoMime != null && (videoMime.contains("vp8") || videoMime.contains("vp9")))) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    outputFormat = MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM;
+                }
+            }
+
+            muxer = new MediaMuxer(outputPath, outputFormat);
             int muxerVideoTrack = muxer.addTrack(videoFormat);
 
             audioExtractor.selectTrack(audioSourceTrack);
@@ -171,7 +179,7 @@ public class MainActivity extends FlutterFragmentActivity {
 
             muxer.start();
 
-            int maxBufferSize = 1024 * 1024 * 2;
+            int maxBufferSize = 1024 * 1024 * 4;
             if (videoFormat.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) {
                 int s = videoFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE);
                 if (s > maxBufferSize) maxBufferSize = s;
@@ -188,6 +196,8 @@ public class MainActivity extends FlutterFragmentActivity {
             boolean audioDone = false;
             long lastVideoTime = -1;
             long lastAudioTime = -1;
+            int videoSampleCount = 0;
+            int audioSampleCount = 0;
 
             while (!videoDone || !audioDone) {
                 long videoTime = videoDone ? Long.MAX_VALUE : videoExtractor.getSampleTime();
@@ -200,12 +210,15 @@ public class MainActivity extends FlutterFragmentActivity {
                         videoDone = true;
                     } else {
                         long sampleTime = videoExtractor.getSampleTime();
-                        if (sampleTime < lastVideoTime) sampleTime = lastVideoTime;
+                        if (sampleTime <= lastVideoTime) {
+                            sampleTime = lastVideoTime + 1000;
+                        }
                         lastVideoTime = sampleTime;
 
                         bufferInfo.presentationTimeUs = sampleTime;
                         bufferInfo.flags = videoExtractor.getSampleFlags();
                         muxer.writeSampleData(muxerVideoTrack, buffer, bufferInfo);
+                        videoSampleCount++;
                         videoExtractor.advance();
                     }
                 } else if (!audioDone) {
@@ -215,23 +228,32 @@ public class MainActivity extends FlutterFragmentActivity {
                         audioDone = true;
                     } else {
                         long sampleTime = audioExtractor.getSampleTime();
-                        if (sampleTime < lastAudioTime) sampleTime = lastAudioTime;
+                        if (sampleTime <= lastAudioTime) {
+                            sampleTime = lastAudioTime + 1000;
+                        }
                         lastAudioTime = sampleTime;
 
                         bufferInfo.presentationTimeUs = sampleTime;
                         bufferInfo.flags = audioExtractor.getSampleFlags();
                         muxer.writeSampleData(muxerAudioTrack, buffer, bufferInfo);
+                        audioSampleCount++;
                         audioExtractor.advance();
                     }
                 }
             }
 
-            muxer.stop();
+            if (videoSampleCount > 0) {
+                try {
+                    muxer.stop();
+                } catch (Exception stopEx) {
+                    Log.e(TAG, "muxer.stop() error: " + stopEx.getMessage());
+                }
+            }
             muxer.release();
             muxer = null;
 
             File finalFile = new File(outputPath);
-            return finalFile.exists() && finalFile.length() > 0;
+            return finalFile.exists() && finalFile.length() > (vFile.length() * 0.7);
         } catch (Exception e) {
             Log.e(TAG, "Native MediaMuxer error: " + e.getMessage(), e);
             return false;
