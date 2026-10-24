@@ -704,7 +704,7 @@ class _YoutubeTabState extends State<YoutubeTab> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const CircularProgressIndicator(color: AppColors.cyan),
+                  CircularProgressIndicator(color: AppColors.cyan),
                   const SizedBox(height: 18),
                   Text(
                     'جاري استخراج أعلى دقات المقطع (1080p / 4K)...',
