@@ -675,6 +675,26 @@ class BackendService {
   static final Map<String, Map<String, dynamic>> _mediaLinksCache = {};
   static final Map<String, StreamManifest> _streamManifestCache = {};
 
+  Future<StreamManifest> _fetchRichManifest(dynamic target) async {
+    try {
+      final m = await _yt.videos.streamsClient.getManifest(
+        target,
+        ytClients: [
+          YoutubeApiClient.androidVr,
+          YoutubeApiClient.android,
+          YoutubeApiClient.ios,
+          YoutubeApiClient.safari,
+        ],
+      ).timeout(const Duration(seconds: 14));
+      if (m.videoOnly.isNotEmpty || m.muxed.isNotEmpty) {
+        return m;
+      }
+    } catch (e) {
+      debugPrint('تنبيه جلب المانيفست متعدد العملاء، الانتقال للوضع القياسي: $e');
+    }
+    return await _yt.videos.streamsClient.getManifest(target);
+  }
+
   Future<Map<String, dynamic>> extractMediaLinks(String url) async {
     try {
       final cleanUrl = url.trim();
@@ -700,9 +720,9 @@ class BackendService {
 
       final dynamic target = videoIdStr.isNotEmpty ? VideoId(videoIdStr) : cleanUrl;
 
-      // جلب المانيفست ومعلومات الفيديو بالتوازي الفوري لتخفيض وقت الانتظار لأكثر من النصف
+      // جلب المانيفست الغني ومعلومات الفيديو بالتوازي الفوري
       final results = await Future.wait([
-        _yt.videos.streamsClient.getManifest(target),
+        _fetchRichManifest(target),
         _yt.videos.get(target),
       ]);
 
@@ -718,6 +738,7 @@ class BackendService {
       
       for (var stream in manifest.videoOnly) {
         final qInfo = getVideoQualityInfo(stream.qualityLabel);
+        final int qOrder = qInfo['order'] is int ? qInfo['order'] as int : 720;
         final container = stream.container.name.toLowerCase();
         final isMp4 = container == 'mp4';
         rawVideoFormats.add({
@@ -725,29 +746,30 @@ class BackendService {
           'tag': stream.tag,
           'video_id': video.id.value,
           'quality_name': stream.qualityLabel,
-          'quality_order': qInfo['order'],
+          'quality_order': qOrder,
           'quality_badge': qInfo['badge'],
           'quality_desc': isMp4 
-              ? 'دقة عالية ${stream.qualityLabel} نقية • أعلى معدل بت وصوت نقي متطابق مع الاستوديو 100%'
+              ? 'دقة عالية ${stream.qualityLabel} مع تعزيز الحدة والوضوح عبر FFmpeg Lanczos'
               : qInfo['desc'],
           'size': stream.size.totalMegaBytes.toStringAsFixed(1),
           'size_bytes': stream.size.totalBytes,
           'container': container,
-          'ext': isMp4 ? 'mp4' : (container.contains('webm') ? 'webm' : 'mp4'), 
+          'ext': 'mp4', 
           'needs_merge': true,
-          'is_upscaled': false,
+          'is_upscaled': qOrder >= 720,
         });
       }
       
       for (var stream in manifest.muxed) {
         final qInfo = getVideoQualityInfo(stream.qualityLabel);
+        final int qOrder = qInfo['order'] is int ? qInfo['order'] as int : 360;
         final container = stream.container.name.toLowerCase();
         rawVideoFormats.add({
           'url': stream.url.toString(),
           'tag': stream.tag,
           'video_id': video.id.value,
           'quality_name': stream.qualityLabel,
-          'quality_order': qInfo['order'],
+          'quality_order': qOrder,
           'quality_badge': qInfo['badge'],
           'quality_desc': qInfo['desc'],
           'size': stream.size.totalMegaBytes.toStringAsFixed(1),
@@ -755,7 +777,7 @@ class BackendService {
           'container': container,
           'ext': 'mp4',
           'needs_merge': false,
-          'is_upscaled': false,
+          'is_upscaled': qOrder >= 720,
         });
       }
 
@@ -767,7 +789,6 @@ class BackendService {
           bestByOrder[order] = f;
         } else {
           final existing = bestByOrder[order]!;
-          // للدقات حتى 1080p: نفضل دائماً حاوية MP4 (H.264) لأنها متوافقة 100% مع محرك المدمج العتادي MediaMuxer
           final bool fIsMp4 = f['container'] == 'mp4' || f['ext'] == 'mp4';
           final bool exIsMp4 = existing['container'] == 'mp4' || existing['ext'] == 'mp4';
           if (fIsMp4 && !exIsMp4) {
@@ -775,7 +796,6 @@ class BackendService {
           } else if (!fIsMp4 && exIsMp4) {
             // احتفظ بـ MP4
           } else if (f['needs_merge'] == true && existing['needs_merge'] != true) {
-            // دفقات الفيديو المنفصلة videoOnly أعلى جودة وبت ريت من المدمجة مسبقاً
             bestByOrder[order] = f;
           } else {
             final int sizeF = f['size_bytes'] is int ? f['size_bytes'] as int : 0;
@@ -789,7 +809,7 @@ class BackendService {
 
       List<Map<String, dynamic>> videoFormats = bestByOrder.values.toList();
 
-      // ترتيب دفقات الفيديو تنازلياً من أقصى جودة (4K / 2K / 1080p FHD) إلى أقل جودة لتقديم أعلى دقة أصلية دائماً
+      // ترتيب دفقات الفيديو تنازلياً من أقصى جودة (4K / 2K / 1080p FHD) إلى أقل جودة
       videoFormats.sort((a, b) {
         int orderA = a['quality_order'] is int ? a['quality_order'] : 0;
         int orderB = b['quality_order'] is int ? b['quality_order'] : 0;
@@ -809,12 +829,13 @@ class BackendService {
 
       final highestBaseStream = videoFormats.isNotEmpty ? videoFormats.first : null;
       if (highestBaseStream != null) {
+        final bool baseNeedsMerge = highestBaseStream['needs_merge'] == true;
         if (!has4K) {
           videoFormats.insert(0, {
             'url': highestBaseStream['url'],
             'tag': highestBaseStream['tag'],
             'video_id': video.id.value,
-            'quality_name': '4K Ultra HD (ترقية سينمائية فائقة • 2160p)',
+            'quality_name': '4K Ultra HD (ترقية FFmpeg Lanczos فائقة • 2160p)',
             'quality_order': 2160,
             'quality_badge': '4K Ultra HD',
             'quality_desc': 'دقة 4K سينمائية خارقة مع تعزيز الحدة والوضوح الكريستالي عبر FFmpeg Lanczos',
@@ -822,7 +843,7 @@ class BackendService {
             'size_bytes': ((highestBaseStream['size_bytes'] is int ? highestBaseStream['size_bytes'] as int : 50000000) * 1.8).toInt(),
             'container': 'mp4',
             'ext': 'mp4',
-            'needs_merge': true,
+            'needs_merge': baseNeedsMerge,
             'is_upscaled': true,
           });
         }
@@ -832,7 +853,7 @@ class BackendService {
             'url': highestBaseStream['url'],
             'tag': highestBaseStream['tag'],
             'video_id': video.id.value,
-            'quality_name': '2K Quad HD (ترقية عالية التباين • 1440p)',
+            'quality_name': '2K Quad HD (ترقية FFmpeg عالية التباين • 1440p)',
             'quality_order': 1440,
             'quality_badge': '2K QHD',
             'quality_desc': 'دقة 2K فائقة الوضوح مع تعزيز التفاصيل للشاشات الكبيرة واللوحية',
@@ -840,7 +861,7 @@ class BackendService {
             'size_bytes': ((highestBaseStream['size_bytes'] is int ? highestBaseStream['size_bytes'] as int : 50000000) * 1.4).toInt(),
             'container': 'mp4',
             'ext': 'mp4',
-            'needs_merge': true,
+            'needs_merge': baseNeedsMerge,
             'is_upscaled': true,
           });
         }
@@ -850,15 +871,15 @@ class BackendService {
             'url': highestBaseStream['url'],
             'tag': highestBaseStream['tag'],
             'video_id': video.id.value,
-            'quality_name': '1080p Full HD (ترقية بلورية فائقة)',
+            'quality_name': '1080p Full HD (ترقية FFmpeg بلورية فائقة)',
             'quality_order': 1080,
             'quality_badge': '1080p FHD',
-            'quality_desc': 'دقة Full HD عالية الوضوح مع تحسين الألوان وتنقيتها عبر FFmpeg',
+            'quality_desc': 'رفع جودة الفيديو إلى Full HD 1080p مع توضيح التفاصيل والألوان عبر FFmpeg Lanczos',
             'size': ((double.tryParse(highestBaseStream['size']?.toString() ?? '40') ?? 40) * 1.2).toStringAsFixed(1),
             'size_bytes': ((highestBaseStream['size_bytes'] is int ? highestBaseStream['size_bytes'] as int : 40000000) * 1.2).toInt(),
             'container': 'mp4',
             'ext': 'mp4',
-            'needs_merge': true,
+            'needs_merge': baseNeedsMerge,
             'is_upscaled': true,
           });
         }
@@ -1300,12 +1321,11 @@ class BackendService {
             streamTag: videoTag,
           );
 
-          // ترقية ورفع جودة الفيديو عند طلب ترقية بصرية فائقة (isUpscaled)
-          // أما الدقات الأصلية (Original Source) فتحفظ كما هي مباشرة دون أي مساس أو ضغط
-          final bool shouldEnhanceDirect = isUpscaled;
+          // ترقية ورفع جودة الفيديو عبر مكتبة FFmpeg Lanczos + Unsharp لجميع دقات HD/FHD/2K/4K
+          final bool shouldEnhanceDirect = isUpscaled || (qualityOrder ?? 1080) >= 720;
           if (ext != 'mp3' && shouldEnhanceDirect && await File(finalOutputPath).exists()) {
             onStatusChanged('جاري رفع جودة وتوضيح الفيديو عبر FFmpeg Lanczos...');
-            task.status = 'جاري رفع جودة الفيديو وتوضيح التفاصيل...';
+            task.status = 'جاري رفع جودة الفيديو عبر FFmpeg...';
             activeDownloads.value = List.from(activeDownloads.value);
             await _ensureVideoPlayabilityAndSound(
               finalOutputPath,
@@ -1375,7 +1395,7 @@ class BackendService {
         if (videoId != null && videoId.isNotEmpty) {
           try {
             StreamManifest? m = _streamManifestCache[videoId];
-            m ??= await _yt.videos.streamsClient.getManifest(videoId);
+            m ??= await _fetchRichManifest(VideoId(videoId));
             _streamManifestCache[videoId] = m;
             
             // اختيار دفق الصوت الأفضل (نفضل mp4/aac ثم webm/opus)
@@ -1445,7 +1465,6 @@ class BackendService {
 
         if (audioSize > 1024 && await vSourceFile.exists()) {
           // خطوة 1 الأساسية: الدمج العتادي فائق السرعة عبر محرك أندرويد الأصلي Native MediaMuxer
-          // سرعة فورية (< 0.5 ثانية) وبدون أي مساس بالجودة أو استهلاك موارد الجهاز إطلاقاً
           try {
             debugPrint("بدء الدمج فائق السرعة عبر محرك أندرويد العتادي Native MediaMuxer...");
             const muxerChannel = MethodChannel('com.boykta.app/media_muxer');
@@ -1468,10 +1487,10 @@ class BackendService {
             debugPrint("تنبيه خطأ في MediaMuxer: $muxerErr. سيتم الانتقال للبديل...");
           }
 
-          // خطوة 2 الاحتياطية: محاولات FFmpeg عند الحاجة فقط (مثل الحاويات غير القياسية أو الأجهزة الخاصة)
+          // خطوة 2 الاحتياطية: محاولات FFmpeg عند الحاجة فقط
           if (!mergeSucceeded) {
             final List<Map<String, dynamic>> ffmpegAttempts = [
-              // محاولة 1: نسخ مباشر نقي 100% لكلا الدفقين فائق السرعة بدون أي فقدان للجودة (Direct Bit-Perfect Copy)
+              // محاولة 1: نسخ مباشر نقي 100% لكلا الدفقين فائق السرعة بدون أي فقدان للجودة
               {
                 'path': tempMergedPath,
                 'args': [
@@ -1482,12 +1501,12 @@ class BackendService {
                   '-map', '1:a:0',
                   '-c:v', 'copy',
                   '-c:a', 'aac',
-                  '-b:a', '256k',
+                  '-b:a', '320k',
                   '-movflags', '+faststart',
                   tempMergedPath,
                 ],
               },
-              // محاولة 2: نسخ مباشر مع تفعيل الوضع المفتوح (-strict -2) لكافة الكودكات (VP9/AV1) داخل MP4 بدون فقد بالجودة
+              // محاولة 2: نسخ مباشر مع تفعيل الوضع المفتوح (-strict -2) لكافة الكودكات (VP9/AV1) داخل MP4
               {
                 'path': tempMergedPath,
                 'args': [
@@ -1498,34 +1517,35 @@ class BackendService {
                   '-map', '1:a:0',
                   '-c:v', 'copy',
                   '-c:a', 'aac',
-                  '-b:a', '256k',
+                  '-b:a', '320k',
                   '-strict', '-2',
                   '-movflags', '+faststart',
                   tempMergedPath,
                 ],
               },
-              // محاولة 3: ترميز استوديو فائق النقاء كريستالي H.264 بجودة CRF 17 (Visually Lossless) وبروفايل High
+              // محاولة 3: ترميز استوديو فائق النقاء كريستالي H.264 عبر libx264 (GPL) بجودة CRF 15 وبروفايل High
               {
                 'path': tempMergedPath,
                 'args': [
                   '-y',
+                  '-threads', '0',
                   '-i', tempVideoPath,
                   '-i', tempAudioPath,
                   '-map', '0:v:0',
                   '-map', '1:a:0',
                   '-c:v', 'libx264',
-                  '-preset', 'fast',
+                  '-preset', 'superfast',
                   '-profile:v', 'high',
                   '-level', '4.2',
                   '-pix_fmt', 'yuv420p',
-                  '-crf', '17',
+                  '-crf', '15',
                   '-c:a', 'aac',
-                  '-b:a', '256k',
+                  '-b:a', '320k',
                   '-movflags', '+faststart',
                   tempMergedPath,
                 ],
               },
-              // محاولة 4: حاوية Matroska الفائقة (MKV) بنسخ مباشر كامل بدون أي مساس بالجودة الأصلية
+              // محاولة 4: حاوية Matroska الفائقة (MKV) بنسخ مباشر كامل
               {
                 'path': tempMergedMkv,
                 'args': [
@@ -1589,12 +1609,11 @@ class BackendService {
           try { await File(tempVideoPath).delete(); } catch (_) {}
           try { await File(tempAudioPath).delete(); } catch (_) {}
 
-          // ترقية ورفع جودة الفيديو بعد الدمج فقط عند طلب ترقية صريحة فائقة (isUpscaled)
-          // أما المقاطع ذات الجودة الأصلية فتحفظ بدون أي إعادة ضغط لضمان أقصى نقاء وأعلى بت ريت أصلي
-          final bool shouldEnhanceMerged = isUpscaled;
+          // ترقية ورفع جودة الفيديو عبر مكتبة FFmpeg Lanczos + Unsharp لجميع دقات HD/FHD/2K/4K
+          final bool shouldEnhanceMerged = isUpscaled || (qualityOrder ?? 1080) >= 720;
           if (shouldEnhanceMerged) {
             onStatusChanged('جاري رفع جودة وتوضيح الفيديو عبر FFmpeg Lanczos...');
-            task.status = 'جاري رفع جودة الفيديو وتوضيح التفاصيل...';
+            task.status = 'جاري رفع جودة الفيديو عبر FFmpeg...';
             activeDownloads.value = List.from(activeDownloads.value);
             await _ensureVideoPlayabilityAndSound(
               targetDestination,
@@ -1626,7 +1645,7 @@ class BackendService {
               streamTag: videoTag,
             );
           }
-          final bool shouldEnhanceFallback = isUpscaled || (qualityOrder != null && qualityOrder >= 1080);
+          final bool shouldEnhanceFallback = isUpscaled || (qualityOrder ?? 1080) >= 720;
           await _ensureVideoPlayabilityAndSound(
             targetDestination,
             tempDir,
@@ -1698,7 +1717,7 @@ class BackendService {
     }
   }
 
-  /// ضمان توافق وترقية جودة الفيديو والصوت عبر محرك FFmpeg Lanczos Super-Resolution والتوضيح الفائق
+  /// محرك FFmpeg Super-Resolution الكامل لرفع جودة وتوضيح الفيديو والصوت (Lanczos + 3D Denoise + Unsharp + Color EQ + Studio H.264)
   Future<void> _ensureVideoPlayabilityAndSound(
     String filePath,
     Directory tempDir,
@@ -1712,104 +1731,133 @@ class BackendService {
       final int originalSize = await file.length();
       if (originalSize < 1024) return;
 
-      // ترقية ورفع جودة الفيديو فقط عند طلب ترقية صريحة (forceUpscale)
-      // أما الدقات الأصلية فتحفظ مباشرة بنسبة 100% نقيّة من السيرفر بدون أي ضغط أو فقدان للجودة
-      if (!forceUpscale) {
+      final int effectiveQuality = qualityOrder ?? 1080;
+      if (!forceUpscale && effectiveQuality < 720) {
         return;
       }
 
       final tempOut = '${tempDir.path}/enhanced_${notifId}.mp4';
       try { if (await File(tempOut).exists()) await File(tempOut).delete(); } catch (_) {}
 
-      // تحديد الدقة المستهدفة ومعدل البت المناسب
+      // تحديد الدقة المستهدفة بدقة زوجية متوافقة 100% مع H.264 YUV420p
       int targetDimension = 1080;
-      if (qualityOrder != null) {
-        if (qualityOrder >= 2160) {
-          targetDimension = 2160;
-        } else if (qualityOrder >= 1440) {
-          targetDimension = 1440;
-        } else if (qualityOrder >= 1080) {
-          targetDimension = 1080;
-        } else if (qualityOrder >= 720) {
-          targetDimension = 720;
-        }
+      if (effectiveQuality >= 2160) {
+        targetDimension = 2160;
+      } else if (effectiveQuality >= 1440) {
+        targetDimension = 1440;
+      } else if (effectiveQuality >= 1080) {
+        targetDimension = 1080;
+      } else if (effectiveQuality >= 720) {
+        targetDimension = 720;
       }
 
-      // فلتر ذكي يكتشف تلقائياً توجيه الفيديو (أفقي 16:9، راسي Reels/Shorts/TikTok 9:16، أو مربع)
-      // ويطبق خوارزمية Lanczos لرفع الأبعاد بدون تشويه، مع قناع الحدة والتوضيح (Unsharp Mask)
-      // وتحسين التباين وتشبع الألوان لإزالة البهتان وضبابية الفيديوهات الضعيفة
-      final String scaleFilter = "scale=w='if(gte(iw,ih),-2,max(iw,$targetDimension))':h='if(gte(iw,ih),max(ih,$targetDimension),-2)':flags=lanczos+accurate_rnd";
-      final String filterChain = "$scaleFilter,unsharp=lx=5:ly=5:la=0.85:cx=5:cy=5:ca=0.45,eq=contrast=1.03:saturation=1.05";
+      // 1. فلتر الترقية المتقدم الكامل (GPL):
+      // - hqdn3d=1.5:1.5:6:6: إزالة التشويش والبيكسلات الناتجة عن ضغط المنصات
+      // - scale=lanczos+accurate_rnd+full_chroma_int: تكبير فائق الدقة يحافظ على الأبعاد (16:9 أو 9:16) ويضمن أرقاماً زوجية
+      // - unsharp=lx=5:ly=5:la=1.15:cx=5:cy=5:ca=0.55: قناع حدة قوي لتوضيح الحواف والوجوه والنصوص
+      // - eq=contrast=1.04:saturation=1.08:brightness=0.01: تعزيز التباين وإشراق الألوان
+      // - format=yuv420p: توافق مطلق مع الاستوديو وواتساب وجميع المشغلات
+      final String scaleFilter = "scale=w='if(gte(iw,ih),-2,$targetDimension)':h='if(gte(iw,ih),$targetDimension,-2)':flags=lanczos+accurate_rnd+full_chroma_int";
+      final String fullFilterChain = "hqdn3d=1.5:1.5:6:6,$scaleFilter,unsharp=lx=5:ly=5:la=1.15:cx=5:cy=5:ca=0.55,eq=contrast=1.04:saturation=1.08:brightness=0.01,format=yuv420p";
+      final String fastFilterChain = "scale=w='if(gte(iw,ih),-2,$targetDimension)':h='if(gte(iw,ih),$targetDimension,-2)':flags=lanczos,unsharp=lx=5:ly=5:la=1.0:cx=5:cy=5:ca=0.5,eq=contrast=1.03:saturation=1.06,format=yuv420p";
 
-      debugPrint("FFmpeg AI-Enhance: بدء رفع جودة الفيديو وتوضيحه (${qualityOrder ?? targetDimension}p)...");
+      debugPrint("FFmpeg Super-Resolution: بدء رفع جودة الفيديو وتوضيحه إلى ${targetDimension}p...");
 
-      bool enhanced = false;
-
-      // محاولة 1: ترقية فائقة بدقة استوديو H.264 High Profile ومعدل بت عالي مع صوت AAC استوديو 320k
-      try {
-        final sessionEnhance = await FFmpegKit.executeWithArguments([
+      final List<List<String>> enhanceTiers = [
+        // الطبقة 1: مشفر libx264 الاحترافي (من حزمة ffmpeg-kit-full-gpl) بدقة بصرية فائقة CRF 15 وصوت استوديو 320k
+        [
           '-y',
-          '-threads', '4',
+          '-threads', '0',
           '-i', filePath,
-          '-vf', filterChain,
+          '-vf', fullFilterChain,
           '-c:v', 'libx264',
-          '-preset', 'veryfast',
+          '-preset', 'superfast',
           '-profile:v', 'high',
           '-level', '4.2',
           '-pix_fmt', 'yuv420p',
-          '-crf', '16',
+          '-crf', '15',
           '-c:a', 'aac',
           '-b:a', '320k',
           '-ar', '48000',
           '-movflags', '+faststart',
           tempOut,
-        ]);
-        final codeEnhance = await sessionEnhance.getReturnCode();
-        final nFile = File(tempOut);
-        if (ReturnCode.isSuccess(codeEnhance) && await nFile.exists() && (await nFile.length()) > (originalSize * 0.3)) {
-          enhanced = true;
-          debugPrint("تم رفع جودة الفيديو بنجاح عبر محرك FFmpeg Lanczos! الحجم: ${await nFile.length()} بايت");
-        } else {
-          final logs = await sessionEnhance.getAllLogsAsString();
-          debugPrint("تنبيه المحاولة 1 لرفع الجودة: $logs");
-        }
-      } catch (e1) {
-        debugPrint("خطأ في محاولة رفع الجودة الأولى: $e1");
-      }
+        ],
+        // الطبقة 2: مشفر libx264 السريع مع نسخ/تحسين الصوت
+        [
+          '-y',
+          '-threads', '0',
+          '-i', filePath,
+          '-vf', fastFilterChain,
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-pix_fmt', 'yuv420p',
+          '-crf', '16',
+          '-c:a', 'aac',
+          '-b:a', '256k',
+          '-movflags', '+faststart',
+          tempOut,
+        ],
+        // الطبقة 3: المشفر العتادي لأندرويد (h264_mediacodec) بمعدل بت عالي 8Mbps
+        [
+          '-y',
+          '-threads', '0',
+          '-i', filePath,
+          '-vf', fastFilterChain,
+          '-c:v', 'h264_mediacodec',
+          '-b:v', '8M',
+          '-pix_fmt', 'yuv420p',
+          '-c:a', 'aac',
+          '-b:a', '256k',
+          '-movflags', '+faststart',
+          tempOut,
+        ],
+        // الطبقة 4: المشفر العالمي المضمون (mpeg4) بأعلى جودة قياستها q:v 1
+        [
+          '-y',
+          '-threads', '0',
+          '-i', filePath,
+          '-vf', fastFilterChain,
+          '-c:v', 'mpeg4',
+          '-q:v', '1',
+          '-pix_fmt', 'yuv420p',
+          '-c:a', 'aac',
+          '-b:a', '256k',
+          '-movflags', '+faststart',
+          tempOut,
+        ],
+      ];
 
-      // محاولة 2: محاولة متوازنة سريعة للأجهزة ذات الموارد المحدودة
-      if (!enhanced) {
+      bool enhanced = false;
+      for (int i = 0; i < enhanceTiers.length; i++) {
         try {
-          final String fallbackChain = "scale=w='if(gte(iw,ih),-2,max(iw,$targetDimension))':h='if(gte(iw,ih),max(ih,$targetDimension),-2)':flags=lanczos,unsharp=lx=5:ly=5:la=0.7:cx=5:cy=5:ca=0.35";
-          final sessionFallback = await FFmpegKit.executeWithArguments([
-            '-y',
-            '-threads', '4',
-            '-i', filePath,
-            '-vf', fallbackChain,
-            '-c:v', 'libx264',
-            '-preset', 'ultrafast',
-            '-pix_fmt', 'yuv420p',
-            '-crf', '18',
-            '-c:a', 'copy',
-            '-movflags', '+faststart',
-            tempOut,
-          ]);
-          final codeFallback = await sessionFallback.getReturnCode();
+          try { if (await File(tempOut).exists()) await File(tempOut).delete(); } catch (_) {}
+          final session = await FFmpegKit.executeWithArguments(enhanceTiers[i]);
+          final returnCode = await session.getReturnCode();
           final nFile = File(tempOut);
-          if (ReturnCode.isSuccess(codeFallback) && await nFile.exists() && (await nFile.length()) > (originalSize * 0.3)) {
+          if (ReturnCode.isSuccess(returnCode) && await nFile.exists() && (await nFile.length()) > (originalSize * 0.25)) {
             enhanced = true;
-            debugPrint("تمت الترقية بنجاح عبر المحاولة البديلة!");
+            debugPrint("تم رفع جودة الفيديو بنجاح عبر FFmpeg (الطبقة ${i + 1})! الحجم الجديد: ${await nFile.length()} بايت");
+            break;
+          } else {
+            final logs = await session.getAllLogsAsString();
+            debugPrint("تنبيه الطبقة ${i + 1} لرفع الجودة: $logs");
           }
-        } catch (e2) {
-          debugPrint("خطأ في محاولة الترقية البديلة: $e2");
+        } catch (tierErr) {
+          debugPrint("استثناء في الطبقة ${i + 1} لرفع الجودة: $tierErr");
         }
       }
 
       if (enhanced && await File(tempOut).exists()) {
         try {
-          await File(tempOut).copy(filePath);
+          final String finalMp4Path = filePath.toLowerCase().endsWith('.mkv')
+              ? '${filePath.substring(0, filePath.lastIndexOf('.'))}.mp4'
+              : filePath;
+          await File(tempOut).copy(finalMp4Path);
           await File(tempOut).delete();
-          debugPrint('تم اعتماد النسخة عالية الجودة بنجاح: $filePath');
+          if (finalMp4Path != filePath && await File(filePath).exists()) {
+            try { await File(filePath).delete(); } catch (_) {}
+          }
+          debugPrint('تم اعتماد النسخة المحسنة عالية الدقة بنجاح: $finalMp4Path');
         } catch (copyErr) {
           debugPrint('خطأ في استبدال الملف بالنسخة المحسنة: $copyErr');
         }

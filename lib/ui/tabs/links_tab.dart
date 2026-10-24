@@ -125,7 +125,10 @@ class _LinksTabState extends State<LinksTab> {
             final processedAudios = _processFormats(List<Map<String, dynamic>>.from(audioList));
             Map<String, dynamic>? initialFormat;
             if (processedVideos.isNotEmpty) {
-              initialFormat = processedVideos.first; // أعلى جودة تلقائياً (1080p Full HD)
+              initialFormat = processedVideos.firstWhere(
+                (f) => f['quality_order'] == 1080,
+                orElse: () => processedVideos.first,
+              );
             } else if (processedAudios.isNotEmpty) {
               initialFormat = processedAudios.first;
             }

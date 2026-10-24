@@ -1099,9 +1099,12 @@ class _FormatSelectionSheetState extends State<FormatSelectionSheet> {
   @override
   void initState() {
     super.initState();
-    // تحديد أول جودة متاحة تلقائياً لتسهيل تجربة المستخدم
+    // تحديد جودة 1080p Full HD (ترقية FFmpeg Lanczos) افتراضياً لأفضل توازن بين الوضوح الكريستالي والسرعة
     if (widget.videoFormats.isNotEmpty) {
-      _selectedFormat = widget.videoFormats.first;
+      _selectedFormat = widget.videoFormats.firstWhere(
+        (f) => f['quality_order'] == 1080,
+        orElse: () => widget.videoFormats.first,
+      );
     } else if (widget.audioFormats.isNotEmpty) {
       _selectedFormat = widget.audioFormats.first;
     }

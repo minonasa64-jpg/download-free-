@@ -88,10 +88,10 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.7.0
+                  v1.7.1
                 </span>
               </h1>
-              <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي • محرك دمج 1080p FHD العتادي المباشر</p>
+              <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي • محرك رفع وتوضيح الجودة FFmpeg Full-GPL (Lanczos + libx264 1080p/4K)</p>
             </div>
           </div>
 
@@ -200,7 +200,7 @@ export default function App() {
               <span className="text-slate-500 block mb-1">مكتبة الوسائط FFmpeg</span>
               <span className="font-semibold text-slate-200 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                ffmpeg-kit-min:8.1.7 (Maintained)
+                ffmpeg-kit-full-gpl:8.1.7 (libx264 + Lanczos)
               </span>
             </div>
             <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80">

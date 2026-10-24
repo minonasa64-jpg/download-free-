@@ -46,7 +46,7 @@ jobs:
               configurations.all {
                   resolutionStrategy.eachDependency { DependencyResolveDetails details ->
                       if (details.requested.group == 'com.arthenica' || details.requested.group == 'dev.ffmpegkit-maintained') {
-                          details.useTarget group: 'dev.ffmpegkit-maintained', name: 'ffmpeg-kit-full', version: '8.1.7'
+                          details.useTarget group: 'dev.ffmpegkit-maintained', name: 'ffmpeg-kit-full-gpl', version: '8.1.7'
                       }
                   }
               }
@@ -152,24 +152,23 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v1.7.0"
-          RELEASE_TITLE="Boykta Pro v1.7.0 - حل مشكلة جودة الفيديوهات وتنزيل 1080p Full HD النقي المباشر"
+          TAG="v1.7.1"
+          RELEASE_TITLE="Boykta Pro v1.7.1 - محرك رفع وتوضيح جودة الفيديوهات عبر FFmpeg Full-GPL (Lanczos + libx264 + Unsharp 1080p/4K)"
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
 
           cat << 'EOF' > release_notes.md
-          🚀 **Boykta Pro v1.7.0** - التحديث الجذري الأقوى لحل مشكلة جودة الفيديوهات وضمان تنزيل 1080p Full HD بنقاء كريستالي كامل:
+          🚀 **Boykta Pro v1.7.1** - التحديث الشامل لرفع وتوضيح جودة كافة الفيديوهات عبر مكتبة **FFmpeg Full-GPL (`libx264` + `Lanczos Super-Resolution` + `Unsharp Mask`)**:
 
-          ### 🎬 أبرز إصلاحات وترقيات الجودة في هذا الإصدار (v1.7.0):
-          - ⚡ **المحرك العتادي المباشر فائق السرعة (Native Android MediaMuxer):**
-            * دمج دفقات الفيديو عالي الدقة 1080p FHD مع الصوت الأصلي عبر عتاد الجهاز في أقل من ثانية واحدة (0.3 ثانية).
-            * بدون إعادة ضغط وبدون أي فقدان للجودة (Bit-Perfect Lossless Direct Stream Copy).
-          - 💎 **أولوية مطلقة لحاويات MP4 H.264 (itag 137) الأصلية:**
-            * ضمان استخراج دفقات MP4 H.264 النقية متوافقة 100% مع الاستوديو وكافة مشغلات الفيديو وتطبيقات التواصل (واتساب، إنستغرام، تيك توك).
-            * تجنب تعارضات ترميز VP9/WebM مع مشغلات أندرويد.
-          - 🎧 **دمج الصوت النقي الأصلي (AAC itag 140):**
-            * صوت نقي متوازن فائق النقاء مدمج تلقائياً مع كافة دقات 1080p و 720p.
-          - 📥 **فرز تلقائي واختيار أعلى دقة متاحة تلقائياً في نافذة التنزيل:**
-            * عند الضغط على زر التحميل، يتم تحديد خيار 1080p Full HD تلقائياً للتنزيل الفوري بنقرة واحدة.
+          ### 🎬 أبرز ترقيات محرك رفع الجودة FFmpeg في هذا الإصدار (v1.7.1):
+          - 💎 **تضمين مكتبة `ffmpeg-kit-full-gpl:8.1.7` الكاملة (مع كودك `libx264` و `libx265` وفلتر `hqdn3d`):**
+            * تفعيل المشفر الاحترافي `libx264` High Profile بدقة بصرية فائقة (`CRF 15`) الذي يضمن عمل فلاتر رفع الجودة 100% على جميع هواتف أندرويد.
+          - 🪄 **محرك FFmpeg Super-Resolution متعدد المراحل لرفع الجودة تلقائياً:**
+            * `hqdn3d=1.5:1.5:6:6`: إزالة التشويش والبيكسلات الناتجة عن ضغط المنصات.
+            * `scale=lanczos+accurate_rnd+full_chroma_int`: رفع الأبعاد الفعلي إلى **1080p Full HD / 2K / 4K** مع الحفاظ التام على تناسب الطول والعرض (أفقي 16:9 أو عمودي ريلز/تيك توك 9:16).
+            * `unsharp=lx=5:ly=5:la=1.15:cx=5:cy=5:ca=0.55`: قناع توضيح الحواف والتفاصيل الدقيقة لإزالة الضبابية نهائياً.
+            * `eq=contrast=1.04:saturation=1.08`: تعزيز التباين وإشراق الألوان.
+          - 🎧 **صوت استوديو نقي 320kbps AAC (48kHz) + محرك دمج عتادي MediaMuxer:**
+            * دمج الصوت والصورة بأعلى نقاء مع 4 طبقات حماية (`libx264` -> `libx264 ultrafast` -> `h264_mediacodec` العتادي -> `mpeg4`).
           EOF
 
           if gh release view "$TAG" > /dev/null 2>&1; then
