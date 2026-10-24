@@ -757,7 +757,7 @@ class _SettingsTabState extends State<SettingsTab> {
             context,
             icon: Icons.info_outline_rounded,
             title: _backend.t('about'),
-            subtitle: 'Boykta Pro v1.6.8 (Ultra-HQ Video Multi-Engine & Studio Master)',
+            subtitle: 'Boykta Pro v1.6.9 (Ultra-HQ Video Multi-Engine & Studio Master)',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,

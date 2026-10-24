@@ -1800,7 +1800,26 @@ class BackendService {
       String? primaryHdUrl;
       String? primaryHdQuality;
 
-      // 1. نبحث أولاً في التدفقات المدمجة (صوت وصورة معاً) - نفضل دفقات MP4 عالية الدقة
+      // محاولة استخراج البث المباشر المتكيف HLS عالي الدقة (1080p Full HD مع الصوت المدمج)
+      try {
+        final hlsUrl = await _yt.videos.streamsClient.getHttpLiveStreamUrl(VideoId(videoId)).timeout(const Duration(seconds: 4));
+        if (hlsUrl.isNotEmpty) {
+          primaryUrl = hlsUrl;
+          primaryQuality = '1080p FHD (بث متكيف تلقائي مع الصوت)';
+          primaryHdUrl = hlsUrl;
+          primaryHdQuality = '1080p FHD (بث متكيف)';
+          allStreamsList.add({
+            'url': hlsUrl,
+            'quality': '1080p FHD (بث متكيف تلقائي)',
+            'container': 'm3u8',
+            'size': 'أعلى جودة',
+            'tag': 0,
+            'is_hls': true,
+          });
+        }
+      } catch (_) {}
+
+      // 1. نبحث في التدفقات المدمجة (صوت وصورة معاً) - نفضل دفقات MP4 عالية الدقة
       if (manifest.muxed.isNotEmpty) {
         final muxedList = manifest.muxed.toList();
         // ترتيب تنازلي من أعلى جودة وحجم إلى الأقل لضمان تشغيل الفيديو بأعلى دقة متوفرة تلقائياً
@@ -1810,12 +1829,13 @@ class BackendService {
         final candidatePool = mp4Muxed.isNotEmpty ? mp4Muxed : muxedList;
 
         final topHdStream = candidatePool.first;
-        final fastStream = candidatePool.last;
 
-        primaryUrl = topHdStream.url.toString();
-        primaryQuality = topHdStream.qualityLabel;
-        primaryHdUrl = topHdStream.url.toString();
-        primaryHdQuality = topHdStream.qualityLabel;
+        if (primaryUrl == null) {
+          primaryUrl = topHdStream.url.toString();
+          primaryQuality = topHdStream.qualityLabel;
+          primaryHdUrl = topHdStream.url.toString();
+          primaryHdQuality = topHdStream.qualityLabel;
+        }
 
         for (final s in candidatePool) {
           allStreamsList.add({
@@ -1829,37 +1849,41 @@ class BackendService {
       }
 
       // 2. إذا لم تتوفر تدفقات مدمجة، نبحث في تدفقات الفيديو
-      if (primaryUrl == null && manifest.video.isNotEmpty) {
+      if (manifest.video.isNotEmpty) {
         final videoList = manifest.video.toList();
-        // ترتيب تنازلي من أعلى جودة إلى الأقل
         videoList.sort((a, b) => b.size.totalBytes.compareTo(a.size.totalBytes));
-        final topVideo = videoList.first;
+        
+        if (primaryUrl == null) {
+          final topVideo = videoList.first;
+          primaryUrl = topVideo.url.toString();
+          primaryQuality = topVideo.qualityLabel;
+          primaryHdUrl = topVideo.url.toString();
+          primaryHdQuality = topVideo.qualityLabel;
+        }
 
-        primaryUrl = topVideo.url.toString();
-        primaryQuality = topVideo.qualityLabel;
-        primaryHdUrl = topVideo.url.toString();
-        primaryHdQuality = topVideo.qualityLabel;
-
-        for (final s in videoList) {
-          allStreamsList.add({
-            'url': s.url.toString(),
-            'quality': s.qualityLabel,
-            'container': s.container.name,
-            'size': s.size.totalMegaBytes.toStringAsFixed(1),
-            'tag': s.tag,
-          });
+        // إضافة أعلى 3 دقات فيديو (مثل 1080p, 1440p, 2160p) إلى قائمة الخيارات
+        for (final s in videoList.take(4)) {
+          if (!allStreamsList.any((existing) => existing['quality'] == s.qualityLabel)) {
+            allStreamsList.add({
+              'url': s.url.toString(),
+              'quality': '${s.qualityLabel} (فيديو فائق النقاء)',
+              'container': s.container.name,
+              'size': s.size.totalMegaBytes.toStringAsFixed(1),
+              'tag': s.tag,
+            });
+          }
         }
       }
 
       if (primaryUrl == null && manifest.streams.isNotEmpty) {
         final s = manifest.streams.first;
         primaryUrl = s.url.toString();
-        primaryQuality = 'عادية';
+        primaryQuality = 'عالية HD';
         primaryHdUrl = s.url.toString();
-        primaryHdQuality = 'عادية';
+        primaryHdQuality = 'عالية HD';
         allStreamsList.add({
           'url': s.url.toString(),
-          'quality': 'عادية',
+          'quality': 'عالية HD',
           'size': '',
           'tag': s.tag,
         });

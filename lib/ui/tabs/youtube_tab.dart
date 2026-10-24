@@ -575,6 +575,26 @@ class _YoutubeTabState extends State<YoutubeTab> {
                         ),
                       ),
                     ),
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.75),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.cyan.withOpacity(0.5)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.hd_rounded, color: AppColors.cyan, size: 14),
+                            const SizedBox(width: 3),
+                            Text('1080p FHD', style: TextStyle(color: AppColors.cyan, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
                     if (video.engagement.viewCount > 0)
                       Positioned(
                         top: 10,
@@ -628,26 +648,30 @@ class _YoutubeTabState extends State<YoutubeTab> {
                             style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            gradient: AppColors.primaryGradient,
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.cyan.withOpacity(0.3),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              )
-                            ],
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.download_rounded, color: Colors.white, size: 14),
-                              SizedBox(width: 4),
-                              Text('تحميل', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                            ],
+                        InkWell(
+                          onTap: () => _showDownloadSheetForVideo(video),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.cyan.withOpacity(0.3),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                )
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.download_rounded, color: Colors.white, size: 14),
+                                SizedBox(width: 4),
+                                Text('تحميل', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -658,6 +682,65 @@ class _YoutubeTabState extends State<YoutubeTab> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showDownloadSheetForVideo(yt.Video video) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => FutureBuilder<Map<String, dynamic>>(
+        future: _backend.extractMediaLinks(video.url),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Container(
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(color: AppColors.cyan),
+                  const SizedBox(height: 18),
+                  Text(
+                    'جاري استخراج أعلى دقات المقطع (1080p / 4K)...',
+                    style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            );
+          }
+          if (snapshot.hasError || !snapshot.hasData) {
+            return Container(
+              padding: const EdgeInsets.all(25),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+              ),
+              child: Text(
+                'تعذر استخراج جودات الفيديو حالياً: ${snapshot.error ?? ""}',
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            );
+          }
+
+          final data = snapshot.data!;
+          final List<Map<String, dynamic>> vList = List<Map<String, dynamic>>.from(data['video'] ?? []);
+          final List<Map<String, dynamic>> aList = List<Map<String, dynamic>>.from(data['audio'] ?? []);
+
+          return FormatSelectionSheet(
+            title: video.title,
+            highestAudioUrl: data['highestAudioUrl'] ?? '',
+            highestAudioTag: data['highestAudioTag'],
+            videoId: video.id.value,
+            videoFormats: vList,
+            audioFormats: aList,
+          );
+        },
       ),
     );
   }
