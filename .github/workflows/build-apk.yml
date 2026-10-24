@@ -83,13 +83,7 @@ jobs:
             echo 'tasks.whenTaskAdded { task -> if (task.name.toLowerCase().contains("aarmetadata")) { task.enabled = false } }' >> android/app/build.gradle
             echo 'tasks.whenTaskAdded { task -> if (task.name.toLowerCase().contains("lintvital")) { task.enabled = false } }' >> android/app/build.gradle
             echo 'android { lintOptions { checkReleaseBuilds false; abortOnError false }; packagingOptions { jniLibs { useLegacyPackaging true } } }' >> android/app/build.gradle
-            cat << 'EOF' >> android/app/build.gradle
-            dependencies {
-                implementation 'io.github.junkfood02.youtubedl-android:library:0.17.2'
-                implementation 'io.github.junkfood02.youtubedl-android:ffmpeg:0.17.2'
-                implementation 'io.github.junkfood02.youtubedl-android:aria2c:0.17.2'
-            }
-            EOF
+            echo "dependencies { implementation 'io.github.junkfood02.youtubedl-android:library:0.17.2'; implementation 'io.github.junkfood02.youtubedl-android:ffmpeg:0.17.2'; implementation 'io.github.junkfood02.youtubedl-android:aria2c:0.17.2' }" >> android/app/build.gradle
           fi
           if [ -f "android/app/build.gradle.kts" ]; then
             sed -i -E 's/compileSdk\s*=\s*[0-9]+/compileSdk = 34/g' android/app/build.gradle.kts || true
