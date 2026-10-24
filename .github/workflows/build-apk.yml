@@ -46,7 +46,7 @@ jobs:
               configurations.all {
                   resolutionStrategy.eachDependency { DependencyResolveDetails details ->
                       if (details.requested.group == 'com.arthenica' || details.requested.group == 'dev.ffmpegkit-maintained') {
-                          details.useTarget group: 'dev.ffmpegkit-maintained', name: 'ffmpeg-kit-full', version: '6.0-2'
+                          details.useTarget group: 'dev.ffmpegkit-maintained', name: 'ffmpeg-kit-full', version: '8.1.7'
                       }
                   }
               }
