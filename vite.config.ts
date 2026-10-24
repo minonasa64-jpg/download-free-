@@ -40,13 +40,13 @@ function apiPlugin(): Plugin {
         res.end(JSON.stringify({
           success: true,
           latestRun: {
-            id: 40086628497,
-            status: 'completed',
-            conclusion: 'success',
-            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/40086628497',
+            id: 40089582139,
+            status: 'in_progress',
+            conclusion: null,
+            html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/40089582139',
             head_commit: {
-              id: '70e3371',
-              message: 'release: v1.6.8 with multi-library ultra-HQ video engine & in-app resolution selector'
+              id: 'f6f2266',
+              message: 'feat(v1.6.9): complete ultra-HQ video engine upgrade with adaptive 1080p FHD HLS, in-player quality controls, direct card download sheet, and bit-perfect lossless pass-through'
             }
           },
           runs: []
