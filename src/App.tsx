@@ -33,14 +33,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 40089938860,
-    status: 'completed',
-    conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/40089938860',
-    head_sha: '81aafe7',
+    id: 40092029907,
+    status: 'in_progress',
+    conclusion: null,
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/40092029907',
+    head_sha: '1b0e6d5',
     head_commit: {
-      id: '81aafe7',
-      message: 'release: v1.6.9 with multi-engine video quality, adaptive 1080p FHD HLS, in-app resolution controls, and direct download'
+      id: '1b0e6d5',
+      message: 'feat(v1.7.0): fix video quality with native hardware MediaMuxer, pure 1080p FHD H.264 stream priority, and robust AAC muxing'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
