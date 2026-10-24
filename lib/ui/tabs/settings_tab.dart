@@ -757,7 +757,7 @@ class _SettingsTabState extends State<SettingsTab> {
             context,
             icon: Icons.info_outline_rounded,
             title: _backend.t('about'),
-            subtitle: 'Boykta Pro v1.6.9 (Ultra-HQ Video Multi-Engine & Studio Master)',
+            subtitle: 'Boykta Pro v1.7.2 (Full Native FFmpeg-GPL + yt-dlp + Aria2c 1080p/4K)',
             textColor: textColor,
             subtitleColor: subtitleColor,
             surfaceColor: surfaceColor,
@@ -1175,7 +1175,7 @@ class _SettingsTabState extends State<SettingsTab> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('الإصدار 1.7.1 (محرك رفع الجودة FFmpeg Full-GPL Lanczos 1080p/4K)', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)),
+            Text('الإصدار 1.7.2 (المكتبة الكاملة: FFmpeg Full-GPL + yt-dlp + Aria2c 1080p/4K)', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(
               'تطبيق تنزيل ومشاهدة الوسائط بأعلى جودة مع دعم التوربو المتعدد، دمج الصوت والصورة بدون فقد، الخزنة المشفرة، تشغيل الموسيقى في الخلفية، وإحصائيات تيليجرام المباشرة.',

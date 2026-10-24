@@ -12,6 +12,8 @@ class DownloadProgressDialog extends StatefulWidget {
   final String? videoId;
   final int? videoTag;
   final int? highestAudioTag;
+  final int? qualityOrder;
+  final bool isUpscaled;
 
   const DownloadProgressDialog({
     super.key,
@@ -23,6 +25,8 @@ class DownloadProgressDialog extends StatefulWidget {
     this.videoId,
     this.videoTag,
     this.highestAudioTag,
+    this.qualityOrder = 1080,
+    this.isUpscaled = true,
   });
 
   @override
@@ -68,6 +72,8 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
         videoId: widget.videoId,
         videoTag: widget.videoTag,
         highestAudioTag: widget.highestAudioTag,
+        qualityOrder: widget.qualityOrder ?? 1080,
+        isUpscaled: widget.isUpscaled,
         onStatusChanged: (status) {
           if (mounted) {
             setState(() {
@@ -369,6 +375,8 @@ class _BatchDownloadProgressDialogState extends State<BatchDownloadProgressDialo
           videoId: targetVideoId,
           videoTag: targetTag,
           highestAudioTag: highestAudioTag,
+          qualityOrder: 1080,
+          isUpscaled: !widget.isAudio,
           onStatusChanged: (status) {
             if (mounted) {
               setState(() => _currentStatus = '$status (${i + 1}/${widget.items.length})');

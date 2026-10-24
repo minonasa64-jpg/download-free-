@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter/ffprobe_kit.dart';
 import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:flutter/services.dart';
 import 'universal_extractor_service.dart';
@@ -676,21 +677,31 @@ class BackendService {
   static final Map<String, StreamManifest> _streamManifestCache = {};
 
   Future<StreamManifest> _fetchRichManifest(dynamic target) async {
-    try {
-      final m = await _yt.videos.streamsClient.getManifest(
-        target,
-        ytClients: [
-          YoutubeApiClient.androidVr,
-          YoutubeApiClient.android,
-          YoutubeApiClient.ios,
-          YoutubeApiClient.safari,
-        ],
-      ).timeout(const Duration(seconds: 14));
-      if (m.videoOnly.isNotEmpty || m.muxed.isNotEmpty) {
-        return m;
+    final List<List<YoutubeApiClient>> clientPriority = [
+      [YoutubeApiClient.androidVr],
+      [YoutubeApiClient.safari],
+      [YoutubeApiClient.tv],
+      [YoutubeApiClient.ios],
+      [YoutubeApiClient.android],
+    ];
+    StreamManifest? bestFallback;
+    for (final clients in clientPriority) {
+      try {
+        final m = await _yt.videos.streamsClient
+            .getManifest(target, ytClients: clients)
+            .timeout(const Duration(seconds: 10));
+        if (m.videoOnly.isNotEmpty) {
+          return m;
+        }
+        if (m.muxed.isNotEmpty && bestFallback == null) {
+          bestFallback = m;
+        }
+      } catch (e) {
+        debugPrint('تنبيه جلب المانيفست عبر العميل ${clients.first}: $e');
       }
-    } catch (e) {
-      debugPrint('تنبيه جلب المانيفست متعدد العملاء، الانتقال للوضع القياسي: $e');
+    }
+    if (bestFallback != null) {
+      return bestFallback;
     }
     return await _yt.videos.streamsClient.getManifest(target);
   }
@@ -1313,28 +1324,68 @@ class BackendService {
             }
           }
         } else {
-          await _downloadFile(
-            url: selectedUrl,
-            savePath: finalOutputPath,
-            onReceiveProgress: (r, t) => updateProgress(r, t, status: 'جاري تحميل الفيديو...'),
-            videoId: videoId,
-            streamTag: videoTag,
-          );
+          final tempRawVideo = '${tempDir.path}/raw_direct_${notifId}.mp4';
+          try { if (await File(tempRawVideo).exists()) await File(tempRawVideo).delete(); } catch (_) {}
 
-          // ترقية ورفع جودة الفيديو عبر مكتبة FFmpeg Lanczos + Unsharp لجميع دقات HD/FHD/2K/4K
+          bool directDownloaded = false;
+          try {
+            await _downloadFile(
+              url: selectedUrl,
+              savePath: tempRawVideo,
+              onReceiveProgress: (r, t) => updateProgress(r, t, status: 'جاري تحميل الفيديو...'),
+              videoId: videoId,
+              streamTag: videoTag,
+            );
+            if (await File(tempRawVideo).exists() && (await File(tempRawVideo).length()) > 1024) {
+              directDownloaded = true;
+            }
+          } catch (dlErr) {
+            debugPrint('تنبيه التنزيل المباشر للرابط، جاري التبديل للمحرك الأصلي الكامل yt-dlp: $dlErr');
+          }
+
+          if (!directDownloaded) {
+            try {
+              onStatusChanged('جاري التحميل بأعلى دقة عبر المحرك الكامل yt-dlp...');
+              const muxerChannel = MethodChannel('com.boykta.app/media_muxer');
+              final bool ok = await muxerChannel.invokeMethod('downloadLinkWithYtDlp', {
+                'url': selectedUrl,
+                'outputPath': tempRawVideo,
+                'maxHeight': qualityOrder ?? 1080,
+                'isAudio': false,
+              }) == true;
+              if (ok && await File(tempRawVideo).exists() && (await File(tempRawVideo).length()) > 1024) {
+                directDownloaded = true;
+              }
+            } catch (ytdlpErr) {
+              debugPrint('خطأ في محرك yt-dlp الاحتياطي: $ytdlpErr');
+            }
+          }
+
+          if (!directDownloaded || !await File(tempRawVideo).exists()) {
+            throw Exception('تعذر تنزيل ملف الفيديو من الرابط.');
+          }
+
+          // ترقية ورفع جودة الفيديو داخل المجلد المؤقت السريع عبر مكتبة FFmpeg الكاملة (libx264 + Lanczos + Unsharp)
           final bool shouldEnhanceDirect = isUpscaled || (qualityOrder ?? 1080) >= 720;
-          if (ext != 'mp3' && shouldEnhanceDirect && await File(finalOutputPath).exists()) {
-            onStatusChanged('جاري رفع جودة وتوضيح الفيديو عبر FFmpeg Lanczos...');
+          if (shouldEnhanceDirect) {
+            onStatusChanged('جاري رفع جودة وتوضيح الفيديو عبر FFmpeg Full-GPL...');
             task.status = 'جاري رفع جودة الفيديو عبر FFmpeg...';
             activeDownloads.value = List.from(activeDownloads.value);
             await _ensureVideoPlayabilityAndSound(
-              finalOutputPath,
+              tempRawVideo,
               tempDir,
               notifId,
               qualityOrder: qualityOrder ?? 1080,
               forceUpscale: true,
             );
           }
+
+          final outFile = File(finalOutputPath);
+          if (await outFile.exists()) {
+            try { await outFile.delete(); } catch (_) {}
+          }
+          await File(tempRawVideo).copy(finalOutputPath);
+          try { await File(tempRawVideo).delete(); } catch (_) {}
         }
       } else {
         // أسماء مؤقتة آمنة تماماً خالية من أي حروف خاصة أو مسافات لتفادي مشاكل MediaMuxer
@@ -1602,27 +1653,41 @@ class BackendService {
         }
 
         if (mergeSucceeded && await File(successfulMergedPath).exists()) {
-          onStatusChanged('تم الدمج بنجاح!');
-          await File(successfulMergedPath).copy(targetDestination);
-          try { await File(tempMergedPath).delete(); } catch (_) {}
-          try { await File(tempMergedMkv).delete(); } catch (_) {}
-          try { await File(tempVideoPath).delete(); } catch (_) {}
-          try { await File(tempAudioPath).delete(); } catch (_) {}
-
-          // ترقية ورفع جودة الفيديو عبر مكتبة FFmpeg Lanczos + Unsharp لجميع دقات HD/FHD/2K/4K
+          // ترقية ورفع جودة الفيديو داخل المجلد المؤقت أولاً عبر مكتبة FFmpeg Full-GPL (Lanczos + Unsharp + libx264)
           final bool shouldEnhanceMerged = isUpscaled || (qualityOrder ?? 1080) >= 720;
           if (shouldEnhanceMerged) {
-            onStatusChanged('جاري رفع جودة وتوضيح الفيديو عبر FFmpeg Lanczos...');
+            onStatusChanged('جاري رفع جودة وتوضيح الفيديو عبر FFmpeg Full-GPL...');
             task.status = 'جاري رفع جودة الفيديو عبر FFmpeg...';
             activeDownloads.value = List.from(activeDownloads.value);
             await _ensureVideoPlayabilityAndSound(
-              targetDestination,
+              successfulMergedPath,
               tempDir,
               notifId,
               qualityOrder: qualityOrder ?? 1080,
               forceUpscale: true,
             );
+            if (successfulMergedPath.toLowerCase().endsWith('.mkv')) {
+              final mp4Candidate = '${successfulMergedPath.substring(0, successfulMergedPath.lastIndexOf('.'))}.mp4';
+              if (await File(mp4Candidate).exists()) {
+                successfulMergedPath = mp4Candidate;
+                if (targetDestination.toLowerCase().endsWith('.mkv')) {
+                  targetDestination = '${targetDestination.substring(0, targetDestination.lastIndexOf('.'))}.mp4';
+                }
+              }
+            }
           }
+
+          onStatusChanged('تم الدمج ورفع الجودة بنجاح!');
+          final finalDestFile = File(targetDestination);
+          if (await finalDestFile.exists()) {
+            try { await finalDestFile.delete(); } catch (_) {}
+          }
+          await File(successfulMergedPath).copy(targetDestination);
+          try { await File(successfulMergedPath).delete(); } catch (_) {}
+          try { await File(tempMergedPath).delete(); } catch (_) {}
+          try { await File(tempMergedMkv).delete(); } catch (_) {}
+          try { await File(tempVideoPath).delete(); } catch (_) {}
+          try { await File(tempAudioPath).delete(); } catch (_) {}
         } else {
           // إذا فشلت محاولات الدمج مع ملف الصوت، نعطي المستخدم خيار الحفظ الاحتياطي مع تنبيه
           debugPrint('تحذير: تعذر دمج الصوت عبر FFmpeg/MediaMuxer. حفظ ملف الفيديو المتاح.');
@@ -1751,17 +1816,50 @@ class BackendService {
         targetDimension = 720;
       }
 
-      // 1. فلتر الترقية المتقدم الكامل (GPL):
-      // - hqdn3d=1.5:1.5:6:6: إزالة التشويش والبيكسلات الناتجة عن ضغط المنصات
-      // - scale=lanczos+accurate_rnd+full_chroma_int: تكبير فائق الدقة يحافظ على الأبعاد (16:9 أو 9:16) ويضمن أرقاماً زوجية
-      // - unsharp=lx=5:ly=5:la=1.15:cx=5:cy=5:ca=0.55: قناع حدة قوي لتوضيح الحواف والوجوه والنصوص
-      // - eq=contrast=1.04:saturation=1.08:brightness=0.01: تعزيز التباين وإشراق الألوان
-      // - format=yuv420p: توافق مطلق مع الاستوديو وواتساب وجميع المشغلات
-      final String scaleFilter = "scale=w='if(gte(iw,ih),-2,$targetDimension)':h='if(gte(iw,ih),$targetDimension,-2)':flags=lanczos+accurate_rnd+full_chroma_int";
-      final String fullFilterChain = "hqdn3d=1.5:1.5:6:6,$scaleFilter,unsharp=lx=5:ly=5:la=1.15:cx=5:cy=5:ca=0.55,eq=contrast=1.04:saturation=1.08:brightness=0.01,format=yuv420p";
-      final String fastFilterChain = "scale=w='if(gte(iw,ih),-2,$targetDimension)':h='if(gte(iw,ih),$targetDimension,-2)':flags=lanczos,unsharp=lx=5:ly=5:la=1.0:cx=5:cy=5:ca=0.5,eq=contrast=1.03:saturation=1.06,format=yuv420p";
+      // فحص أبعاد الفيديو الفعلي (أفقي 16:9 أم عمودي 9:16 لـ Reels/TikTok/Shorts) عبر FFprobeKit
+      bool isPortrait = false;
+      try {
+        final infoSession = await FFprobeKit.getMediaInformation(filePath);
+        final mediaInfo = infoSession.getMediaInformation();
+        if (mediaInfo != null) {
+          for (final stream in mediaInfo.getStreams()) {
+            if (stream.getType() == 'video') {
+              final int w = stream.getWidth() ?? 0;
+              final int h = stream.getHeight() ?? 0;
+              int rotation = 0;
+              try {
+                final tags = stream.getTags();
+                if (tags != null && tags['rotate'] != null) {
+                  rotation = int.tryParse(tags['rotate'].toString()) ?? 0;
+                }
+              } catch (_) {}
+              if (w > 0 && h > 0) {
+                final bool rotated = (rotation.abs() == 90 || rotation.abs() == 270);
+                final int effW = rotated ? h : w;
+                final int effH = rotated ? w : h;
+                isPortrait = effH > effW;
+              }
+              break;
+            }
+          }
+        }
+      } catch (probeErr) {
+        debugPrint('تنبيه فحص أبعاد الفيديو عبر FFprobe: $probeErr');
+      }
 
-      debugPrint("FFmpeg Super-Resolution: بدء رفع جودة الفيديو وتوضيحه إلى ${targetDimension}p...");
+      // فلتر التكبير النقي الخالي من علامات الاقتباس المفردة لضمان التوافق المطلق مع FFmpegKit و libffmpeg.so
+      // للوضع العمودي (Reels / TikTok / Shorts): العرض = targetDimension والطول = -2
+      // للوضع الأفقي (YouTube / Facebook / X): العرض = -2 والطول = targetDimension
+      final String scaleFilter = isPortrait
+          ? 'scale=$targetDimension:-2:flags=lanczos'
+          : 'scale=-2:$targetDimension:flags=lanczos';
+
+      final String fullFilterChain =
+          'hqdn3d=1.5:1.5:6:6,$scaleFilter,unsharp=5:5:1.15:5:5:0.55,eq=contrast=1.04:saturation=1.08:brightness=0.01,format=yuv420p';
+      final String fastFilterChain =
+          '$scaleFilter,unsharp=5:5:1.0:5:5:0.5,eq=contrast=1.03:saturation=1.06,format=yuv420p';
+
+      debugPrint('FFmpeg Super-Resolution: بدء رفع جودة الفيديو وتوضيحه إلى ${targetDimension}p (عمودي=$isPortrait)...');
 
       final List<List<String>> enhanceTiers = [
         // الطبقة 1: مشفر libx264 الاحترافي (من حزمة ffmpeg-kit-full-gpl) بدقة بصرية فائقة CRF 15 وصوت استوديو 320k
@@ -1782,7 +1880,7 @@ class BackendService {
           '-movflags', '+faststart',
           tempOut,
         ],
-        // الطبقة 2: مشفر libx264 السريع مع نسخ/تحسين الصوت
+        // الطبقة 2: مشفر libx264 السريع مع تحسين الصوت
         [
           '-y',
           '-threads', '0',
@@ -1797,21 +1895,21 @@ class BackendService {
           '-movflags', '+faststart',
           tempOut,
         ],
-        // الطبقة 3: المشفر العتادي لأندرويد (h264_mediacodec) بمعدل بت عالي 8Mbps
+        // الطبقة 3: المشفر العتادي لأندرويد (h264_mediacodec) بمعدل بت عالي 10Mbps
         [
           '-y',
           '-threads', '0',
           '-i', filePath,
           '-vf', fastFilterChain,
           '-c:v', 'h264_mediacodec',
-          '-b:v', '8M',
+          '-b:v', '10M',
           '-pix_fmt', 'yuv420p',
           '-c:a', 'aac',
           '-b:a', '256k',
           '-movflags', '+faststart',
           tempOut,
         ],
-        // الطبقة 4: المشفر العالمي المضمون (mpeg4) بأعلى جودة قياستها q:v 1
+        // الطبقة 4: المشفر العالمي المضمون (mpeg4) بأعلى جودة قياسية q:v 1
         [
           '-y',
           '-threads', '0',
@@ -1836,14 +1934,32 @@ class BackendService {
           final nFile = File(tempOut);
           if (ReturnCode.isSuccess(returnCode) && await nFile.exists() && (await nFile.length()) > (originalSize * 0.25)) {
             enhanced = true;
-            debugPrint("تم رفع جودة الفيديو بنجاح عبر FFmpeg (الطبقة ${i + 1})! الحجم الجديد: ${await nFile.length()} بايت");
+            debugPrint('تم رفع جودة الفيديو بنجاح عبر FFmpegKit (الطبقة ${i + 1})! الحجم الجديد: ${await nFile.length()} بايت');
             break;
           } else {
             final logs = await session.getAllLogsAsString();
-            debugPrint("تنبيه الطبقة ${i + 1} لرفع الجودة: $logs");
+            debugPrint('تنبيه الطبقة ${i + 1} لرفع الجودة: $logs');
           }
         } catch (tierErr) {
-          debugPrint("استثناء في الطبقة ${i + 1} لرفع الجودة: $tierErr");
+          debugPrint('استثناء في الطبقة ${i + 1} لرفع الجودة: $tierErr');
+        }
+      }
+
+      // الطبقة 5: المحرك الأصلي المستقل libffmpeg.so (من مكتبة youtubedl-android:ffmpeg الكاملة)
+      if (!enhanced) {
+        try {
+          try { if (await File(tempOut).exists()) await File(tempOut).delete(); } catch (_) {}
+          const muxerChannel = MethodChannel('com.boykta.app/media_muxer');
+          final bool nativeOk = await muxerChannel.invokeMethod('runNativeFFmpeg', {
+            'args': enhanceTiers[0],
+          }) == true;
+          final nFile = File(tempOut);
+          if (nativeOk && await nFile.exists() && (await nFile.length()) > (originalSize * 0.25)) {
+            enhanced = true;
+            debugPrint('تم رفع جودة الفيديو بنجاح عبر محرك libffmpeg.so الأصلي المستقل! الحجم الجديد: ${await nFile.length()} بايت');
+          }
+        } catch (nativeErr) {
+          debugPrint('تنبيه محرك libffmpeg.so المستقل: $nativeErr');
         }
       }
 
@@ -1852,6 +1968,10 @@ class BackendService {
           final String finalMp4Path = filePath.toLowerCase().endsWith('.mkv')
               ? '${filePath.substring(0, filePath.lastIndexOf('.'))}.mp4'
               : filePath;
+          final targetFile = File(finalMp4Path);
+          if (await targetFile.exists()) {
+            try { await targetFile.delete(); } catch (_) {}
+          }
           await File(tempOut).copy(finalMp4Path);
           await File(tempOut).delete();
           if (finalMp4Path != filePath && await File(filePath).exists()) {
@@ -2030,10 +2150,10 @@ class BackendService {
       }
     }
 
-    final bool isYouTube = (targetVideoId != null && RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(targetVideoId)) ||
-        url.contains('googlevideo.com') ||
+    final bool isYouTube = url.contains('googlevideo.com') ||
         url.contains('youtube.com') ||
-        url.contains('youtu.be');
+        url.contains('youtu.be') ||
+        (targetTag != null && targetVideoId != null && RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(targetVideoId));
 
     // =========================================================================
     // القسم أ: محرك التنزيل الشامل فائق السرعة لكافة المنصات والمواقع الأخرى
@@ -2195,8 +2315,8 @@ class BackendService {
     if (targetVideoId != null && targetVideoId.isNotEmpty) {
       try {
         StreamManifest? manifest = _streamManifestCache[targetVideoId];
-        if (manifest == null) {
-          manifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
+        if (manifest == null || manifest.videoOnly.isEmpty) {
+          manifest = await _fetchRichManifest(VideoId(targetVideoId));
           _streamManifestCache[targetVideoId] = manifest;
         }
 
@@ -2330,7 +2450,7 @@ class BackendService {
             debugPrint("تجديد رابط دفق يوتيوب تلقائياً لتفادي انتهاء الصلاحية (محاولة $retryAttempts)...");
             _streamManifestCache.remove(targetVideoId);
             try {
-              final freshManifest = await _yt.videos.streamsClient.getManifest(targetVideoId);
+              final freshManifest = await _fetchRichManifest(VideoId(targetVideoId));
               _streamManifestCache[targetVideoId] = freshManifest;
               StreamInfo? freshStream;
               if (targetTag != null) {
@@ -2345,6 +2465,16 @@ class BackendService {
               if (freshStream == null) {
                 if (isAudioDownload && freshManifest.audioOnly.isNotEmpty) {
                   freshStream = freshManifest.audioOnly.withHighestBitrate();
+                } else if (freshManifest.videoOnly.isNotEmpty) {
+                  final videoList = freshManifest.videoOnly.toList();
+                  final fhdMp4 = videoList.where((s) => s.qualityLabel.contains('1080') && s.container.name.toLowerCase() == 'mp4').toList();
+                  if (fhdMp4.isNotEmpty) {
+                    fhdMp4.sort((a, b) => b.bitrate.compareTo(a.bitrate));
+                    freshStream = fhdMp4.first;
+                  } else {
+                    videoList.sort((a, b) => b.size.totalBytes.compareTo(a.size.totalBytes));
+                    freshStream = videoList.first;
+                  }
                 } else {
                   freshStream = freshManifest.muxed.isNotEmpty
                       ? freshManifest.muxed.first

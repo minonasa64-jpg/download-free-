@@ -242,21 +242,31 @@ class _LinksTabState extends State<LinksTab> {
 
         Future.delayed(Duration(minutes: minutes), () {
           if (mounted) {
-                final bool isYt = (_selectedFormat!['video_id'] != null && RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(_selectedFormat!['video_id'].toString()));
+                final String selUrl = (_selectedFormat!['url'] ?? '').toString();
+                final bool isYt = _mediaData?['platform'] == 'youtube' ||
+                    selUrl.contains('googlevideo.com') ||
+                    selUrl.contains('youtube.com') ||
+                    selUrl.contains('youtu.be');
                 final bool needsMerge = isYt && (_selectedFormat!['needs_merge'] == true);
+                final int qOrder = _selectedFormat!['quality_order'] is int
+                    ? _selectedFormat!['quality_order']
+                    : (int.tryParse(_selectedFormat!['quality_order']?.toString() ?? '') ?? 1080);
+                final bool isUpscaled = _selectedFormat!['is_upscaled'] == true || qOrder >= 720;
 
                 showDialog(
                   context: context,
                   barrierDismissible: false,
                   builder: (context) => DownloadProgressDialog(
-                    selectedUrl: _selectedFormat!['url'],
+                    selectedUrl: selUrl,
                     title: titleVal,
                     ext: _selectedFormat!['ext'] ?? 'mp4',
                     needsMerge: needsMerge,
                     highestAudioUrl: needsMerge ? audioUrl : '',
-                    videoId: _selectedFormat!['video_id'],
+                    videoId: isYt ? (_selectedFormat!['video_id']?.toString() ?? _mediaData?['id']?.toString()) : null,
                     videoTag: _selectedFormat!['tag'],
                     highestAudioTag: _mediaData?['highestAudioTag'],
+                    qualityOrder: qOrder,
+                    isUpscaled: isUpscaled,
                   ),
                 );
           }
@@ -840,20 +850,30 @@ class _LinksTabState extends State<LinksTab> {
                             AdService().showInterstitialAd();
                           } catch (_) {}
 
-                          final String? targetVideoId = _selectedFormat!['video_id']?.toString() ?? _mediaData?['id']?.toString();
+                          final String selUrl = (_selectedFormat!['url'] ?? '').toString();
                           final bool isYt = _mediaData?['platform'] == 'youtube' ||
-                              (targetVideoId != null && RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(targetVideoId));
-                          final bool needsMerge = isYt && (_selectedFormat!['needs_merge'] == true || (_selectedFormat!['tag'] != 22 && _selectedFormat!['tag'] != 18 && _selectedFormat!['ext'] != 'mp3'));
+                              selUrl.contains('googlevideo.com') ||
+                              selUrl.contains('youtube.com') ||
+                              selUrl.contains('youtu.be');
+                          final String? targetVideoId = isYt
+                              ? (_selectedFormat!['video_id']?.toString() ?? _mediaData?['id']?.toString())
+                              : null;
+                          final bool needsMerge = isYt &&
+                              (_selectedFormat!['needs_merge'] == true ||
+                                  (_selectedFormat!['tag'] != null &&
+                                      _selectedFormat!['tag'] != 22 &&
+                                      _selectedFormat!['tag'] != 18 &&
+                                      _selectedFormat!['ext'] != 'mp3'));
                           final String effectiveAudio = highestAudioUrl.isNotEmpty ? highestAudioUrl : (_mediaData?['highestAudioUrl'] ?? '');
 
                           final int qOrder = _selectedFormat!['quality_order'] is int
                               ? _selectedFormat!['quality_order']
                               : (int.tryParse(_selectedFormat!['quality_order']?.toString() ?? '') ?? 1080);
 
-                          final bool isUpscaled = _selectedFormat!['is_upscaled'] == true;
+                          final bool isUpscaled = _selectedFormat!['is_upscaled'] == true || qOrder >= 720;
 
                           _backend.startDownloadInBackground(
-                            selectedUrl: _selectedFormat!['url'],
+                            selectedUrl: selUrl,
                             title: title,
                             ext: _selectedFormat!['ext'] == 'mp3' ? 'mp3' : 'mp4',
                             needsMerge: needsMerge,

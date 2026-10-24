@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 /// خدمة استخراج الروابط العالمية (Universal Extractor Service)
 /// تدعم استخراج وتحليل مقاطع الفيديو والصوت من:
@@ -112,12 +113,20 @@ class UniversalExtractorService {
       final body = response.data;
       if (body is Map && body['code'] == 0 && body['data'] != null) {
         final data = body['data'] as Map;
+        String resolveTikwm(dynamic val) {
+          final s = (val ?? '').toString().trim();
+          if (s.isEmpty) return '';
+          if (s.startsWith('http://') || s.startsWith('https://')) return s;
+          if (s.startsWith('//')) return 'https:$s';
+          if (s.startsWith('/')) return 'https://www.tikwm.com$s';
+          return 'https://www.tikwm.com/$s';
+        }
         final title = (data['title'] ?? 'فيديو تيك توك').toString().trim();
-        final cover = (data['cover'] ?? '').toString();
-        final playUrl = (data['play'] ?? '').toString();
-        final hdPlayUrl = (data['hdplay'] ?? '').toString();
-        final wmPlayUrl = (data['wmplay'] ?? '').toString();
-        final musicUrl = (data['music'] ?? '').toString();
+        final cover = resolveTikwm(data['origin_cover'] ?? data['cover']);
+        final playUrl = resolveTikwm(data['play']);
+        final hdPlayUrl = resolveTikwm(data['hdplay']);
+        final wmPlayUrl = resolveTikwm(data['wmplay']);
+        final musicUrl = resolveTikwm(data['music'] ?? data['music_info']?['play']);
         final author = data['author'] is Map ? (data['author']['nickname'] ?? 'TikTok') : 'TikTok';
         
         final int rawSizeBytes = (data['size'] as num?)?.toInt() ?? 0;
@@ -1177,6 +1186,63 @@ class UniversalExtractorService {
   }
 
 
+  /// الاستخراج الأصلي الكامل عبر محرك youtubedl-android (yt-dlp + ffmpeg) المدمج في التطبيق
+  Future<Map<String, dynamic>?> extractWithNativeYtDlp(String url, {String? forcedPlatform}) async {
+    try {
+      const muxerChannel = MethodChannel('com.boykta.app/media_muxer');
+      final dynamic res = await muxerChannel.invokeMethod('extractLinkWithYtDlp', {'url': url}).timeout(const Duration(seconds: 25));
+      if (res is Map) {
+        final String id = (res['id'] ?? 'ytdlp_${DateTime.now().millisecondsSinceEpoch}').toString();
+        final String title = (res['title'] ?? 'فيديو عالي الجودة').toString();
+        final String thumb = (res['thumbnail'] ?? '').toString();
+        final String uploader = (res['uploader'] ?? 'Direct').toString();
+        final String mainUrl = (res['url'] ?? '').toString();
+        final String platform = forcedPlatform ?? detectPlatform(url);
+
+        String bestVideoUrl = mainUrl;
+        String sdVideoUrl = mainUrl;
+        final List rawFormats = res['formats'] is List ? (res['formats'] as List) : [];
+        int maxH = 0;
+
+        for (final item in rawFormats) {
+          if (item is Map) {
+            final String fUrl = (item['url'] ?? '').toString();
+            final String vcodec = (item['vcodec'] ?? 'none').toString();
+            final String acodec = (item['acodec'] ?? 'none').toString();
+            final int h = (item['height'] is int) ? (item['height'] as int) : (int.tryParse(item['height']?.toString() ?? '0') ?? 0);
+            if (fUrl.startsWith('http') && vcodec != 'none') {
+              if (h >= maxH && (acodec != 'none' || bestVideoUrl.isEmpty)) {
+                maxH = h;
+                bestVideoUrl = fUrl;
+              } else if (bestVideoUrl.isEmpty) {
+                bestVideoUrl = fUrl;
+              }
+              if (h > 0 && h <= 480) {
+                sdVideoUrl = fUrl;
+              }
+            }
+          }
+        }
+
+        if (bestVideoUrl.isNotEmpty) {
+          return _buildSimpleMediaResult(
+            id: id.isNotEmpty ? id : 'ytdlp_${DateTime.now().millisecondsSinceEpoch}',
+            title: title.isNotEmpty ? title : 'فيديو عالي الدقة',
+            thumbnail: thumb,
+            videoUrl: bestVideoUrl,
+            hdVideoUrl: bestVideoUrl,
+            sdVideoUrl: sdVideoUrl.isNotEmpty ? sdVideoUrl : bestVideoUrl,
+            platform: platform,
+            author: uploader,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('تنبيه استخراج yt-dlp الأصلي: $e');
+    }
+    return null;
+  }
+
   // =========================================================================
   // 7. استخراج أي صفحة ويب عامة أو المحرك الاحتياطي الشامل (Generic HTML5 / OpenGraph Scraper)
   // =========================================================================
@@ -1188,6 +1254,14 @@ class UniversalExtractorService {
       final cobaltResult = await _extractCobaltUniversal(url);
       if (cobaltResult != null) {
         return cobaltResult;
+      }
+    } catch (_) {}
+
+    // 2. تجربة المحرك الأصلي الكامل youtubedl-android (yt-dlp) المدمج داخل التطبيق
+    try {
+      final ytdlpResult = await extractWithNativeYtDlp(url, forcedPlatform: forcedPlatform);
+      if (ytdlpResult != null) {
+        return ytdlpResult;
       }
     } catch (_) {}
 

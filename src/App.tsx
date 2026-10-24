@@ -33,14 +33,14 @@ interface WorkflowRun {
 
 export default function App() {
   const [run, setRun] = useState<WorkflowRun | null>({
-    id: 40092445641,
+    id: 40105937676,
     status: 'completed',
     conclusion: 'success',
-    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/40092445641',
-    head_sha: '2d1fcbb',
+    html_url: 'https://github.com/minonasa64-jpg/download-free-/actions/runs/40105937676',
+    head_sha: 'f630836',
     head_commit: {
-      id: '2d1fcbb',
-      message: 'feat(v1.7.0): fix video quality with native hardware MediaMuxer, pure 1080p FHD H.264 stream priority, and robust AAC muxing'
+      id: 'f630836',
+      message: 'feat(v1.7.1): enable ffmpeg-kit-full-gpl (libx264/hqdn3d) and active FFmpeg Lanczos Super-Resolution + Unsharp quality upscaling'
     }
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -88,10 +88,10 @@ export default function App() {
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Boykta Pro APK
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  v1.7.1
+                  v1.7.2
                 </span>
               </h1>
-              <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي • محرك رفع وتوضيح الجودة FFmpeg Full-GPL (Lanczos + libx264 1080p/4K)</p>
+              <p className="text-xs text-slate-400">لوحة تحكم البناء والتصدير التلقائي • المكتبة الكاملة FFmpeg Full-GPL + yt-dlp + Aria2c (1080p/4K)</p>
             </div>
           </div>
 
@@ -197,10 +197,10 @@ export default function App() {
               </span>
             </div>
             <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80">
-              <span className="text-slate-500 block mb-1">مكتبة الوسائط FFmpeg</span>
+              <span className="text-slate-500 block mb-1">المكتبة الكاملة المدمجة</span>
               <span className="font-semibold text-slate-200 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                ffmpeg-kit-full-gpl:8.1.7 (libx264 + Lanczos)
+                ffmpeg-kit-full-gpl + youtubedl-android (yt-dlp + ffmpeg + aria2c)
               </span>
             </div>
             <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80">

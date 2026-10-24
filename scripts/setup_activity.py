@@ -6,6 +6,7 @@ os.makedirs(dir_path, exist_ok=True)
 java_code = """package com.boykta.pro_downloader;
 
 import android.app.PictureInPictureParams;
+import android.content.Context;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
@@ -19,8 +20,22 @@ import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugins.GeneratedPluginRegistrant;
 
+import com.yausername.youtubedl_android.YoutubeDL;
+import com.yausername.youtubedl_android.YoutubeDLRequest;
+import com.yausername.youtubedl_android.YoutubeDLResponse;
+import com.yausername.youtubedl_android.mapper.VideoFormat;
+import com.yausername.youtubedl_android.mapper.VideoInfo;
+import com.yausername.ffmpeg.FFmpeg;
+import com.yausername.aria2c.Aria2c;
+
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -28,7 +43,24 @@ public class MainActivity extends FlutterFragmentActivity {
     private static final String PIP_CHANNEL = "com.boykta.app/pip";
     private static final String MUXER_CHANNEL = "com.boykta.app/media_muxer";
     private static final String TAG = "MainActivity";
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService executor = Executors.newCachedThreadPool();
+    private volatile boolean nativeEnginesReady = false;
+
+    private synchronized void ensureNativeEnginesInit() {
+        if (nativeEnginesReady) return;
+        try {
+            Context appCtx = getApplicationContext();
+            YoutubeDL.getInstance().init(appCtx);
+            FFmpeg.getInstance().init(appCtx);
+            try {
+                Aria2c.getInstance().init(appCtx);
+            } catch (Exception ignored) {}
+            nativeEnginesReady = true;
+            Log.i(TAG, "YoutubeDL + FFmpeg + Aria2c Full Native Libraries initialized successfully!");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to init YoutubeDL/FFmpeg native engines: " + e.getMessage(), e);
+        }
+    }
 
     @Override
     public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
@@ -38,6 +70,9 @@ public class MainActivity extends FlutterFragmentActivity {
         } catch (Exception e) {
             Log.e(TAG, "Plugin registration error: " + e.getMessage());
         }
+
+        // Pre-warm native YoutubeDL + FFmpeg + Aria2c in background on startup
+        executor.execute(this::ensureNativeEnginesInit);
 
         new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), PIP_CHANNEL)
             .setMethodCallHandler((call, result) -> {
@@ -76,6 +111,44 @@ public class MainActivity extends FlutterFragmentActivity {
                         boolean success = muxNativeAudioVideo(videoPath, audioPath, outputPath);
                         runOnUiThread(() -> result.success(success));
                     });
+                } else if ("runNativeFFmpeg".equals(call.method)) {
+                    final List<String> args = call.argument("args");
+                    if (args == null || args.isEmpty()) {
+                        result.error("INVALID_ARGS", "FFmpeg args cannot be empty", null);
+                        return;
+                    }
+                    executor.execute(() -> {
+                        boolean ok = executeStandaloneFFmpeg(args);
+                        runOnUiThread(() -> result.success(ok));
+                    });
+                } else if ("downloadLinkWithYtDlp".equals(call.method)) {
+                    final String url = call.argument("url");
+                    final String outputPath = call.argument("outputPath");
+                    final Number maxHeightNum = call.argument("maxHeight");
+                    final Boolean isAudioObj = call.argument("isAudio");
+
+                    if (url == null || outputPath == null) {
+                        result.error("INVALID_ARGS", "url and outputPath are required", null);
+                        return;
+                    }
+
+                    final int maxHeight = maxHeightNum != null ? maxHeightNum.intValue() : 1080;
+                    final boolean isAudio = isAudioObj != null && isAudioObj;
+
+                    executor.execute(() -> {
+                        boolean ok = downloadWithNativeYtDlp(url, outputPath, maxHeight, isAudio);
+                        runOnUiThread(() -> result.success(ok));
+                    });
+                } else if ("extractLinkWithYtDlp".equals(call.method)) {
+                    final String url = call.argument("url");
+                    if (url == null || url.isEmpty()) {
+                        result.error("INVALID_ARGS", "url is required", null);
+                        return;
+                    }
+                    executor.execute(() -> {
+                        Map<String, Object> info = extractWithNativeYtDlp(url);
+                        runOnUiThread(() -> result.success(info));
+                    });
                 } else if ("trimAudio".equals(call.method)) {
                     final String inputPath = call.argument("inputPath");
                     final String outputPath = call.argument("outputPath");
@@ -111,6 +184,135 @@ public class MainActivity extends FlutterFragmentActivity {
                     result.notImplemented();
                 }
             });
+    }
+
+    private boolean executeStandaloneFFmpeg(List<String> args) {
+        try {
+            ensureNativeEnginesInit();
+            Context appCtx = getApplicationContext();
+            File binDir = new File(appCtx.getApplicationInfo().nativeLibraryDir);
+            File ffmpegBin = new File(binDir, "libffmpeg.so");
+            if (!ffmpegBin.exists()) {
+                Log.e(TAG, "libffmpeg.so not found in " + binDir.getAbsolutePath());
+                return false;
+            }
+
+            File baseDir = new File(appCtx.getNoBackupFilesDir(), "youtubedl-android");
+            File packagesDir = new File(baseDir, "packages");
+            String ldPath = new File(packagesDir, "ffmpeg/usr/lib").getAbsolutePath() + ":" +
+                            new File(packagesDir, "python/usr/lib").getAbsolutePath() + ":" +
+                            binDir.getAbsolutePath();
+
+            List<String> command = new ArrayList<>();
+            command.add(ffmpegBin.getAbsolutePath());
+            command.addAll(args);
+
+            ProcessBuilder pb = new ProcessBuilder(command);
+            Map<String, String> env = pb.environment();
+            env.put("LD_LIBRARY_PATH", ldPath);
+            env.put("PATH", System.getenv("PATH") + ":" + binDir.getAbsolutePath());
+            env.put("TMPDIR", appCtx.getCacheDir().getAbsolutePath());
+            pb.redirectErrorStream(true);
+
+            Process process = pb.start();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            StringBuilder logBuilder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                logBuilder.append(line).append("\\n");
+            }
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                Log.e(TAG, "Standalone libffmpeg.so exited with " + exitCode + ": " + logBuilder);
+            }
+            return exitCode == 0;
+        } catch (Exception e) {
+            Log.e(TAG, "executeStandaloneFFmpeg error: " + e.getMessage(), e);
+            return false;
+        }
+    }
+
+    private boolean downloadWithNativeYtDlp(String url, String outputPath, int maxHeight, boolean isAudio) {
+        try {
+            ensureNativeEnginesInit();
+            File outFile = new File(outputPath);
+            if (outFile.exists()) {
+                outFile.delete();
+            }
+            YoutubeDLRequest request = new YoutubeDLRequest(url);
+            request.addOption("--no-playlist");
+            request.addOption("--no-mtime");
+            request.addOption("--geo-bypass");
+            request.addOption("--concurrent-fragments", 8);
+
+            if (isAudio) {
+                request.addOption("-x");
+                request.addOption("--audio-format", "mp3");
+                request.addOption("--audio-quality", "0");
+            } else {
+                int effHeight = maxHeight >= 720 ? maxHeight : 1080;
+                String formatSelector = "bestvideo[height<=" + effHeight + "][ext=mp4]+bestaudio[ext=m4a]/" +
+                                        "bestvideo[height<=" + effHeight + "]+bestaudio/" +
+                                        "best[height<=" + effHeight + "][ext=mp4]/" +
+                                        "bestvideo+bestaudio/best[ext=mp4]/best";
+                request.addOption("-f", formatSelector);
+                request.addOption("--merge-output-format", "mp4");
+            }
+            request.addOption("-o", outputPath);
+
+            YoutubeDLResponse response = YoutubeDL.getInstance().execute(request);
+            Log.i(TAG, "YoutubeDL download exitCode=" + response.getExitCode());
+            return outFile.exists() && outFile.length() > 1024;
+        } catch (Exception e) {
+            Log.e(TAG, "downloadWithNativeYtDlp error: " + e.getMessage(), e);
+            return false;
+        }
+    }
+
+    private Map<String, Object> extractWithNativeYtDlp(String url) {
+        try {
+            ensureNativeEnginesInit();
+            YoutubeDLRequest request = new YoutubeDLRequest(url);
+            request.addOption("--no-playlist");
+            request.addOption("--geo-bypass");
+            VideoInfo info = YoutubeDL.getInstance().getInfo(request);
+            if (info == null) return null;
+
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", info.getId() != null ? info.getId() : "");
+            map.put("title", info.getTitle() != null ? info.getTitle() : (info.getFulltitle() != null ? info.getFulltitle() : ""));
+            map.put("thumbnail", info.getThumbnail() != null ? info.getThumbnail() : "");
+            map.put("uploader", info.getUploader() != null ? info.getUploader() : "");
+            map.put("duration", info.getDuration());
+            map.put("url", info.getUrl() != null ? info.getUrl() : "");
+            map.put("ext", info.getExt() != null ? info.getExt() : "mp4");
+            map.put("width", info.getWidth());
+            map.put("height", info.getHeight());
+
+            List<Map<String, Object>> formatsList = new ArrayList<>();
+            if (info.getFormats() != null) {
+                for (VideoFormat vf : info.getFormats()) {
+                    if (vf.getUrl() == null || vf.getUrl().isEmpty()) continue;
+                    Map<String, Object> fm = new HashMap<>();
+                    fm.put("formatId", vf.getFormatId() != null ? vf.getFormatId() : "");
+                    fm.put("ext", vf.getExt() != null ? vf.getExt() : "mp4");
+                    fm.put("vcodec", vf.getVcodec() != null ? vf.getVcodec() : "none");
+                    fm.put("acodec", vf.getAcodec() != null ? vf.getAcodec() : "none");
+                    fm.put("width", vf.getWidth());
+                    fm.put("height", vf.getHeight());
+                    fm.put("tbr", vf.getTbr());
+                    fm.put("abr", vf.getAbr());
+                    fm.put("fileSize", vf.getFileSize() > 0 ? vf.getFileSize() : vf.getFileSizeApproximate());
+                    fm.put("url", vf.getUrl());
+                    formatsList.add(fm);
+                }
+            }
+            map.put("formats", formatsList);
+            return map;
+        } catch (Exception e) {
+            Log.e(TAG, "extractWithNativeYtDlp error: " + e.getMessage(), e);
+            return null;
+        }
     }
 
     private boolean muxNativeAudioVideo(String videoPath, String audioPath, String outputPath) {
